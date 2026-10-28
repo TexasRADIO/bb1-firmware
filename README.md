@@ -115,7 +115,7 @@ Want it gone? Go back to M-VAVE's official firmware any time with M-VAVE's own u
 
 ## Build it yourself
 
-Everything here is the complete source of the released firmware. One command rebuilds it and proves it matches:
+Everything here is the complete source of the released firmware. One command rebuilds it and proves it matches, **given the pinned build inputs** (see below):
 
 ```sh
 python3 -I big-beat/integration/verify_release.py . /tmp/bb1-check \
@@ -125,7 +125,14 @@ python3 -I big-beat/integration/verify_release.py . /tmp/bb1-check \
 
 Those are the identities of **BB1 1.1**, the one-click build (`bb1-1.1.fwsc`, 610,086 bytes). The sound library is `f4bbf1a409d8aadb3429232e49dfb06b121070532787d31078db9630b6e7efcc` (245,760 bytes). BB1 1.0 (app `a5e34e31…`, package `5345b617…`) is the commit before this one, and its source is also `bb1-source-1.0.tar` on the install page.
 
-It runs the host test suites, the audio oracle, a 480-section level sweep, the from-source target build and the deterministic packaging, with negative cases. Exit 0 means the bytes match the release, bit for bit. The pinned toolchain and build inputs are listed in `big-beat/integration/inputs.json`.
+It runs the host test suites, the audio oracle (worker and serial render over all 601 catalogue sections), a 601-section level sweep, the from-source target build and the deterministic packaging, with negative cases. Exit 0 means the bytes match the release, bit for bit.
+
+**Build inputs, honestly:** the verifier checks each external input against `big-beat/integration/inputs.json` by SHA-256 before it runs. Today it looks for them at fixed paths on our build machine, and some aren't published here:
+- the JieLi `pi32v2` toolchain;
+- the linker overlay, the asset symbols and object;
+- the pinned Docker build image.
+
+So a fresh checkout can read, test and audit everything, but it can't yet repeat the bit-for-bit target build without those inputs. Making the inputs relocatable, and documenting where each comes from, is on our list. The JieLi SDK files inside the package are Apache-2.0 and public.
 
 ## Licence
 
