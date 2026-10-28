@@ -90,7 +90,7 @@
 2. Press **Install BB1**, then **Install the sounds**. About five minutes. Your projects, presets and settings stay where they are.
 3. Turn **MASTER** up, press **HOME**, press **PLAY**.
 
-Want it gone? The same page takes you back to the official firmware in one click, after saving a backup of your music.
+Want it gone? Go back to M-VAVE's official firmware any time with M-VAVE's own updater and their `FM-1.fwsc`. BB1 can't export its music to the computer yet, so copy out anything you want to keep before you switch.
 
 **Try before you flash:** the [browser player](https://thebigbeat.app/fm1/emulator/) runs the real BB1 firmware, the same screen and the same engine, right in your browser. Then read **[the guide](https://thebigbeat.app/fm1/guide/)**.
 
@@ -105,6 +105,13 @@ Want it gone? The same page takes you back to the official firmware in one click
   REC + FX ····· dub throw: the echo opens wide, then snaps back
   four knobs ··· always do what the bottom of the screen says
 ```
+
+## Known limits
+
+- **Saving:** on some units, saving a scene is refused with **PROTECTED / NOT BIG BEAT**. Saving hasn't passed testing yet, so don't rely on it to keep a performance setup. A fix is coming in an update.
+- **Headroom:** dense two-drum playback has stayed inside the audio deadline in every recorded test, but above the preferred processing headroom. Not every arrangement has been tested.
+- **Substitute voices:** a missing voice plays a substitute, and the pattern itself is unchanged. On a native 808 drum B, synth percussion plays as cowbell and zap as high tom.
+- **The browser player** is for trying the layout and controls. Both layers play the 808 there, and it doesn't reproduce hardware timing or the sampled kits.
 
 ## Build it yourself
 
