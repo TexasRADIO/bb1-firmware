@@ -1,4 +1,20 @@
-<p align="center"><img src="docs/media/bb1-armadillo.jpg" width="380" alt="The BB1 Armadillo, transmitting"></p>
+```
+                         \   |   /
+                          \  |  /        ((( ON AIR )))
+                     ------ (*) ------
+                          /  |  \
+                         /   |   \
+                            /|\
+                           / | \
+               _.--""""""""""""""""""--._
+           _.-'  |    |    |    |    |   '-._          /\
+        .-'  |   |    |    |    |    |    |  '-.      /  \
+       /  |  |   |    |    |    |    |    |   | \____/  o \
+      ;   |  |   |    |    |    |    |    |   |  ____    __>
+ ____/____|__|___|____|____|____|____|____|___|_/    '--'
+'----'   /  /                              \  \
+        (__(                               (__(
+```
 
 ```
   ____   ____   _       TWO BEATS.  ONE LITTLE BOX.
@@ -32,14 +48,6 @@
 | **21 eras** | Big Beat originals, from Motorik to rave, each with its own Dillo bassline. |
 | **138 classic rhythms** | The preset rhythms of four vintage rhythm boxes: waltzes, bossa novas, rock and everything between. |
 | **Changes on the beat** | New kits and patterns wait for the bar line. The screen says **NEXT** until they land. |
-
-```
-        ___.--------.___
-     .-'  /  |    |  \  '-.        leave it playing
-   .'  __/___|____|___\__ '.   o   and the Armadillo
-  /___/__________________\__\_/    takes the screen.
-      ''  ''        ''  ''
-```
 
 ## Get it on your FM-1
 
