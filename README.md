@@ -83,6 +83,6 @@ GNU GPL v3. See `LICENSE`, `LICENSING.md`, `LICENSES/` and `BIG-BEAT-LICENSING.m
 
 ```
   ────────────────────────────────────────────────────────────────
-   TEXAS RADIO & THE BIG BEAT  ·  OLE BIG BEAT LTD  ·  thebigbeat.app
+   OLE BIG BEAT LTD  ·  thebigbeat.app
   ────────────────────────────────────────────────────────────────
 ```
