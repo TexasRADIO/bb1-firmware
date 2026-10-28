@@ -1,0 +1,36 @@
+From 0aef66cdc70d17d2f43fe0db6baefa8d61ac5486 Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Tue, 27 Oct 2026 20:25:35 +0000
+Subject: [PATCH 2/4] r9 step 2 (02-t5-no-division): 10 kHz LED/key scan
+ reduction from reviewer lane 679f1d8,
+ claude-code/r9/opt/patch/02-t5-no-division.patch
+
+---
+ firmware/src/main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/firmware/src/main.c b/firmware/src/main.c
+index cff1b90..2b82cd4 100644
+--- a/firmware/src/main.c
++++ b/firmware/src/main.c
+@@ -19,7 +19,7 @@ extern uint32_t _pool_start[], _pool_end[], _rt_start[], _rt_end[], _rt_load[];
+ void fm1_timer5_irq(void)
+ {
+     static uint32_t sub, owed;
+-    uint32_t t0 = fm1_ticks(), usb_due = sub % 5u == 0u;
++    uint32_t t0 = fm1_ticks(), usb_due = sub == 0u || sub == 5u;   /* (r9: sub is 0..9; no division) */
+     fm1_timer5_ack();
+     felucca_dbg.timer_irqs++;
+     fm1_input_tick();
+@@ -41,7 +41,7 @@ void fm1_timer5_irq(void)
+     if (usb_due)
+         owed |= 1u;                             /* 2 kHz: all USB SIE traffic lives here */
+ #if FELUCCA_UART
+-    if (sub % 5u == 2u)
++    if (sub == 2u || sub == 7u)
+         owed |= 2u;                             /* 2 kHz: <= ~7 bytes per call at 31250 baud */
+ #endif
+     if (++sub == 10u)
+-- 
+2.54.0 (Apple Git-157)
+

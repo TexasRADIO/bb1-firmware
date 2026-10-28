@@ -1,0 +1,470 @@
+[
+ {
+  "name": "rc2 bb_performance_catalogue.inc",
+  "path": "git:fc9e196ddba065084152fb873cb50d7c30177af7:firmware/src/bb/bb_performance_catalogue.inc",
+  "sha256": "87455aae91f996ce73ee64b6fe4e233d74fc800ff4a165ab7c6127dd541c42df",
+  "bytes": 921305
+ },
+ {
+  "name": "boot42 bb_performance_catalogue.inc (gate 1 only)",
+  "path": "git:ceb0986:firmware/src/bb/bb_performance_catalogue.inc",
+  "sha256": "8c701285f19ab2f8065b66b05300d4b99495b1253ada9d4935e09219b3bb941a",
+  "bytes": 785272
+ },
+ {
+  "name": "claude/drums/79-minimal-drums.json",
+  "path": "claude/drums/79-minimal-drums.json",
+  "sha256": "63318e833f31efb38cdbc65b925e0c9ea6d8be07ef674d9925dcef7a4cadb5e0",
+  "bytes": 5017
+ },
+ {
+  "name": "claude/drums/80-romantic-drums.json",
+  "path": "claude/drums/80-romantic-drums.json",
+  "sha256": "2ad80e54520ee1230daaa6b22d3d3895185898dc25887871a55c874a1ed816ec",
+  "bytes": 8746
+ },
+ {
+  "name": "claude/drums/81-futurist-drums.json",
+  "path": "claude/drums/81-futurist-drums.json",
+  "sha256": "1a4100e8aa5aa80686f4ce463a247d8250a425f61c4908a76a7b88094f190bc7",
+  "bytes": 4771
+ },
+ {
+  "name": "claude/drums/82-synth-pop-drums.json",
+  "path": "claude/drums/82-synth-pop-drums.json",
+  "sha256": "3dafc75260c140ebe28ec851b40dfd7dd430bcd91cb1d3ee2fc072a662904149",
+  "bytes": 7315
+ },
+ {
+  "name": "claude/drums/83-electro-boogie-drums.json",
+  "path": "claude/drums/83-electro-boogie-drums.json",
+  "sha256": "01fa37563beddbfe8cfa5ad9f441e4e0c4e00bd409a68487c7df255440bf956a",
+  "bytes": 5597
+ },
+ {
+  "name": "claude/drums/84-hi-nrg-drums.json",
+  "path": "claude/drums/84-hi-nrg-drums.json",
+  "sha256": "1db29419a1c145c6db058b50a048c62fccdbc80117e929e7bb45ac65efa250b5",
+  "bytes": 3964
+ },
+ {
+  "name": "claude/drums/85-industrial-pop-drums.json",
+  "path": "claude/drums/85-industrial-pop-drums.json",
+  "sha256": "59689f826f1f6e1d03eb507cab33f85cda94eda373762558e48e6d97fb5ded54",
+  "bytes": 4298
+ },
+ {
+  "name": "claude/drums/86-acid-house-drums.json",
+  "path": "claude/drums/86-acid-house-drums.json",
+  "sha256": "8d27c44511081e18dce67c3790bc00a467c80c93860728b83ae4418928983ad1",
+  "bytes": 4992
+ },
+ {
+  "name": "claude/drums/87-chicago-drums.json",
+  "path": "claude/drums/87-chicago-drums.json",
+  "sha256": "4fdf8028e1f2397c67ebb89c684d2e1f229ae0ffa9a072903dddc422d71440a9",
+  "bytes": 6841
+ },
+ {
+  "name": "claude/drums/87-hip-hop-drums.json",
+  "path": "claude/drums/87-hip-hop-drums.json",
+  "sha256": "66f6a68e700c8121b6b70341baeccd1683bf655788cff235723be210671d494d",
+  "bytes": 5117
+ },
+ {
+  "name": "claude/drums/88-balearic-drums.json",
+  "path": "claude/drums/88-balearic-drums.json",
+  "sha256": "4a1354fc6287797c0d88a7cd069dc1130e016501aa3ff924bc92440cc6ab71a9",
+  "bytes": 4198
+ },
+ {
+  "name": "claude/drums/89-detroit-drums.json",
+  "path": "claude/drums/89-detroit-drums.json",
+  "sha256": "f2af38d68394d8de2f4f2cc1e270759bab4dab03e3d29f9c8fd267c01be8e3ff",
+  "bytes": 5375
+ },
+ {
+  "name": "claude/drums/90-rave-drums.json",
+  "path": "claude/drums/90-rave-drums.json",
+  "sha256": "cc604bb0c9f95467e7cf6b3e0ce40399ae9b16fb34dd4d220ba9e97e30deacb1",
+  "bytes": 6975
+ },
+ {
+  "name": "claude/drums/92-boom-bap-drums.json",
+  "path": "claude/drums/92-boom-bap-drums.json",
+  "sha256": "0ede0cf2689c0487d18aa464290a3c49040fd61049192b4e7cfe7ee8b936ba23",
+  "bytes": 4811
+ },
+ {
+  "name": "claude/drums/94-trip-hop-drums.json",
+  "path": "claude/drums/94-trip-hop-drums.json",
+  "sha256": "709ec6eb6c952bd8e50224f8545ff592dc942b9d3ec7a0da24799617dd89f0cf",
+  "bytes": 4521
+ },
+ {
+  "name": "claude/drums/96-big-beat-drums.json",
+  "path": "claude/drums/96-big-beat-drums.json",
+  "sha256": "442cd49287ca014de0b73ee315fcf3364446aae5b4a074befd1c924b21f055f3",
+  "bytes": 5586
+ },
+ {
+  "name": "claude/drums/98-garage-drums.json",
+  "path": "claude/drums/98-garage-drums.json",
+  "sha256": "67b8b440b5c05a889400404bfca90dbbe9a04eabccdfe3558533765eaf7b96fa",
+  "bytes": 5949
+ },
+ {
+  "name": "claude/drums/bb-study-82-boogie-funk-drums.json",
+  "path": "claude/drums/bb-study-82-boogie-funk-drums.json",
+  "sha256": "b79e8bdbec947690c18858d01221d190974762213ee91459766d35cc363213c0",
+  "bytes": 8944
+ },
+ {
+  "name": "claude/drums/bb-study-82-ny-electro-drums.json",
+  "path": "claude/drums/bb-study-82-ny-electro-drums.json",
+  "sha256": "40b7f448dde84a388705bf15e73104ffc1f79b219035486e323d77139ce0cdb3",
+  "bytes": 8617
+ },
+ {
+  "name": "claude/drums/bb-study-84-la-electro-drums.json",
+  "path": "claude/drums/bb-study-84-la-electro-drums.json",
+  "sha256": "e71b5d39d01016059e7bace10ec789b2ecf397152c0c5ed899122efefabac940",
+  "bytes": 8438
+ },
+ {
+  "name": "claude/drums/pilot-77-motorik-drums.json",
+  "path": "claude/drums/pilot-77-motorik-drums.json",
+  "sha256": "060b61c3aaad7a698be9a383973c6f857cae0ab6e18cbe3218c134c047572d66",
+  "bytes": 6284
+ },
+ {
+  "name": "claude/dillo/pilot-77-motorik.json",
+  "path": "claude/dillo/pilot-77-motorik.json",
+  "sha256": "16f18fa062835fd34cec92a0732bdf6161a5421fa8d188e0c4688508d2946b82",
+  "bytes": 28078
+ },
+ {
+  "name": "claude/dillo/eras/79-minimal.json",
+  "path": "claude/dillo/eras/79-minimal.json",
+  "sha256": "47baed4db1b660438e66b6063abce2eeab01869b8a601f0fccf77627da9748ca",
+  "bytes": 29047
+ },
+ {
+  "name": "claude/dillo/eras/80-romantic.json",
+  "path": "claude/dillo/eras/80-romantic.json",
+  "sha256": "524ddcda2a118225ed5012e5508603d664d9e421c6076f88652fa185decc978e",
+  "bytes": 28320
+ },
+ {
+  "name": "claude/dillo/eras/81-futurist.json",
+  "path": "claude/dillo/eras/81-futurist.json",
+  "sha256": "bd24874fa7eb6224716d112f21672d28e1801a0b145061444551682c59534fc9",
+  "bytes": 26848
+ },
+ {
+  "name": "claude/dillo/eras/82-synth-pop.json",
+  "path": "claude/dillo/eras/82-synth-pop.json",
+  "sha256": "2c11e80364c7ea4932208ebb503b50d0a0f9e796c5230866a9bb1c2cfef5d2ae",
+  "bytes": 28989
+ },
+ {
+  "name": "claude/dillo/eras/83-electro-boogie.json",
+  "path": "claude/dillo/eras/83-electro-boogie.json",
+  "sha256": "c15d4dbd18491bc422e14d13e9d082cffe0b4a0e8f9a97d57a48b71a58a59d0d",
+  "bytes": 28557
+ },
+ {
+  "name": "claude/dillo/eras/84-hi-nrg.json",
+  "path": "claude/dillo/eras/84-hi-nrg.json",
+  "sha256": "2be105dfd4d0bf6b17c68814f203de57dd15280822f2ce20e8128509ae75103d",
+  "bytes": 28999
+ },
+ {
+  "name": "claude/dillo/eras/85-industrial-pop.json",
+  "path": "claude/dillo/eras/85-industrial-pop.json",
+  "sha256": "f5e4e189ddf49a810f6f7c48a043b1f5508e9e9e3a51ee801076f3b2d6ba70a7",
+  "bytes": 28341
+ },
+ {
+  "name": "claude/dillo/eras/86-acid-house.json",
+  "path": "claude/dillo/eras/86-acid-house.json",
+  "sha256": "f6738e0d6df79e001928dd7fcb2c8788cca2936257e284dd2fd1253aa0c97d82",
+  "bytes": 29002
+ },
+ {
+  "name": "claude/dillo/eras/87-chicago.json",
+  "path": "claude/dillo/eras/87-chicago.json",
+  "sha256": "e67bb0103ea591ad3cfc3c16d46cab7bc95d8cea0dc0debcc772132f86dbc348",
+  "bytes": 28855
+ },
+ {
+  "name": "claude/dillo/eras/87-hip-hop.json",
+  "path": "claude/dillo/eras/87-hip-hop.json",
+  "sha256": "5165d9c9ca9dea9af0108ae04131ede7851631aff07c65768219dc3f7d5be54c",
+  "bytes": 27177
+ },
+ {
+  "name": "claude/dillo/eras/88-balearic.json",
+  "path": "claude/dillo/eras/88-balearic.json",
+  "sha256": "13c96258432f2b994c96461b5c9252b89246981fe3aff1c536ad5169e75814f5",
+  "bytes": 28948
+ },
+ {
+  "name": "claude/dillo/eras/89-detroit.json",
+  "path": "claude/dillo/eras/89-detroit.json",
+  "sha256": "98d1a94adc357e3bf8088c637387dd26d1e85a03eeda080f27b158934dc2a587",
+  "bytes": 29500
+ },
+ {
+  "name": "claude/dillo/eras/90-rave.json",
+  "path": "claude/dillo/eras/90-rave.json",
+  "sha256": "4c5309dea4712df92a4931cc0508dafbcc2b256ad13e65d5ac077b467742e57a",
+  "bytes": 29095
+ },
+ {
+  "name": "claude/dillo/eras/92-boom-bap.json",
+  "path": "claude/dillo/eras/92-boom-bap.json",
+  "sha256": "7119053a5ced4f24fbf63e6cb38cb490ed37c783a47ec45536270d4cc5e5aa84",
+  "bytes": 27699
+ },
+ {
+  "name": "claude/dillo/eras/94-trip-hop.json",
+  "path": "claude/dillo/eras/94-trip-hop.json",
+  "sha256": "f8058d7651ee55f202f1a52818f73004388b0a5f2f80d880be6771d49b527847",
+  "bytes": 27015
+ },
+ {
+  "name": "claude/dillo/eras/96-big-beat.json",
+  "path": "claude/dillo/eras/96-big-beat.json",
+  "sha256": "235c5cc9e77a88229f733bd1c898dabf675e769f2946b7d3f298e19fed0a9bc7",
+  "bytes": 29033
+ },
+ {
+  "name": "claude/dillo/eras/98-garage.json",
+  "path": "claude/dillo/eras/98-garage.json",
+  "sha256": "42e846e95a64ee181ffe28b03372698d8e0739ba01610f6ec4ef4037158510e3",
+  "bytes": 28653
+ },
+ {
+  "name": "claude/dillo/eras/bb-study-82-boogie-funk.json",
+  "path": "claude/dillo/eras/bb-study-82-boogie-funk.json",
+  "sha256": "384a6b2c5929a5d51e0f0c0295c3414721b3704daa11f7271cc1550934e50849",
+  "bytes": 52812
+ },
+ {
+  "name": "claude/dillo/eras/bb-study-82-ny-electro.json",
+  "path": "claude/dillo/eras/bb-study-82-ny-electro.json",
+  "sha256": "173477c4385e5cc0122fc1a5390bf4dcd5b0d6cf186013fdbbef77873703603b",
+  "bytes": 52604
+ },
+ {
+  "name": "claude/dillo/eras/bb-study-84-la-electro.json",
+  "path": "claude/dillo/eras/bb-study-84-la-electro.json",
+  "sha256": "9bdf85874049f18459053575712b62e9c257b9f20c21ff6cf8b31d6ed8245d3b",
+  "bytes": 52533
+ },
+ {
+  "name": "claude/dillo/songs/777-9311.json",
+  "path": "claude/dillo/songs/777-9311.json",
+  "sha256": "22541e38b2caf729b0d89c2332827bd58bd5f6bee49b445beb118bfd789d681b",
+  "bytes": 15285
+ },
+ {
+  "name": "claude/dillo/songs/bassline.json",
+  "path": "claude/dillo/songs/bassline.json",
+  "sha256": "23137c074460ff090a914e0291e39e1eb44d640580aedc7f3da58b7bda676953",
+  "bytes": 35529
+ },
+ {
+  "name": "claude/dillo/songs/behind-the-mask.json",
+  "path": "claude/dillo/songs/behind-the-mask.json",
+  "sha256": "bb16477f9401d3e0802f196693ee7f8f6fc4ecbb18aee485a096daf1b7548cc1",
+  "bytes": 42505
+ },
+ {
+  "name": "claude/dillo/songs/blue-monday.json",
+  "path": "claude/dillo/songs/blue-monday.json",
+  "sha256": "29da091ed9757729cc4d9e3782cecc5a61cadcf97028e4de59a078062a5a4cd3",
+  "bytes": 22195
+ },
+ {
+  "name": "claude/dillo/songs/clear.json",
+  "path": "claude/dillo/songs/clear.json",
+  "sha256": "7f75a1a57a3842c64b43ca09124b8fec42c62ef50578b38a8da32dd2e297fb00",
+  "bytes": 27614
+ },
+ {
+  "name": "claude/dillo/songs/computer-love.json",
+  "path": "claude/dillo/songs/computer-love.json",
+  "sha256": "58b3f2c1eee113362a938cd074284bab24a47f8c623fc847851a75f1305f8d0d",
+  "bytes": 17985
+ },
+ {
+  "name": "claude/dillo/songs/egypt-egypt.json",
+  "path": "claude/dillo/songs/egypt-egypt.json",
+  "sha256": "c8fa09289cdd7534b090b5289283cf7ecace2018aa4d40c53085be72263ac243",
+  "bytes": 107648
+ },
+ {
+  "name": "claude/dillo/songs/in-the-air-tonight.json",
+  "path": "claude/dillo/songs/in-the-air-tonight.json",
+  "sha256": "f1ce6deb5e4597efab6d81de4cc3bdd8425bc98b0826c1e7cc40126d74242abb",
+  "bytes": 8337
+ },
+ {
+  "name": "claude/dillo/songs/its-yours.json",
+  "path": "claude/dillo/songs/its-yours.json",
+  "sha256": "b702e16a61203df55c516bb7f657ba5a62d0bc118b9d0728916ab7c0e3ef5c28",
+  "bytes": 22876
+ },
+ {
+  "name": "claude/dillo/songs/numbers-kraftwerk.json",
+  "path": "claude/dillo/songs/numbers-kraftwerk.json",
+  "sha256": "613d451de3e1eff52ff22df4a6745cf6b464bef7b4a0ca1328ce0a9c4ac89dc9",
+  "bytes": 47810
+ },
+ {
+  "name": "claude/dillo/songs/paul-revere.json",
+  "path": "claude/dillo/songs/paul-revere.json",
+  "sha256": "0a19f75c920c6995fba67ef58ec466092714f3bd7d301fab86a388b405519efa",
+  "bytes": 29776
+ },
+ {
+  "name": "claude/dillo/songs/planet-rock.json",
+  "path": "claude/dillo/songs/planet-rock.json",
+  "sha256": "4032e6a9a659be23e789375dfab59c8f10e5a29f6949e71d149cc8decd122fd8",
+  "bytes": 8877
+ },
+ {
+  "name": "claude/dillo/songs/posse-on-broadway.json",
+  "path": "claude/dillo/songs/posse-on-broadway.json",
+  "sha256": "30c08afec67866d8bce2e3f48331cab93bc54723d0851dbe94660f3e47fbd749",
+  "bytes": 43157
+ },
+ {
+  "name": "claude/dillo/songs/radioactivity.json",
+  "path": "claude/dillo/songs/radioactivity.json",
+  "sha256": "60cd1c5da0bb2104beb7402c4e92fbeafc0a78d403e6d5a5a0671082304d831d",
+  "bytes": 37653
+ },
+ {
+  "name": "claude/dillo/songs/sexual-healing.json",
+  "path": "claude/dillo/songs/sexual-healing.json",
+  "sha256": "f48d7c4301068a5a7ddb1d368f8b2fa72c74d223edef47109f0c927ee7cbfe0e",
+  "bytes": 8783
+ },
+ {
+  "name": "claude/dillo/songs/tainted-love.json",
+  "path": "claude/dillo/songs/tainted-love.json",
+  "sha256": "15ce12c44aff0b23d182edbb18bae3edec7f4ea421384bb942622843daa8048f",
+  "bytes": 30706
+ },
+ {
+  "name": "claude/dillo/songs/the-model.json",
+  "path": "claude/dillo/songs/the-model.json",
+  "sha256": "b3d7e25a65aa23d1629b2254e0818dd442fdd4d5b431126d80cc722ae1097adc",
+  "bytes": 20709
+ },
+ {
+  "name": "claude/dillo/songs/the-robots.json",
+  "path": "claude/dillo/songs/the-robots.json",
+  "sha256": "68c448dec51632627ec09816d4c2f67512bcaeab10aeb587585c76fc67728eca",
+  "bytes": 7689
+ },
+ {
+  "name": "claude/dillo/songs/trans-europe-express.json",
+  "path": "claude/dillo/songs/trans-europe-express.json",
+  "sha256": "85f44cb1d9a1c4c0e7adfa688a2936e9d54a86c9735c857322ef86800f405b33",
+  "bytes": 24401
+ },
+ {
+  "name": "claude/dillo/songs/true-faith.json",
+  "path": "claude/dillo/songs/true-faith.json",
+  "sha256": "9785cb095a8298ff2575ce04870cccd71702991a1b92bc2498c8fc7680911d76",
+  "bytes": 39193
+ },
+ {
+  "name": "claude/dillo/songs/voodoo-ray.json",
+  "path": "claude/dillo/songs/voodoo-ray.json",
+  "sha256": "a0ab164faf885cbdffee7b718baacf02109cc44d8566c9724e5f00d74a72f6de",
+  "bytes": 8802
+ },
+ {
+  "name": "claude/telegram/77-motorik.json",
+  "path": "claude/telegram/77-motorik.json",
+  "sha256": "499eeecc36b6fe7d63eac04a67cc51a4321d969742fe1d4abd4c41998aadb265",
+  "bytes": 48938
+ },
+ {
+  "name": "claude/telegram/79-minimal.json",
+  "path": "claude/telegram/79-minimal.json",
+  "sha256": "450524f105b87c39c10273820064dad0223f9b52dd9b47365cd24fea90efe0a5",
+  "bytes": 23216
+ },
+ {
+  "name": "claude/telegram/80-romantic.json",
+  "path": "claude/telegram/80-romantic.json",
+  "sha256": "2699b3b3d103070c69ef5bc21cbb5cb15235b7c04eb8298fc74d7812ac751354",
+  "bytes": 45186
+ },
+ {
+  "name": "claude/telegram/85-industrial-pop.json",
+  "path": "claude/telegram/85-industrial-pop.json",
+  "sha256": "c4aa39fdd4b971e042a0550d8dbf18b488de20cb7b925e7feec3f08807834de0",
+  "bytes": 33333
+ },
+ {
+  "name": "claude/telegram/88-balearic.json",
+  "path": "claude/telegram/88-balearic.json",
+  "sha256": "7d10fae4bccea25d0e10fe6026898554c673ade9a49c1901b939a37edcf60d48",
+  "bytes": 23072
+ },
+ {
+  "name": "claude/telegram/90-rave.json",
+  "path": "claude/telegram/90-rave.json",
+  "sha256": "713ed454435c7fccbd1243e1102e7a71f3cbd16c07863f54b8c50e00a7926af3",
+  "bytes": 45462
+ },
+ {
+  "name": "claude/telegram/96-big-beat.json",
+  "path": "claude/telegram/96-big-beat.json",
+  "sha256": "48fdc9b3070bc668f41f747d81054f45e8f4aa4d15c88cc0a6feb3afedc915c1",
+  "bytes": 46622
+ },
+ {
+  "name": "claude/telegram/98-garage.json",
+  "path": "claude/telegram/98-garage.json",
+  "sha256": "46fd9e0e61341e80b51f635f8cae938b3d34915c4656f4493078d4d45488b731",
+  "bytes": 44114
+ },
+ {
+  "name": "claude/telegram/bb-study-82-boogie-funk.json",
+  "path": "claude/telegram/bb-study-82-boogie-funk.json",
+  "sha256": "60c131d0b2763e5411034287318caadc029a720cdcf640ed9d9b1e7e1a49b3f5",
+  "bytes": 48150
+ },
+ {
+  "name": "claude/telegram/behind-the-mask.json",
+  "path": "claude/telegram/behind-the-mask.json",
+  "sha256": "c5ce4b8b6365636ccff9f7ea168e3f97faa69d72e0d0a0161cf500b2d6d54d95",
+  "bytes": 45345
+ },
+ {
+  "name": "claude/telegram/computer-love.json",
+  "path": "claude/telegram/computer-love.json",
+  "sha256": "cc5031f8e9ba2d9e8d51c2ea873f7739bd62db086728903a462e21c8f8329ace",
+  "bytes": 18646
+ },
+ {
+  "name": "claude/telegram/paul-revere.json",
+  "path": "claude/telegram/paul-revere.json",
+  "sha256": "efa67a9001d5726894ff69e5fa2a2162857fe7ad9c3aeb50295750f86eb42bd4",
+  "bytes": 32565
+ },
+ {
+  "name": "claude/telegram/planet-rock.json",
+  "path": "claude/telegram/planet-rock.json",
+  "sha256": "108ac2bfe0fac247f1b45d9120ab7b562f451e36775832656f25d766ca19cdf1",
+  "bytes": 7590
+ }
+]

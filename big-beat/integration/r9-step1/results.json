@@ -1,0 +1,80 @@
+{
+  "hardware_verified": false,
+  "device_contacted": false,
+  "note": "Host and build evidence only. Timing, sound, button routes and recovery need the FM-1.",
+  "source": "/Volumes/Orange Base/Codex Workspaces/big-beat-claude-integration/work/r9-step4-run1/src",
+  "started": "2026-10-27T22:24:50Z",
+  "steps": {
+    "inputs": {
+      "files": 6,
+      "trees": 1,
+      "ok": true
+    },
+    "inventory": {
+      "tree_sha256": "9fdd18453c39b12d35c8cf869be5b8d58777d36863b441bd94dc254f44db04d2",
+      "files": 444,
+      "git_head": "8e6d3dc29cf947437a77e313ab6bef4429fd0766",
+      "uncommitted_changes": false,
+      "ok": true
+    },
+    "host-tests": {
+      "routes": "routes: 164 reachable states (STUDIO 12, PLAY 12, KIT 12, PATTERN 12, SOUND 20, FX 60, SAVE 12, EVOLVE 12, GLOBAL 12); legacy normal pages 0; 984 checks, 0 failures",
+      "captures": "captures: 69 frames, 0 lint/route failures, 4 known (HOME lane section line, approved)",
+      "kit_intent": "kit intent: 11 cases x 2 layers + null ok (0 failures)",
+      "test_sound_pending": "",
+      "test_sound_picker_outcomes": "sound picker outcomes: 10 cases on 2 layers ok",
+      "route_matrix": "identical to route-matrix.csv",
+      "ok": true
+    },
+    "oracle": {
+      "worker": {
+        "digest": "e20351bda888d322382b1537c6c096503e95b9982d6cd26946f70e6d44e23999",
+        "worker_jobs": "422871",
+        "refused": "0",
+        "failed_calls": "0",
+        "retirements": "0"
+      },
+      "serial": {
+        "digest": "e20351bda888d322382b1537c6c096503e95b9982d6cd26946f70e6d44e23999",
+        "worker_jobs": "0",
+        "refused": "0",
+        "failed_calls": "0",
+        "retirements": "0"
+      },
+      "faults": {
+        "digest": "b74586b8a1976f343ec2aed261cab9c259a876be0b1435d275886b6fc669df3a",
+        "worker_jobs": "384218",
+        "refused": "0",
+        "failed_calls": "53",
+        "retirements": "53"
+      },
+      "ok": true
+    },
+    "sweep": {
+      "cases": 11,
+      "limited_frames": 0.0,
+      "invalid_faults": 0.0,
+      "refused": 0.0,
+      "wrong_kit": 0.0,
+      "worst_peak_dbfs": -0.7,
+      "ok": true
+    },
+    "target": {
+      "sha256": "21ea33afd1a15c12625db96b8148271e335643626de8a68b12a0d9578c60ce07",
+      "bytes": 564940,
+      "code_free": 16624,
+      "ram_free": 8864,
+      "pool_free": 81744,
+      "ram_text_bytes": 24028,
+      "ok": true
+    },
+    "package": {
+      "sha256": "6ff03d1a9f0689d8ee2272c743fe9636444cebc1c7c48302a7d7910cea994a3d",
+      "bytes": 610086,
+      "negative_cases": 8,
+      "rollback_sha256": "f3383921a500e4c0d771adcab968b6f905d278ab79b5edc616cdc5e921e5865b",
+      "ok": true
+    }
+  },
+  "passed": true
+}

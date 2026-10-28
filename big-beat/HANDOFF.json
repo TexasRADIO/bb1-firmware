@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "candidate": "r9",
+  "base": {
+    "repository": "TexasRADIO/big-beat-fm1-review",
+    "commit": "fc9e196ddba065084152fb873cb50d7c30177af7"
+  },
+  "source": {
+    "inventory": "claude-code/integration/r9-step1/source-inventory.txt",
+    "inventory_sha256": "c992c6bbbf9aa811e1939c6854e0b4b054975c33c6aff753017e4a22a75ff010",
+    "expected_tree_sha256": "9fdd18453c39b12d35c8cf869be5b8d58777d36863b441bd94dc254f44db04d2"
+  },
+  "recipe": {
+    "path": "claude-code/integration/r9-step1/materialize-and-test.sh",
+    "sha256": "363a9b6698e7754b4bb867556cf1583e6b0b3f1c74b048b6dccbc04d05f6d6e6"
+  },
+  "patches": [
+    {
+      "order": 1,
+      "path": "claude-code/integration/r9-step1/patches/0001-r9-step-2-01-scan-walk-timed-pulse-10-kHz-LED-key-sc.patch",
+      "sha256": "358504aed171fd9f7d47aa332e490e1d8aff29405c713c28fbf5bc53f8b82c40"
+    },
+    {
+      "order": 2,
+      "path": "claude-code/integration/r9-step1/patches/0002-r9-step-2-02-t5-no-division-10-kHz-LED-key-scan-redu.patch",
+      "sha256": "0753aeb86a1afbbc075a6189420fd24892f028e64f723dd877f786f427ab6519"
+    },
+    {
+      "order": 3,
+      "path": "claude-code/integration/r9-step1/patches/0003-r9-catalogue-reviewer-75dd228-approved-Dillo-pads-le.patch",
+      "sha256": "ae7dcfd77dbac348f658df3caa3c524f11373d3c1b866a6bcb5f74d829fbb670"
+    },
+    {
+      "order": 4,
+      "path": "claude-code/integration/r9-step1/patches/0004-r9-navigation-reviewer-7384889-claude-r9-fixes-0004-.patch",
+      "sha256": "c14ed9ebbd0b44e6e7ebab8ec0eb8351b027c1b4dc0864b93d62e7b17a9baa89"
+    }
+  ],
+  "inputs": [
+    {
+      "name": "inputs.json",
+      "path": "claude-code/integration/inputs.json",
+      "sha256": "37fc19b197ee95aa1d201d226165873543835223587cd6335bb6abef15ab3061",
+      "bytes": 2054
+    },
+    {
+      "name": "verify_release.py",
+      "path": "claude-code/integration/verify_release.py",
+      "sha256": "a12f519455998d2bbc72bb514c19843bdcdc15159a6e70c97ed7a8a34820eabf",
+      "bytes": 11579
+    },
+    {
+      "name": "run_build.sh",
+      "path": "claude-code/integration/build/run_build.sh",
+      "sha256": "17dfb25f4b6c36b4bed46ae2b2429fa2520d2908fa11590ba7422867445baed4",
+      "bytes": 1724
+    },
+    {
+      "name": "build_from_source.py",
+      "path": "claude-code/integration/build/build_from_source.py",
+      "sha256": "56d0e686ad5b1f333671fe7eccc054d8eded5b9c233b42ff08e65e57d8818439",
+      "bytes": 5980
+    },
+    {
+      "name": "Dockerfile",
+      "path": "claude-code/integration/build/image/Dockerfile",
+      "sha256": "e57a41127d2ea5702ea1656856f48ca6b1f1fab21ca7c5702a1f77a90fab53a8",
+      "bytes": 486
+    },
+    {
+      "name": "candidate-recipe.json",
+      "path": "claude-code/integration/build/recipes/candidate/recipe.json",
+      "sha256": "f4a830a0f6268b6fda4116843b74111643949b202cfd28d0bc10726876d877eb",
+      "bytes": 2777
+    },
+    {
+      "name": "package_candidate.py",
+      "path": "claude-code/integration/package/package_candidate.py",
+      "sha256": "3085554c5aed66fba21dd2c6f798e9f2a89d1e2afec278776b37dfb9ef841abc",
+      "bytes": 5135
+    },
+    {
+      "name": "integration-480.c",
+      "path": "claude-code/integration/tests/oracle/integration-480.c",
+      "sha256": "d3c7e3032edb0afa53b931310e7765a6771741ebfa35b81698936b8a63a90fba",
+      "bytes": 9498
+    },
+    {
+      "name": "compile.json",
+      "path": "claude-code/integration/tests/oracle/compile.json",
+      "sha256": "ce4275c3d8be3ba08ae11e14c07f8e286fa51ec5f5576c0d0c45a87e2d5a38ff",
+      "bytes": 3502
+    },
+    {
+      "name": "build_sweep.py",
+      "path": "claude-code/integration/tests/sweep/build_sweep.py",
+      "sha256": "cf1aa824e0498d4d5aac3762903775c38e0fb714dd92c6294526892db594d97b",
+      "bytes": 1947
+    },
+    {
+      "name": "sweep_levels.c",
+      "path": "claude-code/integration/tests/sweep/sweep_levels.c",
+      "sha256": "adbbeb9ad5774ba6f3c477bdf5e9ca8de761290b312433601be887a1b71deb13",
+      "bytes": 9741
+    },
+    {
+      "name": "host_flags.sh",
+      "path": "claude-code/integration/tests/host_flags.sh",
+      "sha256": "b40f3c22880eb419e92d163eefaa09d0d9975d8504f5787d370feae610b059ae",
+      "bytes": 1536
+    },
+    {
+      "name": "test_routes.c",
+      "path": "claude-code/integration/tests/test_routes.c",
+      "sha256": "54cd3e7853a0cee5b9b397f08a42d99a000aa4fac8e478fbd26e36504b511a2e",
+      "bytes": 6965
+    },
+    {
+      "name": "capture.c",
+      "path": "claude-code/integration/tests/capture.c",
+      "sha256": "7beaed3ab29891ca93149f6022fd49186e7115531b6ce4f9113265c62b4618e2",
+      "bytes": 11378
+    },
+    {
+      "name": "test_kit_intent.c",
+      "path": "claude-code/integration/tests/test_kit_intent.c",
+      "sha256": "40d82047ab41c73c6c30fcb92330fc2b727d720b66f4b7afe98bee0dfdca0a18",
+      "bytes": 2473
+    },
+    {
+      "name": "test_sound_pending.c",
+      "path": "claude-code/integration/tests/test_sound_pending.c",
+      "sha256": "f36f5d5b3965e39ff7e913d28c000d9b17ff586a0586019a9027d2bf79a28293",
+      "bytes": 1539
+    },
+    {
+      "name": "test_sound_picker_outcomes.c",
+      "path": "claude-code/integration/tests/test_sound_picker_outcomes.c",
+      "sha256": "1e2439549e4168d0c0ec360ca219b8a89a708f9881611e7b740ea3b3e1b0cdb4",
+      "bytes": 3017
+    },
+    {
+      "name": "stub_telegram_bank.c",
+      "path": "claude-code/integration/tests/stub_telegram_bank.c",
+      "sha256": "c99b7b684161b347357bdd0565e57af4f1c76f98ad34dfe6e701fa9ad4bce8af",
+      "bytes": 379
+    },
+    {
+      "name": "route-matrix.csv",
+      "path": "claude-code/integration/route-matrix.csv",
+      "sha256": "82f2759067a9cc76b14f6ab48a42c33dbb2bd801dc59674769bfd17c4c6360f3",
+      "bytes": 17707
+    }
+  ],
+  "results": {
+    "path": "claude-code/integration/r9-step1/results.json",
+    "sha256": "eb4fb92d25ec1e090438c2389cf0da636c5458fdced08e3f7c2cf55c8d323823"
+  },
+  "resources": {
+    "path": "claude-code/integration/r9-step1/resource-report.json",
+    "sha256": "9aa68234392c3337e77015721be2b803e66ef1550850c0c4519c9806696f3dca"
+  },
+  "artifacts": {
+    "application": {
+      "path": "Codex Workspaces/big-beat-claude-integration/work/build-r9-nav/candidate/app.bin",
+      "sha256": "21ea33afd1a15c12625db96b8148271e335643626de8a68b12a0d9578c60ce07",
+      "bytes": 564940
+    },
+    "package": {
+      "path": "Codex Workspaces/big-beat-claude-integration/release/r9-step4/Big-Beat-Studio-r9-step4-nav-EXPERIMENTAL.fwsc",
+      "sha256": "6ff03d1a9f0689d8ee2272c743fe9636444cebc1c7c48302a7d7910cea994a3d",
+      "bytes": 610086
+    },
+    "sound_region": {
+      "path": "Codex Working Cache/tmp/bb-silent-b-candidate-r1/verification/target-r1/postinstall-boot42-20261027/pass-1.bin",
+      "sha256": "f4bbf1a409d8aadb3429232e49dfb06b121070532787d31078db9630b6e7efcc",
+      "bytes": 245760
+    },
+    "rollback": {
+      "path": "Codex Working Cache/tmp/bb-silent-b-candidate-r1/verification/target-r1/Big-Beat-Studio-HOME-silent-B-EXPERIMENTAL.fwsc",
+      "sha256": "f3383921a500e4c0d771adcab968b6f905d278ab79b5edc616cdc5e921e5865b",
+      "bytes": 610086
+    }
+  }
+}

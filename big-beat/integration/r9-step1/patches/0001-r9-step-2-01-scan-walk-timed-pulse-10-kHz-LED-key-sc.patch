@@ -1,0 +1,149 @@
+From 3c10add94f373f47f0e1c5d77c147fae562cab34 Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Tue, 27 Oct 2026 20:25:35 +0000
+Subject: [PATCH 1/4] r9 step 2 (01-scan-walk-timed-pulse): 10 kHz LED/key scan
+ reduction from reviewer lane 679f1d8,
+ claude-code/r9/opt/patch/01-scan-walk-timed-pulse.patch
+
+---
+ firmware/hal/fm1_input.h | 63 +++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 56 insertions(+), 7 deletions(-)
+
+diff --git a/firmware/hal/fm1_input.h b/firmware/hal/fm1_input.h
+index d0a5894..8e85cf4 100644
+--- a/firmware/hal/fm1_input.h
++++ b/firmware/hal/fm1_input.h
+@@ -51,6 +51,10 @@
+  * follows FM1_LED_DIM_NS (one bit up or down a tick: the widths straddle the target by a bit's time). Only
+  * if the whole shift were shorter than the pulse would the rest be waited (console `inp`: dim_pulse_ns,
+  * dim_bits). An LED in both is fully lit. FM1_LED_DIM_DIV > 1 also skips frames (keep >= 200 Hz).
++ * r9: the shift is now one bit on 10 ticks of 11 (fm1__sr_col), too short to carry the pulse, so on those the pulse
++ * is timed on TIMER4 (T = fm1__dim_t, the breath's share kb of it) and the column's keys are decoded inside it; the
++ * frame's one 16-bit reload (column 1 -> 2) is the pulse as above, unchanged (fm1__dim_k, dim_bits). The same line
++ * writes, the same latched words, the same keys.
+  * Two glows (MENU > LEDS): fm1_led_dim_level(0) FM1_LED_DIM_NS (DIM HI, the default), (1) FM1_LED_DIM_LO_NS
+  * (DIM LO, ~1/60). The tick reads the target from fm1__dim_t (TIMER4 ticks, set here only, never divided):
+  * both are shorter than the shift (~3-5 us measured, dim_pulse_ns 3125 at 14 of 16 bits), so neither waits.
+@@ -234,6 +238,17 @@ static void fm1__sr_word(uint32_t w)
+     fm1__sr_bits(w, 0, 16u);
+     fm1__sr_latch();
+ }
++/* r9: the 595 word that selects column c (active low; columns 0 and 1 also pull bit 11 + c), and the column whose
++ * word the 595's shift stage holds after the last latch (0xFF: not known, the tick shifts all 16 bits). The shift
++ * stage is apart from the outputs: a clock moves stage j to j + 1 and takes the new bit into stage 0, the outputs
++ * change only at the latch. So when the next column's word is this one's moved up a bit (columns 2..10 -> 3..10,
++ * 0, 1: everything but 1 -> 2), one clock with that word's bit 0 leaves the stage holding exactly the word 16 clocks
++ * would have, and the latch puts out the same word. 1 -> 2 shifts all 16 bits every frame, so a disturbed stage is
++ * rewritten within a frame (11 ticks, 1.1 ms), as are the first tick and any tick after fm1_input_init/_scan. */
++static const uint16_t FM1__COLW[11] = {
++    0xFFFFu ^ 1u ^ 1u << 11, 0xFFFFu ^ 1u << 1 ^ 1u << 12, 0xFFFFu ^ 1u << 2, 0xFFFFu ^ 1u << 3, 0xFFFFu ^ 1u << 4,
++    0xFFFFu ^ 1u << 5, 0xFFFFu ^ 1u << 6, 0xFFFFu ^ 1u << 7, 0xFFFFu ^ 1u << 8, 0xFFFFu ^ 1u << 9, 0xFFFFu ^ 1u << 10};
++static uint8_t fm1__sr_col = 0xFFu;
+ 
+ static uint32_t fm1__rows(void)
+ {
+@@ -276,6 +291,7 @@ static void fm1_input_init(void)
+     FM1_PR(FM1_PA, FM1_OUT) &= ~sr;
+     FM1_PR(FM1_PA, FM1_DIR) &= ~sr;
+     fm1__sr_word(0xFFFFu);
++    fm1__sr_col = 0xFFu;
+     for (i = 0; i < FM1_NENC; i++)
+         fm1_in.enc_prev[i] = fm1_in.enc_last[i] = 0xFF;   /* seeded by the first frame */
+ }
+@@ -336,6 +352,7 @@ static void fm1_input_scan(void)
+         fm1__wait(FM1_LED_US);
+     }
+     fm1__led_lines(0);
++    fm1__sr_col = 0xFFu;
+     fm1__frame();
+ }
+ 
+@@ -399,6 +416,8 @@ static void fm1__frame(void)
+ /* one column per call, from a timer ISR (see top) */
+ #define FM1__DIM_T(ns) (((ns) * FM1_TICKS_PER_US + 500u) / 1000u)   /* a pulse in TIMER4 ticks */
+ static uint8_t fm1__tick_col, fm1__dim_k = 16u;   /* the bits of the shift the dim pulse spans (0..16) */
++static uint8_t fm1__dim_o;                        /* r9: the waits end this many ticks early, so that the measured
++                                                   * pulse straddles T as rc2's bit count did (0..3, a tick a pulse) */
+ static uint16_t fm1__dim_t = FM1__DIM_T(FM1_LED_DIM_NS);   /* the pulse the tick aims at (fm1_led_dim_level) */
+ /* the breath's constants for each glow (see top): its peak (/256 of lit), the glow G (of a lit frame, /65536),
+  * 2^24 / G (the pulse's share: B x it >> 16, 0..256), 2^30 / (65536 - G) (the lit share: (B - G) x it >> 14) */
+@@ -523,8 +542,10 @@ static void fm1_input_tick(void)
+ {
+     uint32_t p = fm1__tick_col, n = p + 1u == FM1_NCOL ? 0u : p + 1u;
+     uint32_t t0 = fm1_ticks(), g = t0 - fm1_in_stat.last, b = 0;
+-    uint32_t w = 0xFFFFu ^ (1u << n) ^ (n < 2u ? 1u << (11u + n) : 0u), lit, dim = 0, k = fm1__dim_k;
++    uint32_t w = FM1__COLW[n], lit, dim = 0, k = fm1__dim_k, keys = 1;
+     uint32_t br = 0, kb = 0;
++    /* r9: one clock, not 16, when the 595 holds column p's word and column n's is it moved up a bit (fm1__sr_col) */
++    uint32_t walk = fm1__sr_col == p && ((uint32_t)FM1__COLW[p] << 1 & 0xFFFFu) == (w & 0xFFFEu);
+     fm1__led_lines(0);
+     fm1_in_stat.last = t0;
+     while (b < FM1_GAP_BINS - 1u && g >= (150u * FM1_TICKS_PER_US << b))
+@@ -546,13 +567,13 @@ static void fm1_input_tick(void)
+ #endif
+     {
+         dim = fm1_led_dim[p] & ~lit;
+-        if (fm1__br_on) {                          /* breathing: the first kb of the k bits (kb <= k) */
+-            kb = (k * fm1__br_lv + fm1__br_d) >> 8;
++        if (fm1__br_on) {                          /* breathing: the first kb of the k bits (kb <= k); r9, a walk */
++            kb = ((walk ? (uint32_t)fm1__dim_t : k) * fm1__br_lv + fm1__br_d) >> 8;   /* tick: of T ticks */
+             br = kb ? fm1_led_breath[p] & ~(lit | dim) : 0u;
+         }
+     }
+-    if (dim | br) {                                /* the dim pulse of column p: over the first k bits */
+-        uint32_t t1, d, T = fm1__dim_t;
++    if ((dim | br) && !walk) {                     /* the dim pulse of column p: over the first k bits */
++        uint32_t t1, d, T = fm1__dim_t;            /* (r9: as rc2, on the frame's one 16-bit reload, 1 -> 2) */
+         t1 = fm1_ticks();                          /* (before the write: d spans one write and the bits) */
+         fm1__led_lines(lit | dim | br);
+         if (fm1__br_on) {                          /* (every pulse while any LED breathes: the same width) */
+@@ -569,16 +590,44 @@ static void fm1_input_tick(void)
+         fm1__dim_k = (uint8_t)(d > T ? (k ? k - 1u : 0u) : d < T && k < 16u ? k + 1u : k);
+         fm1_in_stat.dim_n++;
+         fm1_in_stat.dim_sum += d;
++    } else if (dim | br) {                         /* r9, a walk tick: the shift is one bit, too short to carry */
++        uint32_t t1, d, T = fm1__dim_t, o = fm1__dim_o;   /* the pulse, so it is timed: T, the breath's kb of it */
++        t1 = fm1_ticks();
++        fm1__led_lines(lit | dim | br);
++        if (fm1__br_on) {                          /* (every pulse while any LED breathes: the same write) */
++            do                                     /* (nothing else in a breathing pulse: kb can be a tick) */
++                d = fm1_ticks() - t1;
++            while (d + o < kb);
++            fm1__led_lines(lit | dim);
++        } else {                                   /* (the 595 still drives column p: outputs change at the latch) */
++            fm1__sr_bits(w, 15u, 16u);
++            fm1__keys(p);                          /* the column's keys in the pulse's wait: fm1_in only, no port, */
++            keys = 0;                              /* ~1 us at most, inside DIM LO's 1.6 us (r9 README) */
++            walk = 2u;                             /* (shifted) */
++        }
++        do                                         /* the waits end o ticks early: the measured pulse straddles */
++            d = fm1_ticks() - t1;                  /* T, as rc2's bit count makes it do */
++        while (d + o < T);
++        fm1__led_lines(0);
++        fm1__dim_o = (uint8_t)(d > T ? (o < 3u ? o + 1u : 3u) : d < T && o ? o - 1u : o);
++        fm1_in_stat.dim_n++;
++        fm1_in_stat.dim_sum += d;
++        k = 0;
+     } else {
+         k = 0;
+     }
+-    fm1__sr_bits(w, k, 16u);
++    if (walk == 1u)
++        fm1__sr_bits(w, 15u, 16u);
++    else if (!walk)
++        fm1__sr_bits(w, k, 16u);
+     fm1__sr_latch();                               /* column n, the lines dark */
++    fm1__sr_col = (uint8_t)n;
+     if (n == 0u)                                   /* (a new frame: the mid level's turn, before column 0 lights) */
+         fm1__mid_ph = (uint8_t)(fm1__mid_ph + 1u >= fm1__mid_n ? 0u : fm1__mid_ph + 1u);
+     fm1__led_lines(FM1__LIT(n));
+     fm1__tick_col = (uint8_t)n;
+-    fm1__keys(p);                                  /* its keys now: no wait for the frame's end */
++    if (keys)
++        fm1__keys(p);                              /* its keys now: no wait for the frame's end */
+     if (n == 0u) {
+         fm1__frame();
+         if (fm1__an_f)                             /* the power-on sweep: the next frame's picture */
+-- 
+2.54.0 (Apple Git-157)
+

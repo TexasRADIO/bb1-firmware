@@ -1,0 +1,398 @@
+{
+ "units": {
+  "crt0": {
+   "source": "/src/firmware/crt0.S",
+   "source_sha256": "e26b8e38377cd477beaa2f238f5022c6e9d221947fc546d34fe857d9d3add0a0",
+   "object_sha256": "a038b72c3bb98101faba65f7c6df989838f2fd104ff4f8af645b61274b4a2a8c"
+  },
+  "fm1_vec": {
+   "source": "/src/firmware/hal/fm1_vec.S",
+   "source_sha256": "8f9e787871332f522157d561dc3cfe8906ed0abf160139ed5819cfdeab66f01a",
+   "object_sha256": "28b3ddb497512aa7fc9625058ad5222ebb1f66a2f29918fde6e837594ba9b570"
+  },
+  "fm1_isr": {
+   "source": "/src/firmware/hal/fm1_isr.S",
+   "source_sha256": "2aad84e24a51c79b187ef3faf9d1bae108b1389bf78659f6b02dbbd95d8a7d7b",
+   "object_sha256": "ec6ab6cdb1e7fbba23a71dadaeca1ad081ec1ae21010ae7a30494710bbbba6c9"
+  },
+  "bb_core1_probe": {
+   "source": "/src/firmware/hal/bb_core1_probe.S",
+   "source_sha256": "d906f99042ff053cb6bc5098a0bfac29528d0f3b390aafe50b733ac084fccc7e",
+   "object_sha256": "cfb4672c0dd09a9f3085643595e093b64d73a159c1aa384c4e9ab4765d4c9e0d"
+  },
+  "bb_core": {
+   "source": "/src/firmware/src/bb/bb_core.c",
+   "source_sha256": "940123a66aae6fdc8eaff09eddd631e0b113049ca3dd26ac30a63dede5793634",
+   "object_sha256": "c7bea89d719cee1d38fe2055906940c895fbad6019d6ca899c208f0633dae094"
+  },
+  "bb_control": {
+   "source": "/src/firmware/src/bb/bb_control.c",
+   "source_sha256": "a5356b38ab9c33a88ae3c6d7b147b010b6f2c813c26d2376f488324970d815f4",
+   "object_sha256": "effceffc5bfc246891bbfd729954c9bdd7799c89eefb4d8099d89dedefff7c73"
+  },
+  "bb_panel": {
+   "source": "/src/firmware/src/bb/bb_panel.c",
+   "source_sha256": "f3675e6eefc5c5830483a95ea46b95dc70850b1c6bf717c2dca24cea2b6f50de",
+   "object_sha256": "2e91dfe8f060607d39eb53b9fa909fa7caba1300142a7d4d05ab2a45ce9d05d8"
+  },
+  "bb_audio": {
+   "source": "/src/firmware/src/bb/bb_audio.c",
+   "source_sha256": "9f6ea1bc7e7ad003504b5166dd8b7dab90d3713a43732a96bcc7158f5bd058fc",
+   "object_sha256": "840d79bf1e799b6f1baf775a7dcfde187b7afd18698cffe1f0e98123157d754c"
+  },
+  "bb_x0x_drum808": {
+   "source": "/src/firmware/src/bb/x0x/group_renderer.c",
+   "source_sha256": "79419c685be0a4efd568554f0d1f41e2ceac072d40a66477c8fd5b8ad94dbe7a",
+   "object_sha256": "441e239605ab954576abbe874d4c2e445631b5f4522d328d82a4fa8b91970f20"
+  },
+  "bb_player": {
+   "source": "/src/firmware/src/bb/bb_player.c",
+   "source_sha256": "8e7dca7b713a68bc23e2e7be2dcb3f3b8d11e59e7ea540c7a4e1706931846d1d",
+   "object_sha256": "6b10ccc6007e8eb1f2060c70f9be2318e1619a476af033f4046743ba3c23817f"
+  },
+  "bb_audio_pattern": {
+   "source": "/src/firmware/src/bb/bb_audio_pattern.c",
+   "source_sha256": "15788c6a18bce3674187353b3562af2f569114e6cab04a895d4ff1fa1bc80bc4",
+   "object_sha256": "c3715a1529636c544432a6dc3693d85193e89e079612efb379db9b2b7e8e7b0c"
+  },
+  "bb_factory_launch": {
+   "source": "/src/firmware/src/bb/bb_factory_launch.c",
+   "source_sha256": "18b667d2cd031338990961f2778e9be0e3537ca280ca8a029ee41a652021085a",
+   "object_sha256": "8fdd6401bcc81cb743c644d8fb103ff78084fbbcb837a2fd36497ba513333d7f"
+  },
+  "bb_factory_drum": {
+   "source": "/src/firmware/src/bb/bb_factory_drum.c",
+   "source_sha256": "39f2f63034ad293c61132ae884d91c764f750392a03a6908d0961a79e2bbd4bd",
+   "object_sha256": "4b3060ad03df5cef030630129177df1588b46714dcd4b570abc886f2c961911b"
+  },
+  "bb_factory_drum_launch": {
+   "source": "/src/firmware/src/bb/bb_factory_drum_launch.c",
+   "source_sha256": "0f7af97b417f80728e5d8af559cdfa55b4be7bf9d3bca15601c70a27291b5638",
+   "object_sha256": "a2f00b6bb2833d3ade948d51d265a177576d9b919f09729bca063afe6868dc40"
+  },
+  "bb_catalogue": {
+   "source": "/src/firmware/src/bb/bb_catalogue.c",
+   "source_sha256": "5b02cc781a0c578cd5c0c0061e8b8fbb06bd424d2b3b74c74e37633ee3bedaa7",
+   "object_sha256": "b1c602e49879517d86cc1d22aab2679d4894d905b0d9a7457df680a754bf1533"
+  },
+  "bb_factory": {
+   "source": "/src/firmware/src/bb/bb_factory.c",
+   "source_sha256": "c081399e9270cf0e1fa587d1ae55f76ad939de68a7eb90f06b9acc22062b8b36",
+   "object_sha256": "b9182ee45e39fdd515689e153d820ebd6b8991e4f23656fe493157be9d58f823"
+  },
+  "bb_browser": {
+   "source": "/src/firmware/src/bb/bb_browser.c",
+   "source_sha256": "c8cb50073c019a5b85c03eaebec1dc20e307e272223b3d08db872f825a6940aa",
+   "object_sha256": "26f007eb779c75a2222527e1e7e394fabd826cad473c27e42241326cb43f65d8"
+  },
+  "bb_factory_pattern": {
+   "source": "/src/firmware/src/bb/bb_factory_pattern.c",
+   "source_sha256": "f587daf49bb28d8cedb13235cffc869b2420a5acf02bbe98a4786446254246f9",
+   "object_sha256": "9d3f30ea1a643907f327312c9a57060a30c98c1683dedab39cc6bd355e2a49c8"
+  },
+  "bb_parts": {
+   "source": "/src/firmware/src/bb/bb_parts.c",
+   "source_sha256": "8ff8e0681a4f690e2470e6bb389dcab7bd86d95800c7346e7ebedf9b2a6e8cdf",
+   "object_sha256": "e5b3549a2329e0b6f2de3df80f6c6aa0c791afacaebf9b3f69330a00b462c6df"
+  },
+  "bb_trio": {
+   "source": "/src/firmware/src/bb/bb_trio.c",
+   "source_sha256": "24c10add869bcd2a35fd12488a4cbc2a1b04a704fc0b24108c6f7e046dbe51f1",
+   "object_sha256": "bb64aa6471bc903df679f557ef965fe4328c377daeca30d0d8b21a4b03212fe9"
+  },
+  "bb_audio_trio": {
+   "source": "/src/firmware/src/bb/bb_audio_trio.c",
+   "source_sha256": "fa11d1b0a69e4190da9566195456ec850eca14654bf3fc61f6b3d324eb644b86",
+   "object_sha256": "bcdd7fa03dde6f55e06552ac320b4e4a121fa1295bec7b6ddb2aa21693cf72de"
+  },
+  "bb_evolve": {
+   "source": "/src/firmware/src/bb/bb_evolve.c",
+   "source_sha256": "d409b1073f6d790b460e772d43d2eb0f169bfa230b0aa7ed5d0707a16a3af962",
+   "object_sha256": "94c87af4e18ef82ffb5aa042836f3652ed58ec7b2679c7f3a6b4148c4458b3eb"
+  },
+  "bb_audio_evolve": {
+   "source": "/src/firmware/src/bb/bb_audio_evolve.c",
+   "source_sha256": "254cf22b2211ca99cebf3efbcfdcc9ec1bd61aff561c8f59e0f1c255d8af1da3",
+   "object_sha256": "476f50f979d6daa2fa95c5746061db9c438e55657134f201ea1e5f01a90b7065"
+  },
+  "bb_session": {
+   "source": "/src/firmware/src/bb/bb_session.c",
+   "source_sha256": "b02d2dbe72f75a6b751da11f57eea1493f7d4263b0bbc234626b2555366b0902",
+   "object_sha256": "7871026603bd1af82cbedbf49fc53fd400867533c5cc6f425c5c67e6cc396792"
+  },
+  "bb_audio_session": {
+   "source": "/src/firmware/src/bb/bb_audio_session.c",
+   "source_sha256": "5ee169a338207dff6463eaac8c0e23e391818de06082c6d631f8f8490508fb00",
+   "object_sha256": "c7ac8d89ca106871161e36e15a99b99065cdbdf58c040770f47a0c93f8a73527"
+  },
+  "bb_profile": {
+   "source": "/src/firmware/src/bb/bb_profile.c",
+   "source_sha256": "b94ac7ca6d041dc2317bc264d0e9544eb714e6a31805ea4200a1e4fd98704e83",
+   "object_sha256": "364e951c985f9a8a420f5fca23ca8c24dff3ab4f6e30466ebc51806f015f7db7"
+  },
+  "bb_echo": {
+   "source": "/src/firmware/src/bb/bb_echo.c",
+   "source_sha256": "aa1910674e86257bfac070fc8ad67d94d100310d683e67e80c27ff845097552e",
+   "object_sha256": "864210d79b2f81e1660f2f9a199e824703c047d736c67544bb0dbe7b1656cf26"
+  },
+  "bb_spring": {
+   "source": "/src/firmware/src/bb/bb_spring.c",
+   "source_sha256": "9e27267786977b0a92faae2ca91fa4aa420a45b96bf3d5942deeff00caee9905",
+   "object_sha256": "de3f1854df2801930a3909c8bae6892cc16cdf99a97d7fc144a2170835c3fb89"
+  },
+  "bb_output": {
+   "source": "/src/firmware/src/bb/bb_output.c",
+   "source_sha256": "873a0da4879a23883f72b0fb8cafdcad2612b539052629dcd9d878c78868f7b7",
+   "object_sha256": "5c327b991067f8055a1a585869e1cb3f44977056dfad57744c39462dabd3b01e"
+  },
+  "bb_dillo": {
+   "source": "/src/firmware/src/bb/bb_dillo.c",
+   "source_sha256": "ef1d3e778bd2925b15fd1b5be375d46e81025dbb04c4defe7ad292213c205ae4",
+   "object_sha256": "7fb692548779fd142ce25c8dfdc321e20d84d95b769b78a0270152371fa6c77a"
+  },
+  "bb_x0x_bass303": {
+   "source": "/src/firmware/src/bb/x0x/bass303.c",
+   "source_sha256": "8296645d239a5cb80edba1b54072d6a4d6e7d4a00952d9ea786b6ca6a83d489f",
+   "object_sha256": "50ac579a3dd626f340ae58cd3a9f050e7c4c5bee4483ac3482351739b1753abd"
+  },
+  "bb_telegram": {
+   "source": "/src/firmware/src/bb/bb_telegram.c",
+   "source_sha256": "9d24cdba91711496f8cf6fdaabf6effc21e43b3d23d8df8610e230d16b5cf3fa",
+   "object_sha256": "d7f4a15d617c5898048a1271472c5bb30a40ddabcd2449fdb7de258b4cbb54bd"
+  },
+  "bb909_controls": {
+   "source": "/src/firmware/src/bb/bb909_controls.c",
+   "source_sha256": "e878e085ab7eaa1e1aa13c4ae97a50492be0c34b8dbf96dc0008464e152a4e86",
+   "object_sha256": "aa82b8a5303905599acdb8e0d3f5a71c6fe5d80627e2111a2d535f3620a5411d"
+  },
+  "bb909_patch": {
+   "source": "/src/firmware/src/bb/bb909_patch.c",
+   "source_sha256": "771acd17cf5b2e2cdd11d389cf31c9c8fdca6722c5b36acf13c707dff3382a27",
+   "object_sha256": "07db74f8bd7be70508c1759740ad9e14b42c0f6fc2272c592659f491a2034c88"
+  },
+  "bb909_switch": {
+   "source": "/src/firmware/src/bb/bb909_switch.c",
+   "source_sha256": "d7fa1954ad64fee60768aff9c05c99f15fa80d1a1bd0d5f2fe9fda4a3eabc52e",
+   "object_sha256": "6efbb0fc82745a0c2e72d732ed1037fa348cb68adf445489df867dc03b94305a"
+  },
+  "bb909_sequence": {
+   "source": "/src/firmware/src/bb/bb909_sequence.c",
+   "source_sha256": "1ef474fc7edd72ef9e249c613435b8cddca8eb011cd0edf8aaef16e54795118d",
+   "object_sha256": "1fe04c1fd6be801f21f31fddb7bec95e5312b0da0493104b84cc551ddf6ab82c"
+  },
+  "bb_family_scene": {
+   "source": "/src/firmware/src/bb/bb_family_scene.c",
+   "source_sha256": "d218772003aa7302e1dd4e425d98ae147ec24849834c1b57e2e9d596675593ad",
+   "object_sha256": "8236a6754ee929c397befd82177d1b85ea432193d3f291283754712008943ac9"
+  },
+  "bb_crc32": {
+   "source": "/src/firmware/src/bb/bb_crc32.c",
+   "source_sha256": "6432b7fd2be8a5e367f513a561cc7a3beee28002b29d33798c362131cb67a18f",
+   "object_sha256": "8e35f5299501da72b252e92b90c783f033e2df5f43f086b29b9875bec29d60b2"
+  },
+  "bb_wire": {
+   "source": "/src/firmware/src/bb/bb_wire.c",
+   "source_sha256": "9e8fdd010cfd11f81e157a450243410faf330f404d1aa5a1bc609222b2b8c51c",
+   "object_sha256": "fd82b08f888e2418dcd21495271b148c31d1950991c70d49fbcc7e08f858cbe8"
+  },
+  "bb_factory_recipe": {
+   "source": "/src/firmware/src/bb/bb_factory_recipe.c",
+   "source_sha256": "1d4f12a90ba32e6a5ddaa86108dda5e53c384bd964e2f6df9ab775c28ab4b9f8",
+   "object_sha256": "f37b01f870d8f0630c401cf0aa0976b2e637619cba33bdb5fe9725aec6f9be70"
+  },
+  "bb_factory_trio": {
+   "source": "/src/firmware/src/bb/bb_factory_trio.c",
+   "source_sha256": "838a2ec0fa1bbe6c8e7affd67c369f510b7d4933b610349185699b56eb332e11",
+   "object_sha256": "a250b685e16263aa56925a54c196f5e4f2cd3e96ce2a8e347c40e2ebaa334e09"
+  },
+  "bb_factory_trio_launch": {
+   "source": "/src/firmware/src/bb/bb_factory_trio_launch.c",
+   "source_sha256": "1756975d6a28091548b5e0ac1ea3b2b82b1c228d45da9620ecf3ed1148c2a8a5",
+   "object_sha256": "da683eaf6a665e2c418635b22440bc063a03c4016d647d0a2ad038ffe8fd2e9b"
+  },
+  "bb_performer": {
+   "source": "/src/firmware/src/bb/bb_performer.c",
+   "source_sha256": "500f378f2cd014ab9d126130864dc43f2577d955b76ff95882a3c1cced693e9b",
+   "object_sha256": "ab438d400d29fa6d6a09be145ca37e7ee3ee827260a3c4794d70d1e871bfbc95"
+  },
+  "bb_home_control": {
+   "source": "/src/firmware/src/bb/bb_home_control.c",
+   "source_sha256": "48538f6c2565e9ca890d76294c6399be33443668500e6507170c0dd1daff5b67",
+   "object_sha256": "228d93994f874b78b81ad8914cde55e0007e5c4010f09552450d2e0ac9f3b27b"
+  },
+  "bb_home_service": {
+   "source": "/src/firmware/src/bb/bb_home_service.c",
+   "source_sha256": "686a988f09cef9ff9975eb30a6c5f5709e781102db1651f7ec9dfeb1ff9d3767",
+   "object_sha256": "040b822c4a556ed3ba003110dc709fea2bddedf8bc88d53892d782e99b5e4b43"
+  },
+  "transfer": {
+   "source": "/src/firmware/src/bb_asset_transfer.c",
+   "source_sha256": "12959289904e8fd913396ebd578d4b58f03cd548c9b0cb237f235ea035520b8c",
+   "object_sha256": "3793c0049d0145a33f4e60d30eb95ed323b62f4e08b579a48e54795ba7ea1277"
+  },
+  "owner": {
+   "source": "/src/firmware/src/bb909_owner.c",
+   "source_sha256": "b909e18f04212613c01f16123a510f4bfca79c9b74a6fd49c4e190bb19e1878f",
+   "object_sha256": "754dc57bc8ffa92c5f7e87bcd81ab254e4d3498edb74e974c18fbaba1fae2509"
+  },
+  "drum909": {
+   "source": "/src/firmware/src/drum909.c",
+   "source_sha256": "86c6d9ee1a639ed32c673b6b6211f1fe481ef18044564bfd488a6de729bd05e0",
+   "object_sha256": "088adac1da54f1dd82755ed4fa401facf671e75903b5b120763e95f588a23620"
+  },
+  "bb909": {
+   "source": "/src/firmware/src/bb909.c",
+   "source_sha256": "679dc986643d1ff5259737b7410e061e55972c433a5cf6349a32b88b75ce2191",
+   "object_sha256": "9668ab57f3929e5819b8da44dc4a87e4c63c53857feca6a18d765cc6b2dcc0b1"
+  },
+  "bb909_assets": {
+   "source": "/src/firmware/src/bb909_assets.c",
+   "source_sha256": "f228b9c028178d13459055d396bb324f405f2339e61472723eec3d46da154163",
+   "object_sha256": "e93bc7342c4a67eed7f363c26f0ad600693be78d5f0c92bd9a85a134ded9d6d9"
+  },
+  "bb_paged_records": {
+   "source": "/src/firmware/src/bb/bb_paged_records.c",
+   "source_sha256": "04eb969d2516ee2e78e5b3cf98b17a2eb8930e010b1ff995b72439f3f4c07463",
+   "object_sha256": "0a7b43e4822711870b9e93eb5ce4d357c3326feb7952ce57a69b3977703e83c9"
+  },
+  "bb_paged_container": {
+   "source": "/src/firmware/src/bb/bb_paged_container.c",
+   "source_sha256": "4c773157d9cebe515f07d8bae9b4ebcb7bbc0be5f072be99515ab09c9f52083e",
+   "object_sha256": "56af2c7947a90ee6c15569106568722c28b34b91aefabfd4ebb86ff76725e6ab"
+  },
+  "bb_catalogue_page": {
+   "source": "/src/firmware/src/bb/bb_catalogue_page.c",
+   "source_sha256": "7eee412fee9c7e36093ce14ea5ddcebb4fb0f88a1330897cbcdd8e877be10ff4",
+   "object_sha256": "41828b4c41b250070312838a663779f6e0373057ea8d62247b27a4ce5c9fe66a"
+  },
+  "bb_sound_picker": {
+   "source": "/src/firmware/src/bb/bb_sound_picker.c",
+   "source_sha256": "590dafab70f8be783dce94b03d1f5c251470dd8a82270450b216f8690e52c841",
+   "object_sha256": "54211b4f1d033d5299ef3991f15b8820f46d0417e58bd5d9156b3be915d4607e"
+  },
+  "group_gain": {
+   "source": "/src/firmware/src/bb/group_gain.c",
+   "source_sha256": "91e7a1ba7695cc939877b7b463819fa5b43ed46005921a78ae8b792d998f2524",
+   "object_sha256": "15838eecddfb38dc5cfc578d0f31726155d6426bf7e131faa91cbb51cea68ff8"
+  },
+  "group909": {
+   "source": "/src/firmware/src/drum909_group.c",
+   "source_sha256": "76e00f0d22a21d0bde9115776c6118d50bdde148ea20331c50a338a8bc49687b",
+   "object_sha256": "2831710cab628043362cc527fae7077488a63696e63fbc5bf0c3545167e6ed9e"
+  },
+  "group_scene": {
+   "source": "/src/firmware/src/bb/group_scene.c",
+   "source_sha256": "d8b28c2b91f58f93fccca5b63037b5b98c9dd2bb17f47342ed566174e60bd900",
+   "object_sha256": "093bf86fea5a5339e8ae0d57e8fcd894b4a485c552218edd4b430ebff1442ef1"
+  },
+  "sample_scene": {
+   "source": "/src/firmware/src/bb/sample_scene.c",
+   "source_sha256": "dea357b1e8b40bec055686aa3833ee1ffcdc9f029124360e8946d57895d19f11",
+   "object_sha256": "6955dd7384c6c65b00483393e451d2551c2ab150445fd254a02b03b36e59cde1"
+  },
+  "bb_note_expression": {
+   "source": "/src/firmware/src/bb/bb_note_expression.c",
+   "source_sha256": "d3af02e495ce0cea8dc79d8df7c02782f3c5532f37fa1e0e148af1456f4ab323",
+   "object_sha256": "88614a49caedceb2a3b333c26813c98f94689130fb520fdf27d6f30878b21b16"
+  },
+  "bb_note_expression_catalogue": {
+   "source": "/src/firmware/src/bb/bb_note_expression_catalogue.c",
+   "source_sha256": "627e08c0800e780f0f1b270901e620b56c96b55d0594f655c4db21cf38569ca2",
+   "object_sha256": "f24f8d7390da7eb65cf72c95eedf4edafb980d67bfa7af0d4c9e199988c54c33"
+  },
+  "bb_expression_scene": {
+   "source": "/src/firmware/src/bb/bb_expression_scene.c",
+   "source_sha256": "2387c1547d2e911c8c484bde09195e67a368f55fda2061e31a277d6851275cc0",
+   "object_sha256": "26d1057e21946082529e13642ecc59976283c3f46ca0be9a2d7f81843ebf4549"
+  },
+  "bb_phrase": {
+   "source": "/src/firmware/src/bb/bb_phrase.c",
+   "source_sha256": "5a44f28d5f21676057bd602246a05668fad2f13fb95c008cb0cd761083e2ec60",
+   "object_sha256": "a45950a75e23978817b28c73a6097eaa05d589084a49cfa13db53ee7fb2f94f9"
+  },
+  "bb_phrase_controls": {
+   "source": "/src/firmware/src/bb/bb_phrase_controls.c",
+   "source_sha256": "ed1746b44773c59d2f4f3ec2fcb83969d96d33c106a008103636176f3acce042",
+   "object_sha256": "c48041fbe591b668412b2588305a439f66ae5673b230fb2b582f1a5c3be20bc3"
+  },
+  "bb_phrase_index": {
+   "source": "/src/firmware/src/bb/bb_phrase_index.c",
+   "source_sha256": "ff5628768bd9b04a5ad7303ffd8afb6d95982f287840eb4b1fb7eb9aa1818232",
+   "object_sha256": "647fcdb8c751dab67c976e7490cc5a62ee919148554ac167a06897c444892fa6"
+  },
+  "bb_delayed": {
+   "source": "/src/firmware/src/bb/bb_delayed.c",
+   "source_sha256": "7f73c3175b4db6a9d9a4deaa32bfc21fc96021d1441e36f72652c4fc9db32206",
+   "object_sha256": "ccba4d08124f0d9a3850bceb44101a302b907de27547ec78d6be50db9a5d3f8d"
+  },
+  "bb_audio_phrase": {
+   "source": "/src/firmware/src/bb/bb_audio_phrase.c",
+   "source_sha256": "e4348cb23d698c7be79b33625a2c23e2486d072a057fae87298f5ebfacfd9688",
+   "object_sha256": "5239b63962e1127e4f873464eec06e423031a95ceda05e29a51b77f01f575451"
+  },
+  "bb_phrase_strike": {
+   "source": "/src/firmware/src/bb/bb_phrase_strike.c",
+   "source_sha256": "a9cb0e2abba2a6b4f8c0fe0c69c87dd587ce9d815d156cc0681806dde1c4406a",
+   "object_sha256": "0077728622823aabbcbd578c25e88563540ec073ee8d5abd44e52630b3808ca5"
+  },
+  "bb_audio_phrase_render": {
+   "source": "/src/firmware/src/bb/bb_audio_phrase_render.c",
+   "source_sha256": "3c909a6aabcdd654c6f50c3d63ffb742550d5e9d538466b2528ad4c75c81147e",
+   "object_sha256": "afbfcec169726a6aaeacdec863f63f939662b4cf88c1e1c7c2f3ad248b11d8d6"
+  },
+  "bb_phrase_shaker": {
+   "source": "/src/firmware/src/bb/bb_phrase_shaker.c",
+   "source_sha256": "556b9e999e5062b89ce7af6393bd32db8c2ba723b828b082b3827bb207c36fe3",
+   "object_sha256": "b4dccc2f7aba75df08abfedca84f90220ca85157401ef2ca4f97d558271db5ab"
+  },
+  "bb_rich_scene": {
+   "source": "/src/firmware/src/bb/bb_rich_scene.c",
+   "source_sha256": "962b4e50fb896ed6b41ec437755c809363beaf7620e01f5dbf377f4143b1c596",
+   "object_sha256": "e4226933400d2c8b98a152f06c32f682bcb91f848d1a39985079f667562b195a"
+  },
+  "compact_scene": {
+   "source": "/src/firmware/src/bb/compact_scene.c",
+   "source_sha256": "69e1834879def3dc442df9c8bbc9696546025813cdc4ce090226302b9663d97b",
+   "object_sha256": "aee65019811ef8ffe83674754cf598a9e9d550648078b1b7ecec1932f6d16a71"
+  },
+  "prepared_parts": {
+   "source": "/src/firmware/src/bb/prepared_parts.c",
+   "source_sha256": "2f38b5215d9221bc8547c59d7107c3b661a1f7fb49539d4e2f3e0590d2fc1729",
+   "object_sha256": "53e5d862e51bc98059ebce7608385b084213fcde42db98b4d6e0a9562d346e30"
+  },
+  "prepared_bank": {
+   "source": "/src/firmware/src/bb/prepared_bank.c",
+   "source_sha256": "3769f8af9cc74b9816a33694cf71d4aa8c71825920d2dad1d8ea38b15dbd6e69",
+   "object_sha256": "fe58a18751abe3db2b276c100ec9d36d0e59509c923fae50ab550a0487faa5e1"
+  },
+  "prepared_bank_service": {
+   "source": "/src/firmware/src/bb/prepared_bank_service.c",
+   "source_sha256": "6bb4f8f55f7b4c25548af5683b4d9690bb993cb7cc0338a663326f6918295f4a",
+   "object_sha256": "5c9eca5ea807e765a5e132b7636bf61dcd4e2f9b2c816d78d5e6b881be5a1f65"
+  },
+  "main": {
+   "source": "/src/firmware/src/felucca.c",
+   "source_sha256": "43f502a4c606297bba594e939f96cade4020ae24466ffaf138a01930fdd76e81",
+   "object_sha256": "110e52705c00f87dc8deeaea7a126f63e9c94611231ebe53a2bafa3e0cbc094a"
+  }
+ },
+ "source": "/src",
+ "recipe_sha256": "f4a830a0f6268b6fda4116843b74111643949b202cfd28d0bc10726876d877eb",
+ "installed": false,
+ "packaged": false,
+ "hardware_tested": false,
+ "size_exclude": [
+  "cv_text_fit",
+  "cv_line_t",
+  "cv_line"
+ ],
+ "candidate": {
+  "sha256": "21ea33afd1a15c12625db96b8148271e335643626de8a68b12a0d9578c60ce07",
+  "bytes": 564940,
+  "code_free": 16624,
+  "ram_free": 8864,
+  "pool_free": 81744,
+  "ram_text_bytes": 24028
+ },
+ "resource_limits_pass": true
+}

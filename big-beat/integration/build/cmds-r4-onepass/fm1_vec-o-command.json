@@ -1,0 +1,8 @@
+[
+  "-target",
+  "pi32v2",
+  "-c",
+  "/work/source/firmware/hal/fm1_vec.S",
+  "-o",
+  "/work/group_target_build-r1/fm1_vec.o"
+]

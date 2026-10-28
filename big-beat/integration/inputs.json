@@ -1,0 +1,41 @@
+{
+  "note": "Inputs outside Git, checked by SHA-256 before every verify_release.py run. Trees: SHA-256 of sorted \"relpath sha256\" lines.",
+  "files": {
+    "sound_library_readback": {
+      "path": "/Volumes/Orange Base/Codex Working Cache/tmp/bb-silent-b-candidate-r1/verification/target-r1/postinstall-boot42-20261027/pass-1.bin",
+      "sha256": "f4bbf1a409d8aadb3429232e49dfb06b121070532787d31078db9630b6e7efcc"
+    },
+    "linker_overlay": {
+      "path": "/Volumes/Orange Base/Codex Working Cache/tmp/sample-audio-r758/linker-overlay/run-r3/guarded-gc.ld",
+      "sha256": "e0231dbdb54ea0140524da6bd35a3fa0e8d1dc87b641561dfbb87f878f7aa32b"
+    },
+    "asset_symbols": {
+      "path": "/Volumes/Orange Base/Codex Workspaces/big-beat-fm1-architecture-20261015/experiments/bb-909-shared-assets.W3nC8U/asset-symbols.ld",
+      "sha256": "93e63d74d530ca0c7f63965bf91647e1673483c63161f0eb7d165e189bc2aec8"
+    },
+    "asset_objects": {
+      "path": "/Volumes/Orange Base/Codex Workspaces/big-beat-fm1-architecture-20261015/experiments/bb-909-shared-assets.W3nC8U/assets.o",
+      "sha256": "623d60194db864ac5177047a702e053b2dac2e9ceadf64b1a49a4806b96094db"
+    },
+    "size_fns": {
+      "path": "/Volumes/Orange Base/Codex Workspaces/big-beat-claude-integration/work/tools/size_fns.py",
+      "sha256": "20573a94488e39b4fadce444b184e2f522eb921635808e8b9b492676766a85ff"
+    },
+    "mark_ui": {
+      "path": "/Volumes/Orange Base/Codex Workspaces/big-beat-claude-integration/work/tools/mark_ui.py",
+      "sha256": "273619a2be2cf4cbf3a7fdb35108628a68e3ccebc5c0c8e5c935df25b8a5617c"
+    }
+  },
+  "trees": {
+    "jieli_toolchain": {
+      "path": "/Volumes/Orange Base/Codex Workspaces/big-beat-fm1/tools/jieli-linux-toolchains-20260730.1",
+      "sha256": "a28f1089c44522b77ffc2724dbec74b482813cb2a1abc7a3dc74355e7ccea15a",
+      "files": 640
+    }
+  },
+  "docker_image": {
+    "tag": "bb-build-runtime:bookworm-r1",
+    "id": "sha256:e76dfc2c13ebed389407bacf834d89863d4b3af614c78c12c51f23bae8a3abfd",
+    "dockerfile": "build/image/Dockerfile"
+  }
+}

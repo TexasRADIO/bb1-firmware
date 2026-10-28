@@ -1,0 +1,140 @@
+From c6c1e819e1fda1e53e97fb329fb221105a1c0034 Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Tue, 27 Oct 2026 22:23:49 +0000
+Subject: [PATCH 4/4] r9 navigation (reviewer 7384889, claude/r9-fixes/0004):
+ D1-D4, D6-D8 ported to v3, Dillo/Telegram STOP cancel is terminal
+
+---
+ firmware/src/bb/bb_player.c         |  8 +++++++-
+ firmware/src/bb_ui_v3/bb_ui.c       | 10 ++++++++--
+ firmware/src/bb_ui_v3/bb_ui.h       |  2 +-
+ firmware/src/bb_ui_v3_firmware.inc  | 18 +++++++++++++-----
+ firmware/src/home_master/screen.inc |  2 ++
+ 5 files changed, 31 insertions(+), 9 deletions(-)
+
+diff --git a/firmware/src/bb/bb_player.c b/firmware/src/bb/bb_player.c
+index c5c918f..e427e1c 100644
+--- a/firmware/src/bb/bb_player.c
++++ b/firmware/src/bb/bb_player.c
+@@ -40,7 +40,13 @@ static int sync_with(bb_player *p,bb_audio *a,const bb_player_selection *incomin
+         /* D4: a queued request ended by STOP is terminal, not silently idle. */
+         else if(expected && status.seen==expected && status.result==BB_PATTERN_CANCELLED)
+             p->error=BB_PLAYER_CANCELLED;
+-    } else if(!bb_audio_pattern_status(a,p->target,&status))return 0;
++    } else {
++        if(!bb_audio_pattern_status(a,p->target,&status))return 0;
++        /* D4 for Dillo/Telegram: the same terminal CANCELLED outcome as a drum layer, so the one
++         * core announcer (bb_library_sync) says it; no second owner in the UI. */
++        uint32_t expected=incoming?incoming->ticket:p->request.ticket;
++        if(expected && status.seen==expected && status.result==BB_PATTERN_CANCELLED)p->error=BB_PLAYER_CANCELLED;
++    }
+     if(!status.applied)memset(&p->playing,0,sizeof p->playing);
+     else if(incoming && incoming->ticket==status.applied)p->playing=*incoming;
+     else if(p->request.ticket==status.applied)p->playing=p->request;
+diff --git a/firmware/src/bb_ui_v3/bb_ui.c b/firmware/src/bb_ui_v3/bb_ui.c
+index 75088e9..87e1ab5 100644
+--- a/firmware/src/bb_ui_v3/bb_ui.c
++++ b/firmware/src/bb_ui_v3/bb_ui.c
+@@ -582,7 +582,10 @@ static void draw_notice(const bb_ui_in *in)
+     uint16_t panel = 0x0861u, c = inst_c(in);
+     u_rbox(TOAST_X, NOTICE_Y, TOAST_W, NOTICE_H, 6, c, BB_UI_BG);
+     u_rbox(TOAST_X + 2, NOTICE_Y + 2, TOAST_W - 4, NOTICE_H - 4, 4, panel, c);
+-    u_name(TOAST_X + 10, NOTICE_Y + 10, &AF_M, in->notice, BB_UI_TEXT, panel, TOAST_W - 20);
++    /* r9: a notice too wide for AF_M ("AUDIO STOPPED: RENDER FAULT") is set in AF_S, whole, not cut */
++    int big = text_w(&AF_M, in->notice) <= TOAST_W - 20;
++    u_name(TOAST_X + (big ? 10 : 6), NOTICE_Y + (big ? 10 : 12), big ? &AF_M : &AF_S, in->notice, BB_UI_TEXT, panel,
++           TOAST_W - (big ? 20 : 12));
+ }
+ 
+ /* =================================================================== pages === */
+@@ -1508,7 +1511,7 @@ static void els_page(els_t *l, const bb_ui *u, const bb_ui_in *in, uint32_t page
+             h = h_u(H0, (uint32_t)in->sections << 16 | (uint32_t)in->sec_cur << 8 | in->sec_next);
+             for (i = 0; i < in->sections && i < BB_UI_SECTIONS; i++)
+                 h = h_u(h_s(h, in->sec_name[i]), in->sec_bars[i]);
+-            h = h_u(h, in->running ? (uint32_t)in->sec_pos >> 2 : 0u);
++            h = h_u(h, in->running ? 1u + ((uint32_t)in->sec_pos >> 2) : 0u);   /* the playhead tick shows only while running */
+             h = h_u(h, (uint32_t)in->fill_beats << 8 | in->fill | (uint32_t)in->instr << 16);
+             el(l, 0, TL_Y - 3, 240, 28, h_u(h, in->sec_next != BB_UI_NO ? breath_q(now) : 0u));
+         } else {
+@@ -1668,6 +1671,9 @@ const bb_ui_stats *bb_ui_frame(bb_ui *u, const bb_ui_in *in)
+                 const el_t *f = &l.e[j];
+                 if (f->x >= e->x && f->y >= e->y && f->x + f->w <= e->x + e->w && f->y + f->h <= e->y + e->h)
+                     u->drawn[j] = f->hash;
++                else if (u->drawn[j] != f->hash &&
++                         f->x < e->x + e->w && e->x < f->x + f->w && f->y < e->y + e->h && e->y < f->y + f->h)
++                    u->drawn[j] = ~f->hash;    /* a changed element repainted in part: never take its old hash as drawn */
+             }
+         }
+     }
+diff --git a/firmware/src/bb_ui_v3/bb_ui.h b/firmware/src/bb_ui_v3/bb_ui.h
+index 0de81e0..594dcd2 100644
+--- a/firmware/src/bb_ui_v3/bb_ui.h
++++ b/firmware/src/bb_ui_v3/bb_ui.h
+@@ -90,7 +90,7 @@ typedef struct {
+     uint8_t flags;                       /* BB_UI_LN_*                              */
+ } bb_ui_lane;
+ 
+-#define BB_UI_SECTIONS 8
++#define BB_UI_SECTIONS 11   /* = BB_NAV_SECTION_KEYS: one black key per drawn section */
+ #define BB_UI_LIST 5
+ #define BB_UI_NO 0xFFu
+ 
+diff --git a/firmware/src/bb_ui_v3_firmware.inc b/firmware/src/bb_ui_v3_firmware.inc
+index 5f120ad..5937a8d 100644
+--- a/firmware/src/bb_ui_v3_firmware.inc
++++ b/firmware/src/bb_ui_v3_firmware.inc
+@@ -212,6 +212,7 @@ static void bb_v3_pattern(bb_ui_in *in)
+     bb_player *p = bb_library_current();
+     bb_factory_choice choice;
+     unsigned first, k, n = 0, count = (unsigned)bb_browser_part_count(&p->view), pend = bb_player_pending(p);
++    unsigned count_banks = (unsigned)bb_browser_bank_count(&p->view), cur;
+     in->title = in->subtitle = 0;
+     bb_v3_title[0] = bb_v3_sub[0] = 0;
+     if (bb_browser_current(&p->view, &choice)) {
+@@ -243,8 +244,11 @@ static void bb_v3_pattern(bb_ui_in *in)
+     first = p->view.bank_index - p->view.bank_index % BB_UI_LIST;
+     in->items = 0;
+     for (k = 0; k < BB_UI_LIST; k++) {
+-        unsigned idx = first + k, key = idx - p->view.bank_page * BB_BROWSER_BANK_KEYS;
+-        bb_catalogue_id bank = key < BB_BROWSER_BANK_KEYS ? bb_browser_bank_cell(&p->view, key) : BB_CATALOGUE_NONE;
++        unsigned idx = first + k;
++        bb_browser page = p->view;                            /* the 16-key page that holds idx, not the one in view */
++        bb_catalogue_id bank;
++        page.bank_page = (uint16_t)(idx / BB_BROWSER_BANK_KEYS);
++        bank = idx < count_banks ? bb_browser_bank_cell(&page, idx % BB_BROWSER_BANK_KEYS) : BB_CATALOGUE_NONE;
+         if (bank == BB_CATALOGUE_NONE)
+             break;
+         bb_v3_cat(bb_catalogue_find(&bb_factory_catalogue, bank, p->view.group ? "song" : "name"), bb_v3_items[k],
+@@ -273,9 +277,13 @@ static void bb_v3_pattern(bb_ui_in *in)
+             in->sections++;
+         }
+     }
+-    in->sec_cur = p->view.part_index >= first ? (uint8_t)(p->view.part_index - first) : (uint8_t)BB_UI_NO;
+-    in->sec_next = (bb_nav_f.queued & BB_NAV_Q_SECTION) && bb_nav_f.section_queued >= first &&
+-                   bb_nav_f.section_queued != BB_NAV_NONE_IDX ? (uint8_t)(bb_nav_f.section_queued - first) : (uint8_t)BB_UI_NO;
++    cur = bb_nav_section_playing(p);                          /* the playing section; the cursor only when browsing */
++    if (cur == BB_NAV_NONE_IDX)
++        cur = p->view.part_index;
++    in->sec_cur = cur >= first && cur < first + in->sections ? (uint8_t)(cur - first) : (uint8_t)BB_UI_NO;
++    in->sec_next = (bb_nav_f.queued & BB_NAV_Q_SECTION) && bb_nav_f.section_queued != BB_NAV_NONE_IDX &&
++                   bb_nav_f.section_queued >= first && bb_nav_f.section_queued < first + in->sections ?
++                   (uint8_t)(bb_nav_f.section_queued - first) : (uint8_t)BB_UI_NO;
+     in->sec_pos = 0;
+     in->fill = bb_nav_f.fill_on;
+     in->fill_beats = 0;
+diff --git a/firmware/src/home_master/screen.inc b/firmware/src/home_master/screen.inc
+index b034606..300eb5a 100644
+--- a/firmware/src/home_master/screen.inc
++++ b/firmware/src/home_master/screen.inc
+@@ -51,6 +51,8 @@ static void hm_draw_row(unsigned row, int y, const hm_pattern_row *view,
+                             "name"), &AF_S, 106, text);
+             cv_text(77, y+30, &AF_S, text, BB_TEXT);
+         }
++    } else if (view->error == BB_PLAYER_CANCELLED) {   /* D8: a STOP-cancelled request is not a load failure */
++        cv_text(11, y+30, &AF_S, bb_notice_text(BB_NOTICE_CANCELLED_BY_STOP), BB_DIM);
+     } else if (view->error) {
+         cv_text(11, y+30, &AF_S, "NOT LOADED", BB_SPARK_RED);
+     } else if (shown->ticket && shown->choice.catalogue == &bb_factory_catalogue) {
+-- 
+2.54.0 (Apple Git-157)
+
