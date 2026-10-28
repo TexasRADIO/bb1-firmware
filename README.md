@@ -1,10 +1,11 @@
+<p align="center"><img src="docs/media/bb1-armadillo.jpg" width="380" alt="The BB1 Armadillo, transmitting"></p>
+
 ```
- ██████╗ ██████╗  ██╗      ┌──────────────────────────────────────────┐
- ██╔══██╗██╔══██╗███║      │  TWO BEATS.  ONE LITTLE BOX.              │
- ██████╔╝██████╔╝╚██║      │  firmware for the M-VAVE FM-1             │
- ██╔══██╗██╔══██╗ ██║      │  two drum machines · a bass that bites    │
- ██████╔╝██████╔╝ ██║      │  tape echo · spring · no computer needed  │
- ╚═════╝ ╚═════╝  ╚═╝      └──────────────────────────────────────────┘
+  ____   ____   _       TWO BEATS.  ONE LITTLE BOX.
+ | __ ) | __ ) / |
+ |  _ \ |  _ \ | |      firmware for the M-VAVE FM-1
+ | |_) || |_) || |      two drum machines · a bass that bites
+ |____/ |____/ |_|      tape echo · spring · no computer needed
 ```
 
 # BB1 — the FM-1 becomes a rhythm machine
@@ -13,10 +14,10 @@
 
 ```
           1 . . . 2 . . . 3 . . . 4 . . .
-  KIT A   ■ · · · · · ■ · · · ■ · · · · ·    808 ── synthesised live, voice by voice
-  KIT B   · · · · ■ · · · · · · · ■ · · ·    DMX ── sampled, hard-hitting
-  DILLO   ■ · ■ ■ · · ■ · ■ · · ■ · · ■ ·    acid ─ rubbery, resonant, rude
-  ECHO    ═══════════════════════════════▶   three tape heads, throw it with REC + FX
+  KIT A   ■ · · · · · ■ · · · ■ · · · · ·   808, live
+  KIT B   · · · · ■ · · · · · · · ■ · · ·   DMX, sampled
+  DILLO   ■ · ■ ■ · · ■ · ■ · · ■ · · ■ ·   acid bass
+  ECHO    ═══════════════════════════════▶  REC + FX
 ```
 
 ## What's in the box
@@ -68,8 +69,11 @@ Everything here is the complete source of the released firmware. One command reb
 
 ```sh
 python3 -I big-beat/integration/verify_release.py . /tmp/bb1-check \
-  --expect-app <app SHA-256> --expect-package <package SHA-256>
+  --expect-app a5e34e31a854eb1f731b8633350f751e2454c775c4131448b761b8f0e39f178f \
+  --expect-package 5345b617e7e8fc13460bfbdbc9d47019742002631ebb7aedd25f9639ef506718
 ```
+
+Those are the identities of **BB1 1.0**, the build the web installer ships (`bb1-1.0.fwsc`, 610,086 bytes). The sound library is `f4bbf1a409d8aadb3429232e49dfb06b121070532787d31078db9630b6e7efcc` (245,760 bytes).
 
 It runs the host test suites, the audio oracle, a 480-section level sweep, the from-source target build and the deterministic packaging, with negative cases. Exit 0 means the bytes match the release, bit for bit. The pinned toolchain and build inputs are listed in `big-beat/integration/inputs.json`.
 
