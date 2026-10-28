@@ -87,8 +87,8 @@
 ## Get it on your FM-1
 
 1. Plug the FM-1 into a computer with a USB **data** cable, and open **[thebigbeat.app/fm1/install](https://thebigbeat.app/fm1/install/)** in Chrome or Edge.
-2. Press **Install BB1**, then **Install the sounds**. About five minutes. Your projects, presets and settings stay where they are.
-3. Turn **MASTER** up, press **HOME**, press **PLAY**.
+2. Press **Install BB1** once. The installer handles the firmware and sounds together, checking the existing library before writing it. Allow about five minutes. Your projects, presets and settings stay where they are.
+3. With **MASTER** down, press **HOME**, then **PLAY**. Bring **MASTER** up gently.
 
 Want it gone? Go back to M-VAVE's official firmware any time with M-VAVE's own updater and their `FM-1.fwsc`. BB1 can't export its music to the computer yet, so copy out anything you want to keep before you switch.
 
@@ -111,7 +111,7 @@ Want it gone? Go back to M-VAVE's official firmware any time with M-VAVE's own u
 - **Saving:** on some units, saving a scene is refused with **PROTECTED / NOT BIG BEAT**. Saving hasn't passed testing yet, so don't rely on it to keep a performance setup. A fix is coming in an update.
 - **Headroom:** dense two-drum playback has stayed inside the audio deadline in every recorded test, but above the preferred processing headroom. Not every arrangement has been tested.
 - **Substitute voices:** a missing voice plays a substitute, and the pattern itself is unchanged. On a native 808 drum B, synth percussion plays as cowbell and zap as high tom.
-- **The browser player** is for trying the layout and controls. Both layers play the 808 there, and it doesn't reproduce hardware timing or the sampled kits.
+- **The browser player** runs the released engine with the native 808 and sampled LinnDrum, DrumTraks and DMX library. It lets you try the layout, controls and sound; browser results do not prove FM-1 hardware timing or scene persistence.
 
 ## Build it yourself
 
