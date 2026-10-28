@@ -298,6 +298,9 @@ static void __attribute__((noinline)) fm1_main(void)
         }
 #if FELUCCA_OTA
         /* Stock editor servicing disabled for Big Beat. */
+#if FELUCCA_CDC
+        bb_asset_midi_service();                        /* BB1 one-click install: the sound writer over MIDI */
+#endif
         ota_service();                                  /* M-UPGRADE handshake */
         if (usb.ota_req) {                              /* M-UPGRADE upgrade command */
             usb.ota_req = 0;

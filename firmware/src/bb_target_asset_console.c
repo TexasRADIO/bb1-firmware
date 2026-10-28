@@ -108,7 +108,7 @@ static int bb_asset_command(const char *p) {
     }
     if(con_word(&p,"barestart")) {
         if(!bb_asset_end(p)||!bb_asset_safe()||!bb_asset_ready())goto reply;
-        bb_asset_reply(0);fm1_delay_ms(20);fm1_reboot();return 1;
+        bb_asset_reply(0);if(con_cap){bb_asset_reboot_pending=1;return 1;}fm1_delay_ms(20);fm1_reboot();return 1;
     }
     return 0;
 reply:bb_asset_reply(rc);return 1;

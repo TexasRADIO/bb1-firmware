@@ -12,8 +12,18 @@ static struct {
     uint8_t dtr_seen, stalled;   /* stalled: the host stopped reading, drop the rest of this reply */
 } con;
 
+/* BB1 one-click install: while the MIDI editor tunnel runs a console line, output goes to its buffer. */
+static char *con_cap;
+static uint32_t con_cap_n, con_cap_max;
+static uint8_t bb_asset_reboot_pending;
+
 static void con_putc(char c)
 {
+    if (con_cap) {
+        if (con_cap_n < con_cap_max)
+            con_cap[con_cap_n++] = c;
+        return;
+    }
     uint32_t t0 = fm1_ms;
     while (co_w - co_r >= CO_N) {                      /* full: wait for usb_poll, briefly */
         if (!cdc.dtr || con.stalled || fm1_ms - t0 > 20u) {
@@ -362,6 +372,67 @@ static void con_params(void)
 
 #include "bb_target_diagnostics.c"
 #include "bb_target_asset_console.c"
+
+/* The web installer's sound step over USB-MIDI (editor command 80), so one click installs everything.
+ * Only the sound-library writer and a bounded read of its own region are reachable; every check of the
+ * serial path (safe state, audio hold, chunk CRCs, commit verify) is the same code. *reboot asks the
+ * caller to restart after its reply has gone out. */
+static int con_prefix(const char *s, const char *w) { while (*w) if (*s++ != *w++) return 0; return 1; }
+static uint32_t con_tunnel(const char *line, char *out, uint32_t max, int *reboot)
+{
+    const char *p = line;
+    int ok, ok2;
+    con_cap = out; con_cap_n = 0; con_cap_max = max; bb_asset_reboot_pending = 0;
+    if (con_prefix(line, "bastat") || con_prefix(line, "bainit 1 ") || con_prefix(line, "baw ") ||
+        con_prefix(line, "bacommit") || con_prefix(line, "barestart")) {
+        if (!bb_asset_command(line))
+            con_puts("refused\r\n");
+    } else if (con_word(&p, "flr")) {
+        const char *q = p;
+        uint32_t a = con_num(&q, &ok), n = con_num(&q, &ok2);
+        if (ok && ok2 && n >= 1u && n <= 128u && a >= 0xA0000u && a + n <= 0xDC000u)
+            con_flr(p);
+        else
+            con_puts("refused\r\n");
+    } else
+        con_puts("refused\r\n");
+    con_cap = 0;
+    *reboot = bb_asset_reboot_pending;
+    return con_cap_n;
+}
+
+#if FELUCCA_OTA
+/* BB1 runs no stock editor, so this is the only handler of editor-framed SysEx: F0 7D 46 4C 50 <line> F7
+ * (0x50 = command 80). Any other frame stays for ota_service(). Reply: F0 7D 46 4C 50 <console text> F7. */
+static void bb_asset_midi_service(void)
+{
+    static uint8_t reply[5u + 600u + 1u] __attribute__((section(".pool")));
+    const uint8_t *p;
+    uint32_t n, i, k;
+    char line[128];
+    int reboot = 0;
+    if (!ota_frame_get(&p, &n) || n < 7u || p[0] != 0x7Du || p[1] != 0x46u || p[2] != 0x4Cu || p[3] != 80u)
+        return;
+    for (i = 4, k = 0; i < n && k < sizeof line - 1u; i++, k++) {
+        if (p[i] < 32u || p[i] > 126u) { k = 0; break; }      /* printable ASCII only */
+        line[k] = (char)p[i];
+    }
+    line[k] = 0;
+    ota_frame_done();
+    if (k < 3u || i < n)
+        return;                                           /* malformed or too long: no reply */
+    reply[0] = 0xF0; reply[1] = 0x7D; reply[2] = 0x46; reply[3] = 0x4C; reply[4] = 80u;
+    k = con_tunnel(line, (char *)reply + 5, 600u, &reboot);
+    for (i = 0; i < k; i++)
+        reply[5u + i] &= 0x7Fu;
+    reply[5u + k] = 0xF7;
+    ota_wire_send(reply, 6u + k);
+    if (reboot) {
+        fm1_delay_ms(20);
+        fm1_reboot();
+    }
+}
+#endif
 static int bb_remote_command(const char *p);
 
 static void con_exec(const char *p)

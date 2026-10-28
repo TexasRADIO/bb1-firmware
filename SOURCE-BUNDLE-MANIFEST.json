@@ -1,6 +1,6 @@
 {
  "what": "GPL-3.0-only corresponding source for the Big Beat FM-1 candidate",
- "candidate_tree_sha256": "7f7511f52466b0c6843dd1cf6749edc8864003a19965b936786c061efc700b66",
+ "candidate_tree_sha256": "d4170ee810fe677fef0dc76dfee7ec028ee8c327f99eaf96a6d68f551bb7646d",
  "handoff_sha256": "977686cddd141aae05b49fa7ce686b14cd228c210d659951f8e85a470410f7cd",
  "felucca_upstream": {
   "snapshot": "/Volumes/Orange Base/Codex Workspaces/fm1-build-setup/Felucca-ef1f561b6b105f20350f6b1eac0dc0789a357f00",
@@ -1943,8 +1943,8 @@
    "bytes": 702
   },
   "firmware/src/bb_target_asset_console.c": {
-   "sha256": "76b0bfcbd87a9f401d5751df90ecdd22ac38e24fbe09afc755c9d345130775c4",
-   "bytes": 5255
+   "sha256": "13966428f578e68e1719afc84811a38eba69470984ff05001f20e37d4500a499",
+   "bytes": 5303
   },
   "firmware/src/bb_target_audio.c": {
    "sha256": "67ce9aba94c04747dd108051ae03daebd753b6e6eccd44235e92c2d0d5be70ed",
@@ -2019,8 +2019,8 @@
    "bytes": 3437
   },
   "firmware/src/console.c": {
-   "sha256": "329d5526739cd737de0bb656b9316b032153602e4419c95d28a453f3e6b9f396",
-   "bytes": 27809
+   "sha256": "22f3c0ae898001e05d339b8d0719557475fb0f2fa162693eb3477710a606f35f",
+   "bytes": 30727
   },
   "firmware/src/core.h": {
    "sha256": "0f73468dde8c0563d84cbf0644abe4a4d37b32fedec7a9b85e961e8fa9043f06",
@@ -2255,8 +2255,8 @@
    "bytes": 3387
   },
   "firmware/src/main.c": {
-   "sha256": "544e20ce5d597bd0b747ca5b79d71624a023877a3dd7d7fc754cd647e2aa8e89",
-   "bytes": 16355
+   "sha256": "d3430d5d1db9913b679c45efde33b2bf9d16f66564cb8b13df17610b2bc3278b",
+   "bytes": 16490
   },
   "firmware/src/master.c": {
    "sha256": "14ec3bd8c33455efa3c7ca8d703072ac62deedaf4750da7da5335ed41196b66d",

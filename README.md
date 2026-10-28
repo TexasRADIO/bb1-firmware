@@ -119,11 +119,11 @@ Everything here is the complete source of the released firmware. One command reb
 
 ```sh
 python3 -I big-beat/integration/verify_release.py . /tmp/bb1-check \
-  --expect-app a5e34e31a854eb1f731b8633350f751e2454c775c4131448b761b8f0e39f178f \
-  --expect-package 5345b617e7e8fc13460bfbdbc9d47019742002631ebb7aedd25f9639ef506718
+  --expect-app d5469d591f2b7c0f7aac56b6c3f40da06339b677fd7e43f218e3f6a5ccd4a7a2 \
+  --expect-package 001137925c219199bae394448c578c2d93de7b1528ddfd43e4b2686f297b3308
 ```
 
-Those are the identities of **BB1 1.0**, the build the web installer ships (`bb1-1.0.fwsc`, 610,086 bytes). The sound library is `f4bbf1a409d8aadb3429232e49dfb06b121070532787d31078db9630b6e7efcc` (245,760 bytes).
+Those are the identities of **BB1 1.1**, the one-click build (`bb1-1.1.fwsc`, 610,086 bytes). The sound library is `f4bbf1a409d8aadb3429232e49dfb06b121070532787d31078db9630b6e7efcc` (245,760 bytes). BB1 1.0 (app `a5e34e31…`, package `5345b617…`) is the commit before this one, and its source is also `bb1-source-1.0.tar` on the install page.
 
 It runs the host test suites, the audio oracle, a 480-section level sweep, the from-source target build and the deterministic packaging, with negative cases. Exit 0 means the bytes match the release, bit for bit. The pinned toolchain and build inputs are listed in `big-beat/integration/inputs.json`.
 
