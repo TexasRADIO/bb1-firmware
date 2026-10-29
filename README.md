@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/media/bb1-social.png" alt="BB1 for the M-VAVE FM-1: two beats, one little box. Drum A, drum B and Dillo, with echo and spring. The real BB1 STUDIO screen is shown." width="100%">
+  <img src="docs/media/bb1-social.png" alt="BB1 rhythm firmware for the M-VAVE FM-1: two beats, one little box. Two drum machines and Dillo, a bass synth, through tape echo and spring. The FM-1 is shown with the BB1 STUDIO screen." width="100%">
 </p>
 
 <p align="center">
