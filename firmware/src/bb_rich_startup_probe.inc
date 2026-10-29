@@ -31,7 +31,7 @@ static void bb_rich_diagnostic_startup(void){
     bb_rich_probe.mix_version=1;
     bb_rich_probe.ride_version=1;
     if(!bb_sample_boot_ready||bb_sample_probe.status!=BB_SP_PASS||
-       !bb_single_startup_admitted()||bb_sound.sample!=&bb_sample_store.binding||bb_sample_musical_count!=3){
+       !bb_single_startup_admitted()||bb_sound.sample!=&bb_sample_store.binding||bb_sample_musical_count<3){
         bb_rich_probe.status=BB_RP_ADMISSION;return;
     }
     bb_rich_probe.routes=BB_RP_ROUTES;bb_rich_probe.min_ticks=UINT32_MAX;

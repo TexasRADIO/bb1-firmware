@@ -113,11 +113,11 @@ HOST = {k: shlex.split(re.search(rf'^{k}="(.*)"$', flags, re.M).group(1)) for k 
 SAN = ['-std=c11', '-O1', '-Wall', '-Wextra', '-fsanitize=address,undefined']
 B = OUT / 'bin'; B.mkdir()
 
-def compile_and_run(name, cc, runargs=(), expect=None):
+def compile_and_run(name, cc, runargs=(), expect=None, returncode=0):
     r = run(['clang', *cc, '-o', str(B / name)], f'{name}-compile.log')
     assert r.returncode == 0, f'{name} compile failed (see {name}-compile.log)'
     r = run([str(B / name), *runargs], f'{name}.log', cwd=OUT)
-    assert r.returncode == 0, f'{name} exit {r.returncode}'
+    assert r.returncode == returncode, f'{name} exit {r.returncode} (expected {returncode})'
     last = (r.stdout.strip().splitlines() or [''])[-1]
     if expect: assert re.search(expect, r.stdout), f'{name}: {last}'
     return last
@@ -143,6 +143,31 @@ def host_tests():
     # firmware libc.c memset/memcpy against reference byte loops (the oracle uses the host libc, so this is the only check)
     res['libc'] = compile_and_run('libc_equiv', [*SAN, '-fno-builtin', '-Wno-unused-function', f'-DLIBC_C="{SRC}/firmware/src/libc.c"',
                                   str(T / 'libc/libc_equiv.c')], expect=r'cases, 0 mismatches')
+    # 1.2 scene conversion (r9.14 step 2): 1.1-library scenes load under a successor library, everything else refused
+    if 'bb_sample_scene_set_predecessor' in (SRC / 'firmware/src/bb/sample_scene.c').read_text():
+        res['scene_convert'] = compile_and_run('scene_convert', [*SAN, *HOST['HOST_WARN'], '-Wno-unused-parameter', '-Dsection(x)=used',
+            *HOST['HOST_DEFS'], *HOST['HOST_INC'], str(T / 'scene_convert/scene_convert.c'),
+            *[f'firmware/src/bb/{f}.c' for f in ('sample_scene', 'group_scene', 'bb_family_scene', 'bb_session', 'bb_core',
+              'bb909_patch', 'bb_crc32', 'bb_wire', 'group_gain', 'bb909_controls')], '-lm'],
+            expect=r'scene conversion: \d+ checks, 0 failures')
+    # L3 fix A gate (fix A trees only, those with x0x/metal_capture.inc): kit A's metal lanes via the compact capture,
+    # merged per sample in CB->CY order, are bit-identical to the released full render (outputs, whole kit, groups);
+    # the pre-sum and state mutations must fail (#4 6483954898, 6485319810, 6485803291, 6488119452)
+    if (SRC / 'firmware/src/bb/x0x/metal_capture.inc').exists():
+        cap = [*HOST['HOST_WARN'], '-Wno-unused-parameter', '-Wno-unused-variable', '-Dsection(x)=used', *HOST['HOST_DEFS'],
+               *HOST['HOST_INC'], str(T / 'fixA/capture_exact.c'), 'firmware/src/bb/group_gain.c', '-lm']
+        res['fixA_capture'] = compile_and_run('capture_exact', cap, expect=r'capture gate: \d+ checks, \d+ spans with metal, \d+ parameter/fader changes, 0 failures')
+        res['fixA_presum_fails'] = compile_and_run('capture_exact_presum', ['-DMUTATE_PRESUM', *cap], expect=r' [1-9][0-9]* failures', returncode=1)
+        res['fixA_state_fails'] = compile_and_run('capture_exact_state', ['-DMUTATE_STATE', *cap], expect=r' [1-9][0-9]* failures', returncode=1)
+        trg = [*cap[:-3], str(T / 'fixA/trigger_exact.c'), 'firmware/src/bb/group_gain.c', '-lm']
+        res['fixA_trigger'] = compile_and_run('trigger_exact', trg, expect=r'metal trigger: \d+ checks, 0 refused, 0 failures')
+        res['fixA_trigger_mutation_fails'] = compile_and_run('trigger_exact_mut', ['-DMUTATE_TRIGGER', *trg], expect=r' [1-9][0-9]* failures', returncode=1)
+        # a whole CPU1 call: spans with kit A's hits anywhere in it, the 12-hit cap refused unchanged (bb_metal_capture_call)
+        cal = [*cap[:-3], str(T / 'fixA/call_exact.c'), 'firmware/src/bb/group_gain.c', '-lm']
+        if 'bb_metal_capture_call' in (SRC / 'firmware/src/bb/x0x/metal_capture.inc').read_text():
+            res['fixA_call'] = compile_and_run('call_exact', cal, expect=r'call gate: \d+ calls compared .*, 0 failures')
+            for m in ('SEGFLAGS', 'HITSHIFT', 'EQUALORDER'):
+                res[f'fixA_call_{m.lower()}_fails'] = compile_and_run(f'call_exact_{m.lower()}', [f'-DMUTATE_{m}', *cal], expect=r' [1-9][0-9]* failures', returncode=1)
     if (OUT / 'route-matrix.csv').read_bytes() != (HERE / 'route-matrix.csv').read_bytes():
         res['route_matrix'] = 'DIFFERS from the checked-in route-matrix.csv'
     else:

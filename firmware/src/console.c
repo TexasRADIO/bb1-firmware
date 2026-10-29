@@ -359,6 +359,7 @@ static void con_crash(void)
     }
 }
 
+#if FELUCCA_TRACKS
 static void con_params(void)
 {
     uint32_t i;
@@ -369,6 +370,7 @@ static void con_params(void)
         con_puts(i % 8u == 7u || i + 1u == P_COUNT ? "\r\n" : " ");
     }
 }
+#endif
 
 #include "bb_target_diagnostics.c"
 #include "bb_target_asset_console.c"
@@ -440,7 +442,11 @@ static void con_exec(const char *p)
     if(bb_remote_command(p))return;
     if(bb_asset_command(p))return;
     if (con_word(&p, "help") || con_word(&p, "?"))
+#if FELUCCA_TRACKS
         con_puts("status  dbg  bbdiag  kitdiag  inp  crash  params  memr ADDR [LEN]  flr OFF [LEN]  uboot yes\r\n");
+#else
+        con_puts("status  dbg  bbdiag  kitdiag  inp  crash  memr ADDR [LEN]  flr OFF [LEN]  uboot yes\r\n");
+#endif
     else if (con_word(&p, "c1probe")) {
         bb_diag_counter("c1_probe_status",bb_c1_report.status);
         bb_diag_counter("c1_probe_alive",bb_c1_report.alive);
@@ -645,8 +651,10 @@ static void con_exec(const char *p)
         con_crash();
     else if (con_word(&p, "inp"))
         con_inp();
+#if FELUCCA_TRACKS
     else if (con_word(&p, "params"))
         con_params();
+#endif
     else if (con_word(&p, "memr"))
         con_memr(p);
 #if FELUCCA_FLASH

@@ -21,7 +21,7 @@ static int ota_erase(uint32_t off)
     if (!ota_in_area(off, 0x1000u) || (off & 0xFFFu))
         return -8;
     audio_silence();
-    return fl_erase4k(off, &took);
+    return st_erase_dark(off, &took);                 /* (fl_erase4k with the LED rows dark: storage_hw.c) */
 }
 static int ota_prog(uint32_t off, const void *p, uint32_t n)
 {

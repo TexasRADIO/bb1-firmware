@@ -574,7 +574,13 @@ static void bb_v3_knobs(bb_ui_in *in)
     case BB_NAV_SAVE: {
         char *o = bb_v3_title; const char *w = "SCENE ";
         while (*w) o[n++] = *w++;
-        o[n++] = (char)('1' + bb_scene_slot % 9u); o[n] = 0;
+        o[n++] = (char)('1' + bb_scene_slot % 9u);
+        if (bb_claim_armed(&bb_session_claim, bb_scene_slot)) {   /* other data: the held-SAVE prompt */
+            w = " HAS OTHER DATA";
+            while (*w) o[n++] = *w++;
+            edit = bb_claim_prompt(&bb_session_claim);
+        }
+        o[n] = 0;
         if (bb_face.requested.running) edit = "STOP TO STORE OR LOAD";
         break;
     }

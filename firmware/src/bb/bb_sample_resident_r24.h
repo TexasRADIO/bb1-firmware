@@ -11,9 +11,13 @@
 #include "bb_audio.h"
 #include "bb_sample_pack_r20.h"
 #include "bb_sample_gain.h"
+/* Caller-owned sample polyphony; zone/directory bounds are independent. */
+#define BB_SAMPLE_OWNER_SLOTS 24u
+_Static_assert(BB_SAMPLE_OWNER_SLOTS>0u && BB_SAMPLE_OWNER_SLOTS<=BB_SK_MAX_SLOTS,
+               "sample owner fits the existing slot contract");
 typedef struct {
  bb_sample_zone zones[8][16];
- bb_sample_slot slots[16]; /* existing tested capacity, not a target polyphony claim */
+ bb_sample_slot slots[BB_SAMPLE_OWNER_SLOTS]; /* capacity, not a hardware timing claim */
  bb_sample_audio_binding binding;
  const char *names[8];
  uint8_t counts[8],count;
@@ -35,7 +39,7 @@ static int bb_sample_resident_binding(bb_sample_resident*r,unsigned id,bb_sample
  static const uint8_t lane_notes[11]={36,38,45,47,50,37,39,56,49,46,42};
  if(!r||!out||!r->count||id>=r->count||
     bb_fsmp_overlap(out,sizeof *out,r,sizeof *r))return 0;
- bb_sample_audio_binding b={0};b.slots=r->slots;b.count=16;b.zones=r->zones[id];b.nz=r->counts[id];
+ bb_sample_audio_binding b={0};b.slots=r->slots;b.count=BB_SAMPLE_OWNER_SLOTS;b.zones=r->zones[id];b.nz=r->counts[id];
  b.gain=BB_SAMPLE_DEFAULT_GAIN;b.echo=64;b.spring=48; /* gain: see bb_control.h */
  for(unsigned lane=0;lane<11;lane++){
   b.lane_notes[lane]=255;

@@ -974,6 +974,16 @@ static void bb_nav_scan(uint32_t pressed,uint32_t notes) {
     bb_nav_fill_facts(&in.facts);
     bb_nav_f=in.facts;
     bb_nav_input(&bb_nav,&in,&bb_nav_o);
+#if BB_WITH_SESSION
+    /* SAVE into other data (bb/bb_save_claim.h): after the refused STORE armed
+     * the claim, a fresh SAVE press held 2 s on this page and slot, alone,
+     * replaces the slot. bb_nav does nothing with SAVE on the SAVE page. */
+    if(bb_claim_scan(&bb_session_claim,fm1_ms,bb_nav.page==BB_NAV_SAVE,bb_scene_slot,
+         !!(in.pressed&BB_NAV_BIT(BB_NAV_B_SAVE)),!!(in.held&BB_NAV_BIT(BB_NAV_B_SAVE)),
+         (in.held&~BB_NAV_BIT(BB_NAV_B_SAVE))||in.keys_held||in.keys)) {
+        (void)bb_session_request_ex(bb_scene_slot,0,1);bb_say(bb_session_message);
+    }
+#endif
     if(bb_nav_o.uboot) {
         /* Untouched platform gesture. Sounding panel notes stop now, as the
          * installed bb_keys_sync did (and bb_midi_input does for MIDI); the

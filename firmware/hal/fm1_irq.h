@@ -99,9 +99,35 @@ void fm1_fault_c(uint32_t *f)
     static volatile uint32_t in_fault;
     uint32_t i, count = fm1_crash.magic == FM1_CRASH_MAGIC ? fm1_crash.count : 0;
     uint32_t early = fm1_crash.magic == FM1_CRASH_MAGIC ? fm1_crash.early : 0;
+#ifdef FM1_CORE1_STACK_LO
+    if (f[24] >= FM1_CORE1_STACK_LO && f[24] <= FM1_CORE1_STACK_HI) {
+        /* The second core faulted, and this runs ON it (Felucca 1.6.1 a53ecf4, after Jangada). Record only:
+         * no screen, no IRQ change and no reset from here. A reset path would hold CPU1 first, i.e. itself
+         * (FM1_CORE1_FENCE), and freeze the FM-1 with CPU0 still running. CPU1 stops here; CPU0's next job
+         * wait times out, bb_c1_live_fail() holds CPU1 and audio goes on with one core. vec bit 8 marks
+         * a CPU1 crash in the record (fm1_crash_t keeps its layout). */
+        fm1_crash.magic = FM1_CRASH_MAGIC;
+        fm1_crash.count = count + 1u;
+        fm1_crash.vec = 0x100u | ((f[19] - (uint32_t)(uintptr_t)fm1_fatal_stubs) / 6u - 1u);
+        fm1_crash.pc = f[16];
+        fm1_crash.rets = f[25];
+        fm1_crash.sp = f[24];
+        fm1_crash.psr = f[20];
+        fm1_crash.icfg = f[21];
+        fm1_crash.uptime_ms = *(volatile uint32_t *)0x10804u / 24000u;
+        fm1_crash.early = early;
+        __asm__ volatile("csync" ::: "memory");
+        for (;;)
+            ;
+    }
+#endif
     fm1_irq_off();
-    if (in_fault++)                           /* fault while reporting: reset at once */
+    if (in_fault++) {                         /* fault while reporting: reset at once */
+#ifdef FM1_CORE1_HOLD
+        FM1_CORE1_HOLD();                     /* CPU1 held first (registers only): not left running in RAM the ROM, */
+#endif                                        /* the SPL and the loader reuse at boot (Felucca 1.6.1 FM1_RESET_PREP) */
         *(volatile uint32_t *)0x10000u |= 1u << 4;
+    }
     fm1_crash.magic = FM1_CRASH_MAGIC;
     fm1_crash.count = count + 1u;
     fm1_crash.vec = (f[19] - (uint32_t)(uintptr_t)fm1_fatal_stubs) / 6u - 1u;

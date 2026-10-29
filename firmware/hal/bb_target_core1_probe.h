@@ -260,9 +260,31 @@ mismatch:
 
 /* Completed 909 boot comparison retained in recovery package. */
 
-/* Registers ONLY: safe before BSS clear, including warm-reset leftovers. */
+/* Registers ONLY: safe before BSS clear, including warm-reset leftovers.
+ * Hold CPU1 with CPU0's bus-invalid traps masked (Felucca 1.6.1 a53ecf4, fm1_sys.h fm1_cpu1_halt,
+ * PR #247; felucca-bsp fm1_cpu1_stop.h). Holding CPU1 cuts the bus read it has outstanding (its worker
+ * loop polls the mailbox all the time) and the chip raises AXI read-invalid (DBG_MSG bit 4) a few
+ * instructions later. With FM1_GUARD_BUS armed (main.c) CPU0 took that as an exception: upstream saw
+ * 1 update in 6 with the second core on end in a crash report and a plain reboot instead of the update
+ * loader. So: traps off, hold, let the flag arrive, clear it, traps and the write lock back as found.
+ * Harmless when CPU1 never ran. BB_C1_REG is the host test's hook (tests/felucca-upstream). */
+#ifndef BB_C1_REG
+#define BB_C1_REG(a) (*(volatile uint32_t *)(uintptr_t)(a))
+#endif
+#define BB_C1_DBG_BUS 0x003F0030u   /* AXI rd/wr (4, 5), C0/C1 fetch/rd/wr (16..21): FM1_GUARD_BUS's bits */
 static inline void bb_c1_halt(void) {
-    BB_C1_CON|=2u;BB_C1_CON&=~8u;BB_C1_SYNC();
+    uint32_t locked=!(BB_C1_REG(0x1EEE240u)&1u),en,bus=BB_C1_DBG_BUS;   /* DBG_WR_EN bit 0: unlocked */
+    volatile uint32_t n;
+    __asm__("" : "+r"(bus));         /* (~bus = 0xFFC0FFCF would trip build.py's ROM-address check) */
+    if(locked)BB_C1_REG(0x1EEE240u)=0xE7u;                           /* unlock (as fm1_guard.h) */
+    en=BB_C1_REG(0x1EEE340u);                                        /* DBG_EN */
+    BB_C1_REG(0x1EEE340u)=en&~bus;BB_C1_SYNC();
+    BB_C1_REG(0x1EEE004u)|=2u;BB_C1_REG(0x1EEE004u)&=~8u;BB_C1_SYNC();   /* C1_CON: hold, then disable */
+    for(n=0;n<256u;n++);                                             /* the flag comes some cycles later */
+    BB_C1_REG(0x1EEE248u)=bus;BB_C1_SYNC();                          /* DBG_MSG_CLR: only the bus bits */
+    BB_C1_REG(0x1EEE340u)=en;
+    if(locked && (BB_C1_REG(0x1EEE240u)&1u))BB_C1_REG(0x1EEE240u)=0xE7u;   /* lock again */
+    BB_C1_SYNC();
 }
 
 void __attribute__((section(".c1_text"),noreturn,used)) bb_c1_worker(void) {

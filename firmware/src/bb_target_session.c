@@ -1,12 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Included after storage.c/project.c and before Big Beat UI. Main loop only.
  * Uses existing project slots ONLY for blank or recognized Big Beat records.
- * No automatic boot writes and no overwriting foreign/unsupported projects.
+ * No automatic boot writes and no overwriting foreign/unsupported projects,
+ * with one exception: a slot holding other data (no FELU record in either
+ * copy) may be replaced by SAVE after the player holds SAVE to confirm
+ * (bb/bb_save_claim.h). LOAD never interprets other data.
  */
 #if BB_WITH_SESSION
 #include "bb/bb_family_scene.h"
 #include "bb/group_scene.h"
 #include "bb/bb_expression_scene.h"
+#include "bb/bb_save_claim.h"
 #if BB_WITH_RICH_DRUM_RENDER
 #include "bb/bb_rich_scene.h"
 #define BB_TARGET_RICH_SCENE_BYTES BB_RICH_SCENE_OVERHEAD
@@ -60,6 +64,8 @@ static unsigned bb_session_job,bb_session_slot;
 static uint32_t bb_session_started;
 static const char *bb_session_message;
 static uint8_t bb_session_loaded;
+static uint8_t bb_session_claimed;   /* this SAVE job carries a completed held-SAVE confirm */
+static bb_save_claim bb_session_claim;  /* armed by a refused SAVE into other data (bb/bb_save_claim.h) */
 
 static int bb_session_usb_recording(void) {
 #if FELUCCA_UAC
@@ -123,7 +129,7 @@ static int bb_session_worker_ready(int load) {
     return !load && bb_c1_live.failed && bb_c1_live.held &&
         !bb_c1_live.busy && (BB_C1_CON&10u)==2u;
 }
-static int bb_session_request(unsigned slot,int load) {
+static __attribute__((noinline)) int bb_session_request_ex(unsigned slot,int load,int claim) {
     uintptr_t token;
     if(bb_session_busy()){bb_session_message="BUSY / PLEASE WAIT";return 0;}
     if(bb_kit_hold_request||bb_asset_hold_request||bb_session_hold_request||
@@ -139,12 +145,14 @@ static int bb_session_request(unsigned slot,int load) {
         bb_target_leave(0,token);bb_session_message="STOP / WAIT THEN RETRY";return 0;
     }
     bb_session_loaded=0;bb_session_slot=slot;bb_session_job=load?2u:1u;
+    bb_session_claimed=(uint8_t)(!load&&claim);
     bb_session_started=fm1_ms;bb_session_hold_ack=0;
     bb_kit_hold_ack=0;
     __asm__ volatile("" ::: "memory");bb_session_hold_request=bb_kit_hold_request=1;
     bb_target_leave(0,token);
     bb_session_message="PREPARING / AUDIO PAUSED";return 1;
 }
+static int bb_session_request(unsigned slot,int load){return bb_session_request_ex(slot,load,0);}
 /* Return 1 for an existing supported scene, 0 for blank, -1 for protected
  * foreign/corrupt content. Even a valid journal CRC needs scene validation. */
 static int bb_target_scene_decode(const void *data,size_t bytes){
@@ -183,29 +191,14 @@ static int bb_target_scene_decode(const void *data,size_t bytes){
 #endif
 #endif
 }
-static int bb_session_slot_state(unsigned obj) {
-    st_hdr_t h;int current=st_current(obj,&h);
-    if(current>=0) {
-        if(!bb_target_scene_decode(st_buf,h.len))return -1;
-        return 1;
-    }
-    /* No committed copy: only erased headers count as blank. A torn first
-     * save with an erased commit header is retryable; opaque header damage
-     * is protected, not automatically reformatted. */
-    for(unsigned copy=0;copy<2;copy++) {
-        uint8_t header[32];
-        if(st_read(st_sector(obj,copy),header,sizeof header))return -1;
-        for(unsigned i=0;i<sizeof header;i++)if(header[i]!=255)return -1;
-    }
-    return 0;
-}
+#include "bb_session_slot.inc"
 static void bb_session_release(void) {
     __asm__ volatile("" ::: "memory");bb_session_hold_request=bb_kit_hold_request=0;
-    bb_session_job=0;
+    bb_session_job=0;bb_session_claimed=0;
 }
 /* Returns 1 exactly when a job completes; UI then consumes message/loaded. */
 static __attribute__((noinline)) int bb_session_poll(void) {
-    unsigned obj;int state;
+    unsigned obj;int state,gate;
     if(!bb_session_job)return 0;
     if(bb_session_job==3)return 0; /* latched reset failure: keep silent */
     if(!bb_session_hold_ack||!bb_kit_hold_ack) {
@@ -225,13 +218,19 @@ static __attribute__((noinline)) int bb_session_poll(void) {
     }
     obj=OBJ_PROJECT0+bb_session_slot;
     state=bb_session_slot_state(obj);
-    if(state<0){bb_session_message="PROTECTED / NOT BIG BEAT";bb_session_release();return 1;}
+    gate=bb_save_gate(state,bb_session_job==2,bb_session_claimed);
+    if(gate==BB_GATE_ASK){
+        /* Other data and no confirm: write nothing; the SAVE page asks for a held SAVE. */
+        bb_claim_arm(&bb_session_claim,bb_session_slot,fm1_ms);
+        bb_session_message="OTHER DATA / HOLD SAVE";bb_session_release();return 1;
+    }
+    if(gate==BB_GATE_PROTECT){bb_session_message="PROTECTED / NOT BIG BEAT";bb_session_release();return 1;}
     /* No restore has begun. A failed precondition must release the pause;
      * only a failure after live-state mutation may retain the reset hold. */
     if(!pab_target_session_ready(&bb_sound)) {
         bb_session_message="OWNER NOT READY / CANCELLED";bb_session_release();return 1;
     }
-    if(bb_session_job==1) {
+    if(gate==BB_GATE_STORE) {
         if(!pab_session_snapshot_groups(&bb_sound,1)) {
             bb_session_message="OWNER STATE ERROR / NOT SAVED";bb_session_release();return 1;
         }
@@ -274,7 +273,7 @@ static __attribute__((noinline)) int bb_session_poll(void) {
         else if(st_save(obj,bb_session_memory.wire,(uint32_t)bytes))
             bb_session_message="SAVE FAILED / KEEP SCENE";
         else bb_session_message="SAVED / FLASH VERIFIED";
-    } else if(!state)bb_session_message="EMPTY SCENE";
+    } else if(gate==BB_GATE_EMPTY)bb_session_message="EMPTY SCENE";
     else {
         int n=st_load(obj,bb_session_memory.wire,sizeof bb_session_memory.wire);
         int result=BB_C1_SCENE_REJECTED;

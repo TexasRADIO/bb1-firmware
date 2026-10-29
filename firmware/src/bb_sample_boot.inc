@@ -13,9 +13,12 @@ static bb_aux_voices bb_aux_owner __attribute__((section(".pool")));
 static unsigned bb_sample_musical_count;
 #if defined(BB_SAMPLE_DUAL_TRIAL)
 static bb_sample_audio_binding bb_sample_b_binding;
-static bb_sample_slot bb_sample_b_slots[16] __attribute__((section(".pool")));
+static bb_sample_slot bb_sample_b_slots[BB_SAMPLE_OWNER_SLOTS] __attribute__((section(".pool")));
 #endif
 static unsigned bb_sample_boot_ready;
+/* BB1 1.0/1.1 sound library f4bbf1a4... (header CRC at +16, payload CRC at +12) */
+#define BB_SAMPLE_LIB11_HEADER_CRC 0xaab68e96u
+#define BB_SAMPLE_LIB11_PAYLOAD_CRC 0xf5f132ffu
 static uint32_t bb_sample_library_header_crc,bb_sample_library_payload_crc;
 static int bb_sample_rebind_cold(void){
  bb_sample_audio_binding entries[8];
@@ -45,21 +48,34 @@ static void bb_sample_boot(void) {
  unsigned bytes=bb_fsmp_u32(pack+8);
  if(bytes<256||bytes>BB_SAMPLE_PACK_LIMIT)return;
  if(!bb_sample_resident_prepare(&bb_sample_store,pack,bytes))return;
- if(bb_sample_store.count==4){
-  /* Refuse an arbitrary fourth musical kit instead of exposing it as one.
-   * Whole-pack CRC and zone structure passed resident_prepare already. */
-  if(!bb_sample_store.names[3]||
-     memcmp(bb_sample_store.names[3],"BB AUX",6)!=0||
-     bb_sample_store.names[3][6]!=0||bb_sample_store.counts[3]!=BB_AUX_ZONES||
-     !bb_aux_voices_bind(&bb_aux_owner,bb_sample_store.zones[3],BB_AUX_ZONES))return;
-  bb_sample_musical_count=3;
- }else if(bb_sample_store.count==3){
-  bb_sample_musical_count=3; /* Existing r20 pack remains valid, no aux. */
- }else return;
+ /* 1.2: 3..8 directory entries. An auxiliary layer ("BB AUX") may only be the LAST entry and is never a
+  * selectable kit, so the musical IDs are 0..musical-1 and 1.1's IDs 0..2 keep their meaning (a 1.1 library is
+  * three kits, or three kits + AUX at index 3). "BB AUX" anywhere else is refused rather than exposed as a kit.
+  * Whole-pack CRC and zone structure passed resident_prepare already. */
+ unsigned entries=bb_sample_store.count,aux=0;
+ if(entries<3||entries>8)return;
+ for(unsigned k=0;k<entries;k++){
+  const char *n=bb_sample_store.names[k];
+  if(!n)return;
+  if(memcmp(n,"BB AUX",6)==0&&n[6]==0){if(k!=entries-1)return;aux=1;}
+ }
+ if(aux&&(bb_sample_store.counts[entries-1]!=BB_AUX_ZONES||
+    !bb_aux_voices_bind(&bb_aux_owner,bb_sample_store.zones[entries-1],BB_AUX_ZONES)))return;
+ bb_sample_musical_count=entries-aux;
+ if(bb_sample_musical_count<3){bb_sample_musical_count=0;if(aux)bb_aux_voices_stop(&bb_aux_owner);return;}
  if(!bb_sample_rebind_cold())return;
- if(bb_sample_store.count==4&&!bb_audio_aux_bind(&bb_sound,&bb_aux_owner))return;
+ if(aux&&!bb_audio_aux_bind(&bb_sound,&bb_aux_owner))return;
  bb_sample_ui_names=bb_sample_store.names;bb_sample_ui_count=bb_sample_musical_count;
  bb_sample_library_header_crc=bb_fsmp_u32(pack+16);bb_sample_library_payload_crc=bb_fsmp_u32(pack+12);
+ /* Scenes saved with BB1 1.0/1.1's library (LinnDrum, DrumTraks, DMX + AUX) stay loadable when this library keeps
+  * those three machines in slots 0..2 (#64 6492165998 §2). */
+ {
+  static const char kits11[3][12]={"LinnDrum","DrumTraks","DMX"};   /* names are NUL-terminated in 12-byte fields */
+  static const uint8_t len11[3]={9,10,4};                              /* with the terminator; firmware has no strcmp */
+  unsigned same=bb_sample_musical_count>=3;
+  for(unsigned k=0;same&&k<3;k++)same=memcmp(bb_sample_store.names[k],kits11[k],len11[k])==0;
+  bb_sample_scene_set_predecessor(BB_SAMPLE_LIB11_HEADER_CRC,BB_SAMPLE_LIB11_PAYLOAD_CRC,same?3u:0u);
+ }
  bb_sample_boot_ready=1;
 }
 #if BB_WITH_SESSION

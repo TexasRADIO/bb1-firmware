@@ -33,7 +33,18 @@ static int st_erase(uint32_t off)
         return -8;
     f = irq_save();
     audio_silence();
-    rc = FL_FAR(fl_erase4k_ram)(off, &took);
+    fm1__led_lines(0);                          /* (Felucca 1.6 #236) the erase stops the LED scan for ~17 ms (the IRQs are off */
+    rc = FL_FAR(fl_erase4k_ram)(off, &took);    /* and its code is in the flash): one column would stay lit at full duty and the */
+    irq_restore(f);                             /* rest dark, a flash of the whole panel. Dark rows: the panel just drops out; the */
+    return rc;                                  /* tick lights the rows again at its next pass (also st_erase_dark below) */
+}
+/* the same for the update entry's staging erases (ota_hw.c) and the sound-library writer (bb_target_asset_console.c) */
+static int st_erase_dark(uint32_t off, uint32_t *took)
+{
+    uint32_t f = irq_save();
+    int rc;
+    fm1__led_lines(0);
+    rc = FL_FAR(fl_erase4k_ram)(off, took);
     irq_restore(f);
     return rc;
 }

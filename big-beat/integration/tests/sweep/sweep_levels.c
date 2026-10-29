@@ -77,7 +77,11 @@ static bb_audio audio;static gg_state groups[BB_MACHINES];
 static bb_phrase_index catalogue[MAXSEC];static unsigned nsec;
 static bb_factory_choice choices[MAXSEC]; /* r9.9: each section's catalogue entry, for its Dillo line */
 static bb_sample_resident store;static bb_aux_voices aux;
-static bb_sample_audio_binding current,entries[3],bbind;static bb_sample_slot bslots[16];
+static bb_sample_audio_binding current,entries[3],bbind;
+#ifndef BB_SAMPLE_OWNER_SLOTS
+#define BB_SAMPLE_OWNER_SLOTS 16u   /* before r9.14 step 4b */
+#endif
+static bb_sample_slot bslots[BB_SAMPLE_OWNER_SLOTS];   /* B owner: as bb_sample_boot.inc */
 static void push(bb_command c){assert(bb_command_push(&audio.commands,&c));}
 static float GAIN;
 static void setup(unsigned s){

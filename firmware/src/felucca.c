@@ -22,6 +22,30 @@
 #ifndef FELUCCA_UAC
 #define FELUCCA_UAC 1            /* USB audio input: the master output, 16-bit stereo 44.1 kHz (usb.c) */
 #endif
+#ifndef FELUCCA_EDITOR
+#define FELUCCA_EDITOR 0         /* BB1: Felucca's web-editor SysEx (editor*.c: sample upload, backup/restore, FM6, user
+                                  * presets, MENU, LEARN) is not compiled. main.c never serviced it in BB1 (the installer's
+                                  * command 80 is console.c bb_asset_midi_service). 1 = compile it again (still unserviced) */
+#endif
+#ifndef FELUCCA_USER_SAMPLES
+#define FELUCCA_USER_SAMPLES 0   /* BB1: no boot scan of Felucca's three user-sample slots (0xA0000 + k * 0x14000, inside
+                                  * the BB sound region since 1.0); nothing in BB1 plays them. 1 = scan them again */
+#endif
+#ifndef FELUCCA_TRACKS
+#define FELUCCA_TRACKS 0         /* BB1: Felucca's stock four-track state is not kept: trk[] (7,296 B), the song chain (13,180 B)
+                                  * and motion (1,340 B) are not initialised or allocated; nothing in BB1 plays them. The
+                                  * console's `params` (stock track 1's parameters) goes with them; `status` prints the same
+                                  * bytes. 1 = as before */
+#endif
+#ifndef FELUCCA_CLICK
+#define FELUCCA_CLICK 0          /* BB1: Felucca's metronome click is not rendered: only the stock sequencer (seq.c, not
+                                  * linked) starts it, so click_render returned at once in every audio block. 1 = as before */
+#endif
+#ifndef FELUCCA_HEADER
+#define FELUCCA_HEADER 0         /* BB1: the stock header bar (ui_draw.c draw_head: stock BPM, track slots, battery, REC,
+                                  * metronome, messages) is not drawn; BB1 showed it only above the 2-5 s UBOOT countdown,
+                                  * which now clears the whole screen. 1 = as before */
+#endif
 #ifndef FELUCCA_UAC_TONE
 #define FELUCCA_UAC_TONE 0       /* bench: the USB input sends test triangles instead of the music */
 #endif
@@ -43,6 +67,13 @@
 #include "fm1_time.h"
 static void bb_c1_transition_fence(void);
 #define FM1_CORE1_FENCE() bb_c1_transition_fence()
+/* fm1_irq.h fm1_fault_c: a fault on CPU1's stacks is recorded on CPU1 and stops there; a fault while
+ * reporting holds CPU1 before the reset (bb_target_core1_probe.h, bb_core1_probe.S) */
+extern uint32_t _bb_c1_ustack[], _bb_c1_sstack_top[];
+#define FM1_CORE1_STACK_LO ((uint32_t)(uintptr_t)_bb_c1_ustack)
+#define FM1_CORE1_STACK_HI ((uint32_t)(uintptr_t)_bb_c1_sstack_top)
+static inline void bb_c1_halt(void);
+#define FM1_CORE1_HOLD() bb_c1_halt()
 #include "fm1_sys.h"
 #include "fm1_irq.h"
 #include "fm1_guard.h"
@@ -105,7 +136,9 @@ static void bb_c1_transition_fence(void);
 #if FELUCCA_OTA
 #include "ota.c"
 #include "ota_hw.c"
+#if FELUCCA_EDITOR
 #include "editor.c"              /* web editor SysEx (needs the OTA SysEx plumbing) */
+#endif
 #endif
 #if FELUCCA_CDC
 #include "console.c"

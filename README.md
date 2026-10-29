@@ -76,7 +76,7 @@
 |  |  |
 |---|---|
 | **KIT A + KIT B** | Two independent drum machines running together, each with its own pattern, kit and level. A Linn groove under an 808? Go on. |
-| **Four machines** | The **808**, synthesised in real time, plus sampled **LinnDrum**, **DrumTraks** and **DMX**. Swap the machine under a pattern and it lands on the next bar. |
+| **Eight machines** | The **808**, synthesised in real time, plus seven sampled machines: **LinnDrum**, **DrumTraks**, **DMX**, **LM-1**, **Simmons**, **Rhythm King** and **Drumulator**. Swap the machine under a pattern and it lands on the next bar. |
 | **Dillo** | A monophonic bass synth with eight presets, from rubbery acid to hollow dub. Every era brings its own line. |
 | **Echo & spring** | A three-head tape echo and a spring reverb, shared by everything. Hold **REC + FX** for a dub throw. |
 | **67 songs** | Drum patterns in the style of records you know, section by section. |
@@ -108,10 +108,10 @@ Want it gone? Go back to M-VAVE's official firmware any time with M-VAVE's own u
 
 ## Known limits
 
-- **Saving:** on some units, saving a scene is refused with **PROTECTED / NOT BIG BEAT**. Saving hasn't passed testing yet, so don't rely on it to keep a performance setup. A fix is coming in an update.
+- **Saving:** on an FM-1 that came with its own firmware, a scene can still hold that firmware's data. BB1 shows **SCENE n HAS OTHER DATA** and writes nothing until you hold **SAVE** for two seconds, which replaces it. BB1 never loads that old data. Replacing it is new in 1.2 and hasn't been tried on an FM-1 yet.
 - **Headroom:** dense two-drum playback has stayed inside the audio deadline in every recorded test, but above the preferred processing headroom. Not every arrangement has been tested.
 - **Substitute voices:** a missing voice plays a substitute, and the pattern itself is unchanged. On a native 808 drum B, synth percussion plays as cowbell and zap as high tom.
-- **The browser player** runs the released engine with the native 808 and sampled LinnDrum, DrumTraks and DMX library. It lets you try the layout, controls and sound; browser results do not prove FM-1 hardware timing or scene persistence.
+- **The browser player** runs the released engine with the native 808 and the seven-machine sound library. It lets you try the layout, controls and sound; browser results do not prove FM-1 hardware timing or scene persistence.
 
 ## Build it yourself
 
@@ -119,11 +119,11 @@ Everything here is the complete source of the released firmware. One command reb
 
 ```sh
 python3 -I big-beat/integration/verify_release.py . /tmp/bb1-check \
-  --expect-app d5469d591f2b7c0f7aac56b6c3f40da06339b677fd7e43f218e3f6a5ccd4a7a2 \
-  --expect-package 001137925c219199bae394448c578c2d93de7b1528ddfd43e4b2686f297b3308
+  --expect-app 58445d2c73a8c29037996f7ce7afa2ed2478283bfd14d5eb416b5357c2b50027 \
+  --expect-package adc2619386ae32ae0b912cd12ac994e75a7a40900fc8eccb0d876128375323c8
 ```
 
-Those are the identities of **BB1 1.1**, the one-click build (`bb1-1.1.fwsc`, 610,086 bytes). The sound library is `f4bbf1a409d8aadb3429232e49dfb06b121070532787d31078db9630b6e7efcc` (245,760 bytes). BB1 1.0 (app `a5e34e31…`, package `5345b617…`) is the commit before this one, and its source is also `bb1-source-1.0.tar` on the install page.
+Those are the identities of **BB1 1.2** (`bb1-1.2.fwsc`, 610,086 bytes). Its sound library, with the seven sampled machines, is `154ef6b92553af5803c3e003dc5d2c379aed4e0503f24f08ad8b024cff7d821e` (245,760 bytes); BB1 1.0 and 1.1 used `f4bbf1a409d8aadb3429232e49dfb06b121070532787d31078db9630b6e7efcc`. BB1 1.1 (app `d5469d59…`, package `00113792…`) and BB1 1.0 (app `a5e34e31…`, package `5345b617…`) are earlier commits. Their sources are also on the install page as `bb1-source-1.1.tar` and `bb1-source-1.0.tar`.
 
 It runs the host test suites, the audio oracle (worker and serial render over all 601 catalogue sections), a 601-section level sweep, the from-source target build and the deterministic packaging, with negative cases. Exit 0 means the bytes match the release, bit for bit.
 
@@ -136,7 +136,7 @@ So a fresh checkout can read, test and audit everything, but it can't yet repeat
 
 ## Licence
 
-GNU GPL v3. See `LICENSE`, `LICENSING.md`, `LICENSES/` and `BIG-BEAT-LICENSING.md`. BB1 is a Felucca-family firmware; upstream notices are kept in `LICENSING.md`. M-VAVE, FM-1, Roland, TR-808, LinnDrum, DrumTraks, Sequential, DMX and Oberheim are trademarks of their respective owners. BB1 is independent and not affiliated with or endorsed by them. **No warranty:** you install it at your own risk.
+GNU GPL v3. See `LICENSE`, `LICENSING.md`, `LICENSES/` and `BIG-BEAT-LICENSING.md`. BB1 is a Felucca-family firmware; upstream notices are kept in `LICENSING.md`. M-VAVE, FM-1, Roland, TR-808, Linn, LinnDrum, LM-1, DrumTraks, Sequential, DMX, Oberheim, Simmons, E-mu, Drumulator and Rhythm King are trademarks of their respective owners. BB1 is independent and not affiliated with or endorsed by them. **No warranty:** you install it at your own risk.
 
 ```
   ────────────────────────────────────────────────────────────────

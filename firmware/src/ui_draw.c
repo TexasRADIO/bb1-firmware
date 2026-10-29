@@ -275,7 +275,7 @@ static int head_slot(char *b)
 {
     uint32_t k = song.sel % NTRK, s;
     b[1] = b[2] = 0;
-    if (chain.running) {
+    if (chain_running()) {
         s = chain.lane[k];
         b[0] = s < 4u ? (char)('A' + s) : '-';
         return 1;
@@ -292,7 +292,7 @@ static void head_group(void)
 {
     char b[8];
     int32_t x;
-    if (chain.running) {
+    if (chain_running()) {
         fmt_int(b, (int32_t)chain.row + 1);
         x = HEAD_GRP_R - (16 + 4 + text_w(&AF_M, b));
         x += cv_icon_mid(x, H_HEAD / 2, 16, ICON_X_SONG, T_MID, T_BG);   /* SONG: the disc */
@@ -319,7 +319,7 @@ static void draw_head(void)
     uint32_t sig = (uint32_t)song.playing * 3u + rec * 5u + (uint32_t)(song.octave + 8) * 11u + song.sel * 13131u +
                    (ui.msg_t ? str_hash(7u, ui.msg) : ui.layer * 7919u + (uint32_t)layer_locked() * 3u) + (uint32_t)song.g[G_BPM] * 101u + (ui.bpm_t != 0) * 31u +
                    (uint32_t)seq_counting() * 7u + (ui_prefs & PREF_BPM_LOCK) * 4099u +
-                   (uint32_t)batt_shown() * 7777u + (chain.running ? (chain.row + 1u) * 104729u : 0u) +
+                   (uint32_t)batt_shown() * 7777u + (chain_running() ? (chain.row + 1u) * 104729u : 0u) +
                    (slot ? str_hash(11u, sl) : 0u);
     int msg = ui.msg_t || ui.layer;
     int centre = !msg || ui.bpm_t || ui.layer == LAYER_GLO;   /* the BPM being changed: it stays, the message right */
@@ -367,7 +367,7 @@ static void draw_head(void)
     draw_rec_mark(rx, T_BG);
     if (centre) {
         int32_t ib[4], lx = g.bx + g.b[2];             /* lx: the right end of the BPM (and its lock) */
-        uint32_t id = song.playing ? (chain.running ? ICON_X_SONG : ICON_X_PLAY) : seq_counting() ? ICON_X_PLAY : ICON_X_STOP;
+        uint32_t id = song.playing ? (chain_running() ? ICON_X_SONG : ICON_X_PLAY) : seq_counting() ? ICON_X_PLAY : ICON_X_STOP;
         icon_ink(16, id, ib);                          /* the play state: the song's disc, play (counting in: the
                                                         * accent's, about to play), stop */
         cv_icon_mid(g.mx0 - HEAD_PLAY_GAP - ib[2], H_HEAD / 2, 16, id,
@@ -390,7 +390,7 @@ static void draw_head(void)
     } else {
         head_msg(-1, HEAD_MSG_W);
     }
-    if (!msg && (chain.running || song.octave))
+    if (!msg && (chain_running() || song.octave))
         head_group();
     if (!(msg && centre))
         draw_battery(HEAD_BAT_X);
@@ -1263,7 +1263,11 @@ static void draw_uboot(void)
     if (!ui.force && shown == ui.uboot)
         return;
     shown = ui.uboot;
+#if FELUCCA_HEADER
     lcd_fill(0, H_HEAD, 240, 240 - H_HEAD, T_BG);
+#else
+    lcd_fill(0, 0, 240, 240, T_BG);                    /* BB1: no stock header above the countdown */
+#endif
     ui.head_sig = ~0u;
     draw_text_box(0, 76, 240, &AF_M, "UPDATE MODE IN", T_TEXT, 1);
     draw_text_box(0, 102, 240, &AF_L, d, T_THEME, 1);
@@ -1545,6 +1549,8 @@ static void ui_draw_update(void)
     if (!scr_frame())
         return;
     draw_uboot();
+#if FELUCCA_HEADER
     draw_head();
+#endif
     scr_shown();
 }

@@ -8,6 +8,23 @@ _Static_assert(BB_SAMPLE_SCENE_BYTES<=3840u,"fits existing project journal");
 static uint32_t sample_scene_crc(const uint8_t *p,size_t n){
     return ~bb_crc32_add(bb_crc32_add(UINT32_MAX,p,12),p+16,n-16);
 }
+/* 1.2 scene conversion: a scene saved against the previous library is accepted when the installed library
+ * declares that library its predecessor (bb_sample_boot does, only when kits 0..pred_kits-1 are the same machines in
+ * the same slots). Its kit IDs must lie inside the predecessor's kits; the decoded identity is pinned to the
+ * installed library, so the next save is a current scene. The scene's own CRC, sizes, reserved bytes and every
+ * other check are unchanged; a scene pinned to any other library is still refused. */
+static uint32_t pred_header,pred_payload;
+static unsigned pred_kits;
+void bb_sample_scene_set_predecessor(uint32_t header,uint32_t payload,unsigned kits){
+    pred_header=header;pred_payload=payload;pred_kits=kits<=8?kits:0;
+}
+/* how many kit IDs a scene pinned to (h,p) may use under the installed library (header,payload,count); 0 = refused */
+static unsigned sample_scene_kits(const uint8_t *p,uint32_t header,uint32_t payload,unsigned count){
+    uint32_t h=bb_wire_get32(p+16),q=bb_wire_get32(p+20);
+    if(h==header&&q==payload)return count;
+    if(pred_kits&&h==pred_header&&q==pred_payload)return pred_kits<count?pred_kits:count;
+    return 0;
+}
 static int sample_scene_identity_valid(const bb_sample_scene_identity *i){
     return i && i->kit<8 && i->kind<=1 && (!i->kind||!i->kit) && i->echo<=127 && i->spring<=127 &&
            i->gain>0.0f && i->gain<=1.0f;
@@ -45,9 +62,8 @@ int bb_sample_scene_decode(const void *input,size_t bytes,uint32_t rate,
        !bb_wire_separated(w,sizeof *w,mix,16)||!bb_wire_separated(w,sizeof *w,id,sizeof *id)||
        !bb_wire_separated(mix,16,id,sizeof *id))return 0;
     const uint8_t *p=input;
-    if(memcmp(p,"BBKS",4)||!((p[4]==1&&p[28]==0)||(p[4]==2&&p[28]==1))||p[5]>=count||
-       bb_wire_get32(p+8)!=bytes||bb_wire_get32(p+12)!=sample_scene_crc(p,bytes)||
-       bb_wire_get32(p+16)!=header||bb_wire_get32(p+20)!=payload||p[29]||p[30]||p[31])return 0;
+    if(memcmp(p,"BBKS",4)||!((p[4]==1&&p[28]==0)||(p[4]==2&&p[28]==1))||p[5]>=sample_scene_kits(p,header,payload,count)||
+       bb_wire_get32(p+8)!=bytes||bb_wire_get32(p+12)!=sample_scene_crc(p,bytes)||p[29]||p[30]||p[31])return 0;
     bb_sample_scene_identity next={0};next.pack_header_crc=header;next.pack_payload_crc=payload;
     next.kit=p[5];next.echo=p[6];next.spring=p[7];next.kind=p[28];
     uint32_t gain=bb_wire_get32(p+24);memcpy(&next.gain,&gain,4);
@@ -96,7 +112,7 @@ int bb_sample_pair_scene_decode(const void *input,size_t bytes,uint32_t rate,
         if((bytes!=BB_SESSION_BYTES+48&&bytes!=BB_SESSION_BYTES+GG_SCENE_OVERHEAD+48)||
            memcmp(p,"BBKS",4)||bb_wire_get32(p+8)!=bytes||
            bb_wire_get32(p+12)!=sample_scene_crc(p,bytes)||
-           bb_wire_get32(p+16)!=header||bb_wire_get32(p+20)!=payload||p[5]>=count||p[30]>=count)return 0;
+           p[5]>=sample_scene_kits(p,header,payload,count)||p[30]>=sample_scene_kits(p,header,payload,count))return 0;
         for(unsigned i=33;i<36;i++)if(p[i])return 0;
         for(unsigned i=40;i<48;i++)if(p[i])return 0;
         for(unsigned k=0;k<2;k++){

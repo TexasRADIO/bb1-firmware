@@ -202,7 +202,9 @@ static void bb_target_init(void) {
                 (uint8_t)(notes[k]!=0 && k%4u==0u),0};
     }
 #endif
+#if FELUCCA_TRACKS
     for(k=0;k<NTRK;k++)trk[k].p[P_MUTE]=1;
+#endif
     song.playing=0;
 }
 static void bb_target_audio(int32_t *out,uint32_t n) {

@@ -206,7 +206,9 @@ typedef struct {                               /* format 1 (until 0.5 beta), rea
 } project_v1_t;
 _Static_assert(sizeof(project_v2_t) == 2552u && sizeof(project_v1_t) == 688u && sizeof(project_v3_t) == 2584u &&
                sizeof(project_v4_t) == 2680u, "formats 1 / 2 / 3 / 4 as they were stored");
-project_store_t proj_slot[4] __attribute__((section(".noinit")));
+/* BB1: internal linkage, so the compiler drops this 15,360 B retained cache when nothing live reads it (BB1 has no
+ * Felucca project load/save; the NOINIT region keeps .noinit KEEP, so an external definition stayed allocated) */
+static project_store_t proj_slot[4] __attribute__((section(".noinit")));
 
 static uint32_t proj_hash(const void *p, uint32_t n)   /* FNV-1a over n bytes */
 {
@@ -1079,11 +1081,13 @@ static void persist_boot(void)                    /* before settings_init / pane
 #if FELUCCA_SLICE
     slc_store_boot();                              /* (the scans read each slot's stored slices) */
 #endif
+#if FELUCCA_USER_SAMPLES
     {
         uint32_t k;
         for (k = 0; k < SMP_USER_SLOTS; k++)
             smp_user_scan(k);
     }
+#endif
     {
         int n = st_load(OBJ_SETTINGS, &p, sizeof p);
         if (settings_import(&p, n))

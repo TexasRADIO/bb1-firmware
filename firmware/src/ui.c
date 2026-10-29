@@ -432,7 +432,10 @@ static void ui_message(const char *s) { ui_say(s, ""); }
  * for the header's 130 px after the icon) */
 #define MSG_NO_SAMPLE MSG_NOFILE "NO SAMPLE"
 
-static int chain_busy(void) { return chain.running || chain.armed; }
+/* BB1 (FELUCCA_TRACKS 0): the stock song chain never runs (no linked code arms it), so these are constant 0 and the
+ * chain state is not allocated */
+#define chain_running() (FELUCCA_TRACKS && chain.running)
+static int chain_busy(void) { return FELUCCA_TRACKS && (chain.running || chain.armed); }
 /* Main loop only, with interrupts enabled. PLAY may be consumed between reads;
  * take one coherent snapshot before a flash operation or song preparation. */
 static int transport_busy(void)

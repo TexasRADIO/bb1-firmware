@@ -9,7 +9,7 @@ static int bb_asset_read(void *ctx,uint32_t off,void *out,unsigned n) {
     (void)ctx; fm1_wdt_feed(); return st_read(off,out,n);
 }
 static int bb_asset_erase(void *ctx,uint32_t off) {
-    uint32_t took; (void)ctx; fm1_wdt_feed(); return fl_erase4k(off,&took);
+    uint32_t took; (void)ctx; fm1_wdt_feed(); return st_erase_dark(off,&took); /* LED rows dark (storage_hw.c) */
 }
 static int bb_asset_program(void *ctx,uint32_t off,const void *data,unsigned n) {
     (void)ctx; fm1_wdt_feed(); return fl_write(off,data,n);

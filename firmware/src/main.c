@@ -117,6 +117,7 @@ static void fm1_fault(const fm1_crash_t *c)
  * stock engines or their factory patterns just to mute them immediately. */
 static void felucca_init(void)
 {
+#if FELUCCA_TRACKS
     uint32_t i;
     chain_defaults(&chain_config);
     for (i = 0; i < G_COUNT; i++)
@@ -128,6 +129,9 @@ static void felucca_init(void)
         pat_sig[i] = steps_sig(t);
         pat_last[i] = 0;
     }
+#else
+    song.g[G_BPM] = GP[G_BPM].def;             /* the one stock value BB1 still shows (console status, UBOOT header) */
+#endif
     song.sel = 0;
     song.master_q12 = 2048;
     ui.home = 1;
@@ -276,7 +280,9 @@ static void __attribute__((noinline)) fm1_main(void)
                 if (ui.uboot) {
                     ui.uboot = 0;
                     ui.force = 1;                       /* what the countdown covered */
-                    ui_message("UPDATE CANCELLED");
+#if FELUCCA_HEADER
+                    ui_message("UPDATE CANCELLED");    /* (shown only by the stock header) */
+#endif
                 }
                 t0 = fm1_ms;
             } else if (fm1_ms - t0 > 2000u && fm1_ms - t0 <= 5000u) {

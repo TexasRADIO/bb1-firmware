@@ -17,6 +17,8 @@ size_t bb_sample_scene_encode(const bb_family_scene *, const uint8_t *,
                              const bb_sample_scene_identity *, void *, size_t);
 /* Expected library fingerprints and kit count come from the validated resident
  * pack. Failure may touch workspace only; identity/mix outputs stay unchanged. */
+/* 1.2 scene conversion: accept scenes pinned to this predecessor library (kits 0..kits-1); kits 0 clears */
+void bb_sample_scene_set_predecessor(uint32_t header,uint32_t payload,unsigned kits);
 int bb_sample_scene_decode(const void *,size_t,uint32_t,uint32_t,uint32_t,unsigned,
                            bb_family_scene_workspace *,uint8_t *,bb_sample_scene_identity *);
 /* v3 adds B identity without changing v1/v2 interpretation. Offline codec;
