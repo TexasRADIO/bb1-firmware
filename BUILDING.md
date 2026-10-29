@@ -1,4 +1,18 @@
-# Building Felucca
+# Building BB1 1.2
+
+For the released BB1 image, use the verifier documented in [README.md](README.md#build-it-yourself):
+
+```sh
+python3 -I big-beat/integration/verify_release.py . /tmp/bb1-check \\
+  --expect-app 58445d2c73a8c29037996f7ce7afa2ed2478283bfd14d5eb416b5357c2b50027 \\
+  --expect-package adc2619386ae32ae0b912cd12ac994e75a7a40900fc8eccb0d876128375323c8
+```
+
+This command requires the pinned external inputs listed in `big-beat/integration/inputs.json`. Some inputs currently live at fixed paths on the release build machine and are not distributed in this repository. A fresh checkout alone cannot yet reproduce the target image; see the README's build-input limitations and `big-beat/integration/build/README.md`.
+
+The instructions below are retained upstream Felucca documentation. Their general build script, feature flags, emulator and installation links do not describe the released BB1 1.2 build. They are preserved as historical developer reference, not as an alternative BB1 release recipe.
+
+## Retained upstream Felucca build reference
 
 The build makes three files in `build/`:
 
