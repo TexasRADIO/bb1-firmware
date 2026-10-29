@@ -82,3 +82,14 @@ int bb_factory_read_recipe(const bb_catalogue *c,const bb_factory_choice *choice
     if(!bb_telegram_patch_valid(&r.telegram))return BB_RECIPE_RANGE;
     *out=r;return BB_RECIPE_OK;
 }
+
+/* 1.5: a song's own tempo and swing (settings.bpm 30..300, settings.swing 0..60 on the recipe scale, x2 = 100+swing).
+ * Songs never used them before; the player applies them when a drum layer loads a section of a different song. */
+int bb_factory_read_song_tempo(const bb_catalogue *c,const bb_factory_choice *choice,unsigned *bpm,unsigned *swing_x2) {
+    uint32_t b,w;
+    if(!c || !choice || !bpm || !swing_x2 || !bb_factory_choice_valid(c,choice) || choice->group!=BB_BROWSER_SONGS)return 0;
+    bb_catalogue_id settings=bb_catalogue_find(c,choice->bank,"settings");
+    if(!bb_catalogue_unsigned(c,bb_catalogue_find(c,settings,"bpm"),300,&b) || b<30)return 0;
+    if(!bb_catalogue_unsigned(c,bb_catalogue_find(c,settings,"swing"),60,&w))return 0;
+    *bpm=b;*swing_x2=100u+w;return 1;
+}

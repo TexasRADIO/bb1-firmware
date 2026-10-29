@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "bb/sample_scene.h"
+#include "bb/bb_sample_gain.h"
 #include "bb/bb_core.h"
 /* every scene here is all-808 (no 909 layer), so the 909 parameter table is never read */
 const void *drum909_param(int voice, int i);
@@ -66,6 +67,20 @@ int main(void)
         n = single(OLD_H, OLD_P, 1, 0); buf[40] ^= 1; expect(dec1(n, 7, &id) == 0, "a tampered scene is refused");
         n = single(OLD_H, OLD_P, 1, 0); buf[16] ^= 1; expect(dec1(n, 7, &id) == 0, "a re-pinned scene fails its own CRC");
     }
+    /* 1.5 (Joe: RAISE): a converted scene at the old 0.25 level loads at the default; anything else keeps its level */
+    bb_sample_scene_set_predecessor(OLD_H, OLD_P, 3);
+    { bb_sample_scene_identity q = { OLD_H, OLD_P, 0.25f, 1, 64, 48, 0 };
+      n = bb_sample_scene_encode(&scene, mix, &q, buf, sizeof buf);
+      expect(dec1(n, 7, &id) == 1 && id.gain == BB_SAMPLE_DEFAULT_GAIN, "converted 0.25 scene raised to the default"); }
+    { bb_sample_scene_identity q = { OLD_H, OLD_P, 0.5f, 1, 64, 48, 0 };
+      n = bb_sample_scene_encode(&scene, mix, &q, buf, sizeof buf);
+      expect(dec1(n, 7, &id) == 1 && id.gain == 0.5f, "converted scene at another level keeps it"); }
+    { bb_sample_scene_identity q = { NEW_H, NEW_P, 0.25f, 1, 64, 48, 0 };
+      n = bb_sample_scene_encode(&scene, mix, &q, buf, sizeof buf);
+      expect(dec1(n, 7, &id) == 1 && id.gain == 0.25f, "a current scene at 0.25 keeps it"); }
+    { bb_sample_scene_identity q[2] = { { OLD_H, OLD_P, 0.25f, 0, 64, 48, 0 }, { OLD_H, OLD_P, 0.25f, 2, 30, 20, 0 } };
+      n = bb_sample_pair_scene_encode(&scene, mix, q, buf, sizeof buf);
+      expect(dec2(n, 7, ids) == 1 && ids[0].gain == BB_SAMPLE_DEFAULT_GAIN && ids[1].gain == BB_SAMPLE_DEFAULT_GAIN, "converted pair raised on both layers"); }
     bb_sample_scene_set_predecessor(OLD_H, OLD_P, 3);   /* under the 1.1 library itself nothing changes */
     n = single(OLD_H, OLD_P, 2, 0);
     { uint8_t m[16]; expect(bb_sample_scene_decode(buf, n, 44100, OLD_H, OLD_P, 3, &work, m, &id) == 1 && id.kit == 2 &&

@@ -20,5 +20,7 @@ void bb_telegram_step(bb_telegram *,bb_note,uint32_t frames);
 int bb_telegram_key(bb_telegram *,unsigned note,unsigned velocity,int legato,
                     uint32_t phrase_frames);
 void bb_telegram_stop(bb_telegram *);
-void bb_telegram_render(bb_telegram *,float *,uint32_t frames);
+/* Returns the frames rendered before the voice went idle (0 = the whole span
+ * is silence and the caller may skip mixing it). Idle writes zeroes. */
+uint32_t bb_telegram_render(bb_telegram *,float *,uint32_t frames);
 #endif

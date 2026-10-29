@@ -1,6 +1,6 @@
 {
  "what": "GPL-3.0-only corresponding source for the Big Beat FM-1 candidate",
- "candidate_tree_sha256": "d4170ee810fe677fef0dc76dfee7ec028ee8c327f99eaf96a6d68f551bb7646d",
+ "candidate_tree_sha256": "80f2e431b45e67a595c4d8c7f3031b89d002b00b83f134058aa4acc4739c85eb",
  "handoff_sha256": "977686cddd141aae05b49fa7ce686b14cd228c210d659951f8e85a470410f7cd",
  "felucca_upstream": {
   "snapshot": "/Volumes/Orange Base/Codex Workspaces/fm1-build-setup/Felucca-ef1f561b6b105f20350f6b1eac0dc0789a357f00",
@@ -18,17 +18,25 @@
   "the sampled-kit sound library (not GPL source; redistribution authorised by the owner, see BIG-BEAT-LICENSING.md)"
  ],
  "files": {
+  "BB1-1.5-BUILD.md": {
+   "sha256": "e057e6be9d387a7965ee85f2d7ce1a543c45ef869c1f810310d3521423fdf069",
+   "bytes": 3282
+  },
+  "BB1-1.5-HARDWARE-RECEIPT.json": {
+   "sha256": "190bbbe6b3cf24ce830c5ee7589b716af21d59e77771bf877d98ab83d2cff340",
+   "bytes": 2932
+  },
   "BIG-BEAT-LICENSING.md": {
-   "sha256": "9e228bedfc512fd76f9b914cbffc00ac8b61207e0aa400ddd89515290dcbed25",
-   "bytes": 2633
+   "sha256": "d8d8f031a88efe0bfb9e740f0edcc01aee4170ba6b1398d92f3f80bf9141f442",
+   "bytes": 3847
   },
   "BIG_BEAT_PATCH_MANIFEST.json": {
    "sha256": "58974531015e81997ef0760fb98ea0b6db2f6f2e87087ecf4d76c13e4ffe5a36",
    "bytes": 41737
   },
   "BUILDING.md": {
-   "sha256": "70f7a0b924a35b107fc8266694c8bd2137d2904f7a0b8023e45402226b92bd84",
-   "bytes": 6297
+   "sha256": "a020477d7e197b32d668e08724975380f268a7be3d162f5ee5fbf315dc44016d",
+   "bytes": 7696
   },
   "LICENSE": {
    "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
@@ -69,6 +77,10 @@
   "LICENSING.md": {
    "sha256": "89c487f3dc19218cc0d1ec0d73466092a5cbc5ab842a98b9a2f625a215cb0e5e",
    "bytes": 6722
+  },
+  "RELEASE-BUILD-PINS.json": {
+   "sha256": "946d522e3da4f588c5837fa7e0fe0868f403714758de1ed8cfcdd57677d1dfbf",
+   "bytes": 1244
   },
   "assets/fonts/InterTight[wght].ttf": {
    "sha256": "b81b73dcb64df3c230cabade7df6c5773bf863233f24c9ee51087519f1f88b6f",
@@ -139,8 +151,8 @@
    "bytes": 7082
   },
   "big-beat/catalogue/catalogue.json": {
-   "sha256": "484bf560bf87a0a1e5a0a9415404b2f36c39c1aa1a7dae532aaca51828027a6c",
-   "bytes": 8078435
+   "sha256": "439c04d3caf5a07c9190a089e5b679ccabf962a25cb4f966016dd5b058e8f451",
+   "bytes": 12150169
   },
   "big-beat/catalogue-generator/README.md": {
    "sha256": "f7b53f3421ebddedf1aeb64de51e6a00ca6b7fc14483804713bbacbc2962dbdb",
@@ -502,6 +514,22 @@
    "sha256": "e79c953874463d91000a3687690175f3f119e24b089eb70f3dee5a9b36d65fd1",
    "bytes": 2868
   },
+  "big-beat/integration/build/recipes/duo/link/run-r3/guarded-gc.ld": {
+   "sha256": "89a9d3a72b1c93be9bb8ca575372bfa8b598f5beccc1ac0fb29a77e7fb9f0811",
+   "bytes": 1844
+  },
+  "big-beat/integration/build/recipes/duo/recipe.json": {
+   "sha256": "22dc94ca4860f165e25951486c24707f828244c7d9e2b53933d4c40c7ddf51b9",
+   "bytes": 2895
+  },
+  "big-beat/integration/build/recipes/duo-fixa/link/run-r3/guarded-gc.ld": {
+   "sha256": "89a9d3a72b1c93be9bb8ca575372bfa8b598f5beccc1ac0fb29a77e7fb9f0811",
+   "bytes": 1844
+  },
+  "big-beat/integration/build/recipes/duo-fixa/recipe.json": {
+   "sha256": "726a565fd437b033b086f38cdab948ee92e337613c473ca608e0db6035f83344",
+   "bytes": 2926
+  },
   "big-beat/integration/build/recipes/profile-r9.10/link/run-r3/guarded-gc.ld": {
    "sha256": "89a9d3a72b1c93be9bb8ca575372bfa8b598f5beccc1ac0fb29a77e7fb9f0811",
    "bytes": 1844
@@ -586,9 +614,13 @@
    "sha256": "353a486be2c392c12ae3eeaae41d145b82c72afe70018850ef2c303d6e4e285d",
    "bytes": 17875
   },
+  "big-beat/integration/tests/acid_bank/acid_bank.c": {
+   "sha256": "3dc9da9139114994bbddaaa0d41b0496a56b54db5daed7eaa88fa3f26ee8a812",
+   "bytes": 2226
+  },
   "big-beat/integration/tests/capture.c": {
-   "sha256": "f522685d295a50058f74627d144061633a7229b9e47c4b461394a24aca77c5eb",
-   "bytes": 14810
+   "sha256": "aba55208e7eb6e37eb85f7ddbb5a193fae4f679f32550528713a57decea315d1",
+   "bytes": 14754
   },
   "big-beat/integration/tests/check_handoff.py": {
    "sha256": "f23896d6b98d3cd6cc440a27e17ea9425d917e28e79823717999b911f3b395bf",
@@ -597,6 +629,26 @@
   "big-beat/integration/tests/check_handoff_doc.py": {
    "sha256": "43f777a1266ebb01e40cd4172e2afd24d91f74b4c11b4bc5a20e5615ce0af04b",
    "bytes": 1534
+  },
+  "big-beat/integration/tests/fixA/call_exact.c": {
+   "sha256": "58e074a6f835c9820715e0b07d15ca3c1c234ff2476fca9ac3ecf76ba3ddda63",
+   "bytes": 8492
+  },
+  "big-beat/integration/tests/fixA/capture_exact.c": {
+   "sha256": "ff0a11dffc40f06c930207dd4a18f4ca23c8275a90d5c3ee17fd5611944d4b24",
+   "bytes": 5394
+  },
+  "big-beat/integration/tests/fixA/metal_job.c": {
+   "sha256": "9a8684469178beaca47e3d1def019123e9d21cff8c31acd7291c76ac5303478c",
+   "bytes": 4902
+  },
+  "big-beat/integration/tests/fixA/oracle_fixa.py": {
+   "sha256": "521f8bf8f3b4aa9d32a559e9f1b08d150507d5637106ca7d973ff8b10d695a4c",
+   "bytes": 2897
+  },
+  "big-beat/integration/tests/fixA/trigger_exact.c": {
+   "sha256": "13452548cea3b8b2b9ead702d586610764926812399e784dbaf671e38339d60e",
+   "bytes": 1832
   },
   "big-beat/integration/tests/host_flags.sh": {
    "sha256": "b40f3c22880eb419e92d163eefaa09d0d9975d8504f5787d370feae610b059ae",
@@ -619,12 +671,20 @@
    "bytes": 3502
   },
   "big-beat/integration/tests/oracle/integration-480.c": {
-   "sha256": "1068024489e119bc559e5c0d72b7e3fb764152b51f992095088102a514c7166a",
-   "bytes": 10829
+   "sha256": "1bfc579e03103d3dd642662d14633a7b7b9c9bea5a5c8146d8bf444fcafc6f38",
+   "bytes": 11781
   },
   "big-beat/integration/tests/png.py": {
    "sha256": "f1bf7e03cf4fc4867dce54e8cdced9c09b3aeb11f131eea23e1091fa07e6eef2",
    "bytes": 1883
+  },
+  "big-beat/integration/tests/scene_convert/scene_convert.c": {
+   "sha256": "c52d1fb45ee7f06009efdee009edbe5783726bda00c81144cf512de2ef89ae63",
+   "bytes": 6723
+  },
+  "big-beat/integration/tests/song_tempo/song_tempo.c": {
+   "sha256": "3302fbeef50f5e2d495b5ec22fe2554b0241816ef1415193a09b70d0f463c4d2",
+   "bytes": 2515
   },
   "big-beat/integration/tests/stack_frames.py": {
    "sha256": "783a77bf459e10ed1e80cc4dd0f8ba4bd4d8402887e2a0c2556ff27e87936cf0",
@@ -639,8 +699,8 @@
    "bytes": 1947
   },
   "big-beat/integration/tests/sweep/sweep_levels.c": {
-   "sha256": "b80cd2b0aca922bfbc90735e2b1218dfe0d8043d8011c849631110ddb446906c",
-   "bytes": 10149
+   "sha256": "5fd28aa2a4eeddcfad3ccb53506a4f9ab8581193972a2f6693654ff060f2fefb",
+   "bytes": 10308
   },
   "big-beat/integration/tests/test_kit_intent.c": {
    "sha256": "40d82047ab41c73c6c30fcb92330fc2b727d720b66f4b7afe98bee0dfdca0a18",
@@ -667,8 +727,8 @@
    "bytes": 3017
   },
   "big-beat/integration/verify_release.py": {
-   "sha256": "aa48ba6ed23f235bd48fca4ce7fe162a3575bbb8f9305c890c55e5a779793deb",
-   "bytes": 13647
+   "sha256": "b8dccd9ec304a912eca521bb27f91d1611f7113eb4d526676e4250189cf17fe9",
+   "bytes": 18549
   },
   "big-beat/timing/tests/integration/command.json": {
    "sha256": "4dcf765308ea0ed58c94abe10e747b507fb058d1d452c7738a8240b4c9b9dafb",
@@ -774,6 +834,10 @@
    "sha256": "ef06bc2cae6b528ef81a709a710682459d4a89938fddf997be98a2e3ff9f2417",
    "bytes": 9268
   },
+  "firmware/hal/bb_c1_metal_job.h": {
+   "sha256": "ab369161732cf77613d6c85350865038867c16de444785f078806d4331a10a5f",
+   "bytes": 5596
+  },
   "firmware/hal/bb_c1_probe_protocol.h": {
    "sha256": "c95b5162a076f1ad639094e40c14157d1da56ef7f597a6a40b0d3ad161d79b57",
    "bytes": 3307
@@ -783,8 +847,8 @@
    "bytes": 7566
   },
   "firmware/hal/bb_c1_rich_hooks.inc": {
-   "sha256": "605d73e60868126f40cfcbd3de7a1460b26e78ea392f5a346e812dd86720d1d3",
-   "bytes": 7665
+   "sha256": "3becab42f88f4c1486a76ab13c3710eccb49f43207a0721f706cb85883d56506",
+   "bytes": 14589
   },
   "firmware/hal/bb_core1_probe.S": {
    "sha256": "d906f99042ff053cb6bc5098a0bfac29528d0f3b390aafe50b733ac084fccc7e",
@@ -799,8 +863,8 @@
    "bytes": 880
   },
   "firmware/hal/bb_target_core1_probe.h": {
-   "sha256": "e7b088d18655dc8f1395ee2844b4945931f794162a9e288a7e8c6194fece908a",
-   "bytes": 20308
+   "sha256": "bbcf4fd83fc292eb266da654d4b7730b256f4c86eefddb5f936aa13c238ec3dc",
+   "bytes": 22345
   },
   "firmware/hal/compact.h": {
    "sha256": "eb2a54e440fad43d6d2025cb5e3bbfe26d89e3c831fb8311b29019aa6d9543a1",
@@ -839,8 +903,8 @@
    "bytes": 37146
   },
   "firmware/hal/fm1_irq.h": {
-   "sha256": "f16738e512c056fdd9c9294107198ade0830974fb7cf4f19a3570380360a4943",
-   "bytes": 5908
+   "sha256": "a5d9c0725b1822ed1e479c15d7083e71fed5de7626f106913305dc5266a17141",
+   "bytes": 7299
   },
   "firmware/hal/fm1_isr.S": {
    "sha256": "2aad84e24a51c79b187ef3faf9d1bae108b1389bf78659f6b02dbbd95d8a7d7b",
@@ -871,8 +935,8 @@
    "bytes": 999
   },
   "firmware/hal/fm1_uart.h": {
-   "sha256": "0df7266a58996c688a4279c6b7edbaa7921e18805c8a65f1ff156680b03fcff6",
-   "bytes": 2864
+   "sha256": "e11cf99fb013d17859afb0eff595e5cd37a6659a6582ba4ef845b905fd1e2a88",
+   "bytes": 3969
   },
   "firmware/hal/fm1_usb.h": {
    "sha256": "12b9b31bde0dbb15fa15379a215eaec11e882bd33c18f4b250fa9e3a47c202f0",
@@ -1011,8 +1075,8 @@
    "bytes": 6800
   },
   "firmware/src/audio.c": {
-   "sha256": "2bb09352fd211c7981c946af57733ae95b21a6e15545150fe524aa925dbbdc7d",
-   "bytes": 6749
+   "sha256": "81519133e18e36bd4bebf216b27bf08f6543a9289f20605c2615277f7fb45651",
+   "bytes": 6774
   },
   "firmware/src/aux_navigation.c": {
    "sha256": "097f6e7d0e507594c48717b5ce8e3306a06ef7bd784a7986cb4e17d5f58bd8f8",
@@ -1083,8 +1147,8 @@
    "bytes": 1420
   },
   "firmware/src/bb/bb_audio.c": {
-   "sha256": "9f6ea1bc7e7ad003504b5166dd8b7dab90d3713a43732a96bcc7158f5bd058fc",
-   "bytes": 96806
+   "sha256": "e5ea271244cc06436707c9ef4661d06f3cc1aabdc63743bf4c2542dc6d524da6",
+   "bytes": 109341
   },
   "firmware/src/bb/bb_audio.h": {
    "sha256": "5a1274b6c3c435e5dffb014475267e562b0c6f427d41d6ce784123709850bdf9",
@@ -1111,8 +1175,8 @@
    "bytes": 7494
   },
   "firmware/src/bb/bb_audio_phrase_render.c": {
-   "sha256": "3c909a6aabcdd654c6f50c3d63ffb742550d5e9d538466b2528ad4c75c81147e",
-   "bytes": 12285
+   "sha256": "6a7b501c38dce381470be4faf4c99b06835f12b475e866c0e749dd3c324339f5",
+   "bytes": 12899
   },
   "firmware/src/bb/bb_audio_session.c": {
    "sha256": "5ee169a338207dff6463eaac8c0e23e391818de06082c6d631f8f8490508fb00",
@@ -1139,12 +1203,12 @@
    "bytes": 3999
   },
   "firmware/src/bb/bb_browser.c": {
-   "sha256": "c8cb50073c019a5b85c03eaebec1dc20e307e272223b3d08db872f825a6940aa",
-   "bytes": 8845
+   "sha256": "21103be0385ff8ba84ae10457254bd56b56aff8dabea9e3bff61455a56cfc129",
+   "bytes": 8946
   },
   "firmware/src/bb/bb_browser.h": {
-   "sha256": "f07fd72e5f390b70811a489420fad31b40842fa287edbbf39023596f93eb25e1",
-   "bytes": 2318
+   "sha256": "807a1d385c1f967903de5453c7926f0ce76e73579b1d4dd45dc633220e280456",
+   "bytes": 2454
   },
   "firmware/src/bb/bb_catalogue.c": {
    "sha256": "5b02cc781a0c578cd5c0c0061e8b8fbb06bd424d2b3b74c74e37633ee3bedaa7",
@@ -1163,20 +1227,20 @@
    "bytes": 1054
   },
   "firmware/src/bb/bb_control.c": {
-   "sha256": "a5356b38ab9c33a88ae3c6d7b147b010b6f2c813c26d2376f488324970d815f4",
-   "bytes": 16699
+   "sha256": "b106ed05f3dfd882bdafa7c8f7efdd5fa9f12871fbd9f792283f3016dfe4afeb",
+   "bytes": 17558
   },
   "firmware/src/bb/bb_control.h": {
-   "sha256": "afa8971b260178727c4254219675b237f197bf5c54b723579bef74ed2afaa768",
-   "bytes": 9167
+   "sha256": "0a5e0be555d74122f9647ab5cbfcf9f142a6bc055a37ea8d112e9b432eb23776",
+   "bytes": 9650
   },
   "firmware/src/bb/bb_core.c": {
-   "sha256": "940123a66aae6fdc8eaff09eddd631e0b113049ca3dd26ac30a63dede5793634",
-   "bytes": 14573
+   "sha256": "3fc760a3a76607304d2fd87cebd50a319e878d0488f3a06d2edbcd3df3ce1d93",
+   "bytes": 16761
   },
   "firmware/src/bb/bb_core.h": {
-   "sha256": "ad733a33f1dd5b6a6c0c1e44e024eb3d32175685c621e9b703345ef6abcc7a69",
-   "bytes": 5813
+   "sha256": "ace9c7368a5198b96493cebeefab4e8279e22325f674a2c4b5db539782d0de3a",
+   "bytes": 5814
   },
   "firmware/src/bb/bb_crc32.c": {
    "sha256": "6432b7fd2be8a5e367f513a561cc7a3beee28002b29d33798c362131cb67a18f",
@@ -1279,12 +1343,12 @@
    "bytes": 1192
   },
   "firmware/src/bb/bb_factory_recipe.c": {
-   "sha256": "1d4f12a90ba32e6a5ddaa86108dda5e53c384bd964e2f6df9ab775c28ab4b9f8",
-   "bytes": 5789
+   "sha256": "50c279297f4987213ff45d315ab0a4546c327b2c80441005afc74ac543cd6212",
+   "bytes": 6584
   },
   "firmware/src/bb/bb_factory_recipe.h": {
-   "sha256": "93732c02946c6e321acb6339e6ca133f05144a2996a7774623f6c29051830ed2",
-   "bytes": 1343
+   "sha256": "e55d52cb33033f68928a25b329f6e0632c1f49cfd13dfd04ce486b48eaf012ee",
+   "bytes": 1527
   },
   "firmware/src/bb/bb_factory_trio.c": {
    "sha256": "838a2ec0fa1bbe6c8e7affd67c369f510b7d4933b610349185699b56eb332e11",
@@ -1338,6 +1402,14 @@
    "sha256": "46e250a3c053c8b6cc46d8697ab1d4cddd6b2183da15c6e107f8a8e096830259",
    "bytes": 996
   },
+  "firmware/src/bb/bb_midi_compat.h": {
+   "sha256": "828a0ae4293f045d6b12bc4d5b415dd9a4a6dfd17faea3ccfe954428ea9bb66f",
+   "bytes": 5822
+  },
+  "firmware/src/bb/bb_midi_settings.h": {
+   "sha256": "96d5e2d6ba469557f65910d266cd743814a5296dec23190c85508bd7882e4b6f",
+   "bytes": 1136
+  },
   "firmware/src/bb/bb_note_expression.c": {
    "sha256": "d3af02e495ce0cea8dc79d8df7c02782f3c5532f37fa1e0e148af1456f4ab323",
    "bytes": 961
@@ -1355,8 +1427,8 @@
    "bytes": 445
   },
   "firmware/src/bb/bb_one_drum_profile.h": {
-   "sha256": "4a5a9fa00596e90d66f5f89570c09a52d003fd4ebc05d134e05132dbff21330d",
-   "bytes": 1720
+   "sha256": "26892d44e5fd9b6890b7e55b394a79ca6a6e49b00281eb8bbb736bd47f12407a",
+   "bytes": 2046
   },
   "firmware/src/bb/bb_output.c": {
    "sha256": "873a0da4879a23883f72b0fb8cafdcad2612b539052629dcd9d878c78868f7b7",
@@ -1407,8 +1479,8 @@
    "bytes": 91
   },
   "firmware/src/bb/bb_performance_catalogue.inc": {
-   "sha256": "1264c9bc3cfbd10f3102f291000a20385214a3b1ed3ec1968cf7241a52972a66",
-   "bytes": 995885
+   "sha256": "2c2dd0c021a9949be01bbc926cb1f2b1bf413ebabaf63d57e885d3fa0536b4fc",
+   "bytes": 893317
   },
   "firmware/src/bb/bb_performer.c": {
    "sha256": "500f378f2cd014ab9d126130864dc43f2577d955b76ff95882a3c1cced693e9b",
@@ -1455,8 +1527,8 @@
    "bytes": 935
   },
   "firmware/src/bb/bb_player.c": {
-   "sha256": "8e7dca7b713a68bc23e2e7be2dcb3f3b8d11e59e7ea540c7a4e1706931846d1d",
-   "bytes": 14949
+   "sha256": "f5c6be507a9bcfd8ae73b597cf51432db851b053303fc0fed42b4ebbe8de3567",
+   "bytes": 15852
   },
   "firmware/src/bb/bb_player.h": {
    "sha256": "65ac32c99977143f945de87a931f8e03cb91dad5cdceaacd89b8726d9e80d31f",
@@ -1531,12 +1603,16 @@
    "bytes": 1636
   },
   "firmware/src/bb/bb_sample_resident_r24.h": {
-   "sha256": "24660a90932a4ace8d5b31f2c00414468631067797e279eb941fc2d033a239e3",
-   "bytes": 2145
+   "sha256": "431985bc04953813aa63420c1e41a367666c58b7d7a07366bd9dd8b50db7f363",
+   "bytes": 2423
   },
   "firmware/src/bb/bb_sample_voice_r1.h": {
    "sha256": "ad1e52a0f4158a39014fc06ff6cb8db3930f4da19bf8b81b61aad4dda26a8728",
    "bytes": 3417
+  },
+  "firmware/src/bb/bb_save_claim.h": {
+   "sha256": "4f01940f712b9f5de3eff770fe62f8f2acd42fedf4770626e03bae848776bc8a",
+   "bytes": 5068
   },
   "firmware/src/bb/bb_scope.h": {
    "sha256": "2fbaf7a73d5ee1c3e3affd4a60d6fa191d9c4940e385f290a354b5e8025ba128",
@@ -1595,12 +1671,12 @@
    "bytes": 973
   },
   "firmware/src/bb/bb_telegram.c": {
-   "sha256": "9d24cdba91711496f8cf6fdaabf6effc21e43b3d23d8df8610e230d16b5cf3fa",
-   "bytes": 6923
+   "sha256": "7720969cfd5001254c16c24c16f48be674a4898551229d860f4224a3224def63",
+   "bytes": 7390
   },
   "firmware/src/bb/bb_telegram.h": {
-   "sha256": "7ce72e08cd0ce978925fd0f16f4e3683785347b3d162cf82aa5634d8ac75f80f",
-   "bytes": 1212
+   "sha256": "908f2df407302f5785eb192c0f88006bbd78b4e237b5694ba5898bfa9603cd36",
+   "bytes": 1367
   },
   "firmware/src/bb/bb_transpose.h": {
    "sha256": "315126fea6a7b196acf619cc1fdfd84f3d224d7baa59fb4ba7e08f153d2e9aa2",
@@ -1695,12 +1771,12 @@
    "bytes": 3086
   },
   "firmware/src/bb/sample_scene.c": {
-   "sha256": "dea357b1e8b40bec055686aa3833ee1ffcdc9f029124360e8946d57895d19f11",
-   "bytes": 7221
+   "sha256": "6122526f983b8ab5f4acaaab9a1f00dbe72c9d8a6643093a719b6e0525f6eee3",
+   "bytes": 9037
   },
   "firmware/src/bb/sample_scene.h": {
-   "sha256": "03197db39391fc3cdc9041ad18c7b3520c334af895cca66faabee2284abd4575",
-   "bytes": 2036
+   "sha256": "1e8b790a40d81e8435939aa79076e36c06130cd7943d0ec08349371e21a76948",
+   "bytes": 2231
   },
   "firmware/src/bb/x0x/UPSTREAM_LICENSE": {
    "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
@@ -1751,12 +1827,20 @@
    "bytes": 7681
   },
   "firmware/src/bb/x0x/group_renderer.c": {
-   "sha256": "79419c685be0a4efd568554f0d1f41e2ceac072d40a66477c8fd5b8ad94dbe7a",
-   "bytes": 718
+   "sha256": "9e79bc0aba1455cbba26cd8425266a5f9b63ebd1a93265c9bad0558c7afa2a17",
+   "bytes": 747
   },
   "firmware/src/bb/x0x/group_renderer_generated.inc": {
    "sha256": "0cd53be7e945b1afc4171a725c589b844d9904c251c7838af61dea0154041a55",
    "bytes": 13218
+  },
+  "firmware/src/bb/x0x/metal_capture.h": {
+   "sha256": "588e1902a2622ef2873637f92e8992d03ebd7570cd059fabadae4c59acad6dbe",
+   "bytes": 3623
+  },
+  "firmware/src/bb/x0x/metal_capture.inc": {
+   "sha256": "b41900b8f557e184dd485b83ceac58c37534ae4d8ec0a8fb25a2ef2e0f33cc4b",
+   "bytes": 11971
   },
   "firmware/src/bb/x0x/x0x_param.h": {
    "sha256": "51bc82a79fdcdb8090ec94e4dd2abe9f95cfb6171e521457678b090ca2010e27",
@@ -1842,8 +1926,24 @@
    "sha256": "54eab8136402b72b1eb2acf5a246ec11333086682e08ce11ec98f2251f4b4703",
    "bytes": 3039
   },
+  "firmware/src/bb_midi_globals.inc": {
+   "sha256": "a182856d274ccc19c0271ec337947d73eaa7239607ff6e63f1e12fa982ff137c",
+   "bytes": 300
+  },
+  "firmware/src/bb_midi_settings_hold.inc": {
+   "sha256": "770d0bda64c560214bff1e636f45278912aafb184199c7528cb7e39baf7890bb",
+   "bytes": 1828
+  },
+  "firmware/src/bb_midi_ui_draw.inc": {
+   "sha256": "77184c9262df198d5a3aa8cc933ac43012f280c0057d3a456e581beed8b85491",
+   "bytes": 2169
+  },
+  "firmware/src/bb_midi_ui_input.inc": {
+   "sha256": "003734491776b3f527089111a42eb99a206b00f9a468e1be8795d8a27b96fe71",
+   "bytes": 3050
+  },
   "firmware/src/bb_mixer_contract.inc": {
-   "sha256": "4757e623ea335b49d6d05f7d068231b6afbb9b5e61bd1a80e28ee59fbc6d6387",
+   "sha256": "c74dd55e8e3c440b4c233d93283445b94b644fd5b22e157a92f4c72fa25162ab",
    "bytes": 2107
   },
   "firmware/src/bb_nav.c": {
@@ -1863,12 +1963,12 @@
    "bytes": 14890
   },
   "firmware/src/bb_nav_firmware.inc": {
-   "sha256": "d093e193e5126cb25c1295bfe53b52bf03075910efddc6ea01e173dde2d56c5e",
-   "bytes": 51076
+   "sha256": "68a1cbea1ea577acba2c33f1b345c4f5cf66673c04bf9b4a2ab22aa96273e542",
+   "bytes": 52938
   },
   "firmware/src/bb_playbook_face.inc": {
-   "sha256": "bf0180bd60806d9f4561c417b0d172bf97e9fcdee927f70bbba0e329a79f5ba3",
-   "bytes": 15111
+   "sha256": "089217ff09e0472995354b2540a2147b267a23e0f00f49eeb04c0b5ff173dcf3",
+   "bytes": 15113
   },
   "firmware/src/bb_recovery_console.inc": {
    "sha256": "f6876bae84873106acfd28a9cb85ba00b8eed32cb02aeae5838c8bd2b5cf347c",
@@ -1895,20 +1995,20 @@
    "bytes": 970
   },
   "firmware/src/bb_remote_transport.inc": {
-   "sha256": "5b15f826b971f161c4e4249eb02b1a7fcbbf16fc840826e3fd672143f39ebf51",
-   "bytes": 5466
+   "sha256": "be6b1a808a85a5942fe2095e4967628510f5bba946cf52568d47737a778cc67a",
+   "bytes": 7762
   },
   "firmware/src/bb_rich_panel.inc": {
    "sha256": "e49706be3a2d3cf2c13e9de0eb5e299105e3aed5c52eeeb7494b95d18f5ac65a",
    "bytes": 3036
   },
   "firmware/src/bb_rich_startup_probe.inc": {
-   "sha256": "22820cf3140ddb86aa77fc36b41629b1bb68f379f4beab9c09a69e7764703b2e",
-   "bytes": 19726
+   "sha256": "e5d7a211561fd3591012399ad4611493b2a21b7abf0134e12b1fa24a630aab79",
+   "bytes": 19725
   },
   "firmware/src/bb_sample_boot.inc": {
-   "sha256": "bed7bf46e550cd91c6b769c443e21393f4035a689db8bbc7055506088c3f04bd",
-   "bytes": 7585
+   "sha256": "b0a6a53cd10b9deb4b562413022b0e51fc66830139194b35dd417214ebb56e70",
+   "bytes": 8783
   },
   "firmware/src/bb_sample_peak_snapshot.inc": {
    "sha256": "e0a68a1fcdfca24c96d91de2c26db45440a334cd5ef3476d1a307e93c90527b0",
@@ -1926,13 +2026,17 @@
    "sha256": "4bd12363ccd33a8078df26a8434ea946eae7da58050ab3d0f8b6eb2bd3cbc3c7",
    "bytes": 8802
   },
+  "firmware/src/bb_session_slot.inc": {
+   "sha256": "5a3ce52184bc0c800423e3cfc539e423076f1b29eb6652ed2bac8d45d10cf18a",
+   "bytes": 2008
+  },
   "firmware/src/bb_snapshot_startup_probe.inc": {
    "sha256": "a4ca39271c2952cdb0dd8942ea9b14a1e588ed54100eadb74e199f50ed74035a",
    "bytes": 6830
   },
   "firmware/src/bb_sound_picker_draw.inc": {
-   "sha256": "4091df0140f53b4c979fada0f89f6adbdb04c1948d09b9d3d0f330a5979de44b",
-   "bytes": 4462
+   "sha256": "027ab6d7cfa7f450dace79aaaf2f2e4b966521ec9546c4dfa4b763f38a3e1005",
+   "bytes": 4505
   },
   "firmware/src/bb_sound_picker_input.inc": {
    "sha256": "3cd41a8fc774d09b899062d5dae6ca7819a0ace19a33336715305b8f682c7ee5",
@@ -1943,12 +2047,12 @@
    "bytes": 702
   },
   "firmware/src/bb_target_asset_console.c": {
-   "sha256": "13966428f578e68e1719afc84811a38eba69470984ff05001f20e37d4500a499",
-   "bytes": 5303
+   "sha256": "ae510caf6863173cec724df24986e9f7f9282ff647ee2d70e15b76fbd19d057f",
+   "bytes": 5341
   },
   "firmware/src/bb_target_audio.c": {
-   "sha256": "67ce9aba94c04747dd108051ae03daebd753b6e6eccd44235e92c2d0d5be70ed",
-   "bytes": 14906
+   "sha256": "e53da851892487dfcc3ebb13c1b5824275732262b58e800aa1f6c5279deb0a35",
+   "bytes": 14932
   },
   "firmware/src/bb_target_bank_service.c": {
    "sha256": "1a4e8ded708ac87dae1b285bae046724fe609235c3d2cb70dcc0b7e8831cb740",
@@ -1959,24 +2063,24 @@
    "bytes": 21608
   },
   "firmware/src/bb_target_midi.c": {
-   "sha256": "02944c5d3db0ff8192eb5523b9edbaa55ab8bb84814c36601301b99bc0f598d7",
-   "bytes": 5892
+   "sha256": "d9de7ac82508c855d081e4fecf897521fe64b2dd1376c6edab1b31cca4aaa490",
+   "bytes": 8323
   },
   "firmware/src/bb_target_recovery.c": {
    "sha256": "8bf6d856fda19bdb2bbe5bfc7491f893f5d43105f564fbe5865d2fcbfe0ad515",
    "bytes": 2830
   },
   "firmware/src/bb_target_session.c": {
-   "sha256": "b6f6b2579a8cbcd4f32b820a9cf81dc47e141eef788151b1a46056cc7344d586",
-   "bytes": 14865
+   "sha256": "70b0994edc00c1a74465a069d3942cd5d8639ebc6c78c151570fcfd8f616286f",
+   "bytes": 15269
   },
   "firmware/src/bb_target_timing.h": {
    "sha256": "2677f6cc3d4da4d51d2b7df082b39ca9a8d971d0e80032fba6acb1c14db47cd5",
    "bytes": 3916
   },
   "firmware/src/bb_target_ui.c": {
-   "sha256": "7aad1e55ea5506fb7a911a9a872cd8868ebd066a60abb11938ea7396510e4502",
-   "bytes": 106773
+   "sha256": "28138e7a916e4a56ad661f9c1b143f2aa9f6a5fdc1abda6a85d652178c8df49c",
+   "bytes": 107752
   },
   "firmware/src/bb_ui_909.inc": {
    "sha256": "eede78aa9997ff1b42210cd1c4086db053bede0fc0ada70716b1c822099060fc",
@@ -1987,16 +2091,16 @@
    "bytes": 1000
   },
   "firmware/src/bb_ui_v3/bb_ui.c": {
-   "sha256": "ef9305e3772a2f2feb5e21f77f89ec14dc1372ca5112cbd4b971efa21a8862b2",
-   "bytes": 82480
+   "sha256": "411510c9b62b0cdb572a7d6dd46ab8a96d96be02ea3183b5f819495db7759fea",
+   "bytes": 82555
   },
   "firmware/src/bb_ui_v3/bb_ui.h": {
    "sha256": "b8782bfc4afe63e2a04e1dba076bf8afdaa68963fccf83466fd91c55fd360473",
    "bytes": 12734
   },
   "firmware/src/bb_ui_v3_firmware.inc": {
-   "sha256": "cd7868070fe20fb014b40194cab2b4b27a91129a2a10578e8004d9ba7687b73a",
-   "bytes": 32289
+   "sha256": "e887be4bfc70d179873ba420d5ed0289a1fdcbbcdc9472ad1a1a8319561dff7d",
+   "bytes": 32965
   },
   "firmware/src/bb_ui_v3_route.h": {
    "sha256": "13768cc788b43a7328991f24752ec2d228a8a06a6b5e97e6db2cf5259df16a8b",
@@ -2019,8 +2123,8 @@
    "bytes": 3437
   },
   "firmware/src/console.c": {
-   "sha256": "22f3c0ae898001e05d339b8d0719557475fb0f2fa162693eb3477710a606f35f",
-   "bytes": 30727
+   "sha256": "b81700023db7e10af913247996bc1ee537d1959d1f002ca206d0b47ed7975c3c",
+   "bytes": 30920
   },
   "firmware/src/core.h": {
    "sha256": "0f73468dde8c0563d84cbf0644abe4a4d37b32fedec7a9b85e961e8fa9043f06",
@@ -2031,8 +2135,8 @@
    "bytes": 448
   },
   "firmware/src/dillo-startup-diagnostic-r1.inc": {
-   "sha256": "84cf77475280b3be38be1516c0d709ac585dd4b0c3c43f34b7155f9aa2a8a108",
-   "bytes": 8026
+   "sha256": "76836d1df686ff999196c6c9201ab250b614d94625e9062e1d3eb3cc429d3060",
+   "bytes": 8322
   },
   "firmware/src/drum909.c": {
    "sha256": "86c6d9ee1a639ed32c673b6b6211f1fe481ef18044564bfd488a6de729bd05e0",
@@ -2155,8 +2259,8 @@
    "bytes": 1296
   },
   "firmware/src/felucca.c": {
-   "sha256": "43f502a4c606297bba594e939f96cade4020ae24466ffaf138a01930fdd76e81",
-   "bytes": 4639
+   "sha256": "a9e90d9148a2e81c400e8175fa70a3e12bd8b0b101f0c051f9d0dc8d732d6b97",
+   "bytes": 6901
   },
   "firmware/src/fm4_convert.c": {
    "sha256": "d711d4cf65bc4ac7e01e007045d461cc9f382b7b66118cae92e21e889dc8d633",
@@ -2235,8 +2339,8 @@
    "bytes": 2201
   },
   "firmware/src/home_master/studio_rows.h": {
-   "sha256": "2251c125aaae34e0d44c717949cc7b6a86816a025beed8df4543c4ca94f09d0e",
-   "bytes": 3115
+   "sha256": "0d7cf2d55e816dd1bcc8f4869c163e4d088c3209fe13b1677afa613cea31cdfa",
+   "bytes": 3462
   },
   "firmware/src/home_navigation_ui.inc": {
    "sha256": "ce27cd48c166e59884d1c7b77a7bdaca838bd99f476f73a3d05d37ba06f67610",
@@ -2255,8 +2359,8 @@
    "bytes": 3387
   },
   "firmware/src/main.c": {
-   "sha256": "d3430d5d1db9913b679c45efde33b2bf9d16f66564cb8b13df17610b2bc3278b",
-   "bytes": 16490
+   "sha256": "3df32f0860403cf53222b48bdbc36c5f851b693fcf50dae4c99c51b0ec11e66c",
+   "bytes": 16710
   },
   "firmware/src/master.c": {
    "sha256": "14ec3bd8c33455efa3c7ca8d703072ac62deedaf4750da7da5335ed41196b66d",
@@ -2295,8 +2399,8 @@
    "bytes": 14660
   },
   "firmware/src/ota_hw.c": {
-   "sha256": "9f33552d506b8b1e70db6b2df0a66122cff52c3f1a9be7ccde06a9fb1601963c",
-   "bytes": 2727
+   "sha256": "65205eb6e813b9d8b61517831db35421392a75656b4e290f0e0662128305fa7f",
+   "bytes": 2802
   },
   "firmware/src/pack_constants.h": {
    "sha256": "6209a82bd065dbca10cfcd04e88b838f8e1d933405b897f4fd90a787782a2406",
@@ -2339,8 +2443,8 @@
    "bytes": 3318
   },
   "firmware/src/project.c": {
-   "sha256": "af9e7f37d54ea6f235378d770bc6aaaba505e593ed155d8ff6df59f718a64818",
-   "bytes": 62703
+   "sha256": "1554cdacfec92f3cd531e63c073b6fcef198049f7dca040eb966be4f04419b78",
+   "bytes": 63303
   },
   "firmware/src/seq.c": {
    "sha256": "2eb6f6952c9720ee6fbfb542379908e7ae31257abf688dcf1a24d676c4584e74",
@@ -2351,8 +2455,8 @@
    "bytes": 2358
   },
   "firmware/src/settings_persist.c": {
-   "sha256": "4f4e65c99086228a6326d1216014881ab737dc71f610cf33b4de8246b4cc287b",
-   "bytes": 5706
+   "sha256": "46e107d6396c2e9fcf9131d00532e2ca17beed851a290378e58060e93a8fbc07",
+   "bytes": 6218
   },
   "firmware/src/single-drum-platform-r1.inc": {
    "sha256": "99f4008cd998d0db8c85ae33029fe57bb0a4241eb10b1d3e00a831b928c146b8",
@@ -2379,8 +2483,8 @@
    "bytes": 7628
   },
   "firmware/src/storage_hw.c": {
-   "sha256": "afbd29b540e3c6f85cacdfaa3449258a936f467f5c3d12cb1f9c489d31958eff",
-   "bytes": 1518
+   "sha256": "f54bd84307d28d051da3920c0a59952b51b2364534d007f21b802ac2ba1e3ec7",
+   "bytes": 2283
   },
   "firmware/src/target-binding.inc": {
    "sha256": "4ee895c5905ca310d56cf4c15348c58663d30bdf6c4a1e584d620b2df1c3dcbb",
@@ -2399,12 +2503,12 @@
    "bytes": 33375
   },
   "firmware/src/ui.c": {
-   "sha256": "8473f643b123a41862555bc56651eb43227a8f7c167ebe14978ae7a0e34aa17c",
-   "bytes": 75657
+   "sha256": "ed78dc99faeeacc30bf68df8929f9e85a9cc8ca6117f04c5c858ac54aeecc840",
+   "bytes": 75887
   },
   "firmware/src/ui_draw.c": {
-   "sha256": "b636f96bcb2e35394a9829c22d574d8a4effdd29eaf563676ce44090a65d256a",
-   "bytes": 78380
+   "sha256": "493a6a6735f0d0100ab364ab58956718ac1672b2f80e4523582ba5bbb2fdc2e9",
+   "bytes": 78550
   },
   "firmware/src/ui_events.c": {
    "sha256": "acf41b3a82ea9c1fa4658de008bab2a878ab8d5f6ae7e160ebb141d0174f603b",
@@ -2634,5 +2738,17 @@
    "sha256": "0d871dc5a2efc93ba758ea5341e07f7e6e985e036f5e1953721c3ab0828c780b",
    "bytes": 122373
   }
- }
+ },
+ "release_source_commit": "c04aa9ff7b5407558b247c891c0944a0c7179e1d",
+ "release_review_commit": "e98a2bfc115c3e19b2733753b2abe15f25793a71",
+ "release_recipe": "candidate",
+ "release_flags": {
+  "BB_WITH_TELEGRAM": 0,
+  "BB_FIXA": 0,
+  "BB_AUDIO_PROFILE": 0
+ },
+ "documentation_delta": "Acid Voice count/reference45\u219283 resolved charts; original reported licence/terms qualification retained",
+ "documentation_revision": "bb1-1.5-building-first-preserve-public-PR3",
+ "supersedes_source_tar_sha256": "8e787bfc918495ea0bf67263ff1255c1340d3fcebea0c1f41f3ae2dd62e83d12",
+ "native_receipt_sha256": "1e5227c882fb64a6e812defc933469accbca614770c1844576dfbad132c35ce7"
 }

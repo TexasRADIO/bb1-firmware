@@ -2,8 +2,8 @@
 /* Only called before audio_init/usb_start. Private sequencing never publishes
  * a live transport command and the local output is never submitted to a DAC.
  * Complete production half rendering/conversion/copy; not IRQ/DMA acceptance. */
-#if BB_ONE_DRUM_STUDIO != 1 || BB_WITH_DILLO != 1 || BB_WITH_TELEGRAM || BB_OWNER_AUDIO_BRIDGE
-#error "This startup diagnostic is exclusively for the CPU0 drum plus Dillo profile"
+#if BB_ONE_DRUM_STUDIO != 1 || BB_WITH_DILLO != 1 || (BB_WITH_TELEGRAM != 0 && BB_WITH_TELEGRAM != 1) || BB_OWNER_AUDIO_BRIDGE
+#error "This startup diagnostic is exclusively for the CPU0 drum plus Dillo (and Duo lead) profile"
 #endif
 static int bb_single_startup_admitted(void) {
     if(bb_private_block_active||bb_audio_entered||bb_audio_faults||
@@ -12,6 +12,10 @@ static int bb_single_startup_admitted(void) {
        bb_sound.core.sample_rate!=44100||!bb_commands_idle(&bb_sound.commands)||
        bb_session_hold_request||bb_session_hold_ack||bb_asset_hold_request||bb_asset_hold_ack||
        bb_kit_hold_request||bb_kit_hold_ack||!bb_one_drum_core_ok(&bb_sound.core))return 0;
+#if BB_WITH_TELEGRAM
+    /* Dillo Duo: the lead must be silent; this test never loads a lead line and an idle lead is not mixed. */
+    if(bb_sound.telegram.amp!=0.0f||bb_sound.telegram.amp_target!=0.0f||bb_sound.telegram.gate_left)return 0;
+#endif
     return !bb_sound.core.synths[0].muted&&bb_sound.core.drums[0].enabled&&bb_sound.drum_patterns.family[0]==0;
 }
 static int bb_single_private_title(const char *a,const char *b) {

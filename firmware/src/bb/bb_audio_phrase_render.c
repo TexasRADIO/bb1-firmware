@@ -149,6 +149,13 @@ int bb_audio_phrase_admit(void *context,const bb_command *c){
  if(reject)a->rich.edit_refusals++;
  return !reject;
 }
+#ifndef BB_FIXA
+#define BB_FIXA 0
+#endif
+#if BB_FIXA
+extern int bb_fixa_active(unsigned m);
+extern int bb_fixa_metal_strike(unsigned m,unsigned voice,float velocity,uint64_t frame);
+#endif
 static int strike(bb_audio *a,unsigned m,uint64_t frame,uint32_t payload){
  if(!a->core.drums[m].enabled||a->core.drums[m].muted)return 1;
  bb_phrase_index *p=&a->rich.active[m];
@@ -175,7 +182,17 @@ static int strike(bb_audio *a,unsigned m,uint64_t frame,uint32_t payload){
   if(result==1&&!bb_audio_sample_phrase_hit_layer(a,m,hit.voice,hit.velocity))return 0;
  }else
 #endif
+#if BB_FIXA
+ {
+  /* Fix A call: kit A's metal strikes are checked against CPU1's plan and sounded by CPU1, not triggered here. */
+  bb_phrase_hit fixa_hit;
+  if(bb_fixa_active(m) && (result=bb_phrase_hit_resolve(&p->phrase,&p->controls,payload,&fixa_hit))==1 &&
+     bb_fixa_metal_strike(m,fixa_hit.voice,fixa_hit.velocity,frame)){}
+  else result=bb_phrase_strike(&a->kit[m],&p->phrase,&p->controls,payload);
+ }
+#else
  result=bb_phrase_strike(&a->kit[m],&p->phrase,&p->controls,payload);
+#endif
  if(!result)return 0;
  if(result==1){
   a->hits[m]++;if((payload>>23)&3)a->rich.player[m].delayed++;else a->rich.player[m].primary++;

@@ -81,7 +81,7 @@ static void lint(const char *what)
                 /* r9.9: keyed on geometry, not on the old "HOOK 2/4" placeholder: on the device this grey line is the
                  * kit name ("808 Tight Hats", "DrumTraks"), whose descender meets the anti-aliased top of the
                  * pattern name at one pixel. Box overlap of at most 3 rows, grey line above; anything else fails. */
-                if (!strncmp(what, "studio", 6) && v->y0 > t->y0 && t->y1 - v->y0 < 3 && t->x0 == v->x0) { known++; continue; }
+                /* 1.5 (P7): the kit row now clears the pattern name, so this overlap fails like any other. */
                 FAIL("%s: \"%s\" overlaps \"%s\" (y %d..%d vs %d..%d, x %d..%d vs %d..%d)", what, t->s, v->s, t->y0, t->y1, v->y0, v->y1, t->x0, t->x1, v->x0, v->x1);
             }
         }
@@ -235,6 +235,6 @@ int main(int argc, char **argv)
         if (!lit[0] || lit[0] != lit[2] || lit[1] != lit[2]) FAIL("attract: tower pixels depend on level (%u / %u / %u)", lit[0], lit[1], lit[2]);
     }
     fclose(out);
-    printf("captures: %u frames, %u lint/route failures, %u known (HOME lane section line, approved)\n", shots, failures, known);
+    printf("captures: %u frames, %u lint/route failures\n", shots, failures); (void)known;
     return failures != 0;
 }

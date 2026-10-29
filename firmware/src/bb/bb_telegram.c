@@ -91,11 +91,19 @@ int bb_telegram_key(bb_telegram *v,unsigned note,unsigned velocity,int legato,
     v->gate_left=UINT32_MAX;v->slide_out=0;
     return 1;
 }
-void bb_telegram_render(bb_telegram *v,float *out,uint32_t frames) {
+uint32_t bb_telegram_render(bb_telegram *v,float *out,uint32_t frames) {
     uint32_t i;
     for(i=0;i<frames;i++) {
         float dt,saw,square,sub,x,fc,g,v1,v2,v3,c;
         if(!v->gate_left)v->amp_target=0;
+        /* Dillo Duo: a released voice whose amplitude has reached exactly zero
+         * is idle. Its state is frozen (no phase, LFO, smoother or filter
+         * advance) and it writes zeroes, so the result never depends on how a
+         * caller splits its blocks, and an empty or muted lead costs nothing. */
+        if(!v->gate_left && v->amp==0.0f) {
+            memset(out+i,0,(frames-i)*sizeof *out);
+            return i;
+        }
         if(v->gate_left && v->gate_left!=UINT32_MAX)v->gate_left--;
         c=v->amp_target>v->amp?v->attack_c:v->release_c;
         v->amp=v->amp_target+(v->amp-v->amp_target)*c;
@@ -126,4 +134,5 @@ void bb_telegram_render(bb_telegram *v,float *out,uint32_t frames) {
             if(!--v->filter_left)v->cutoff=fm_minf((float)v->sound.cutoff_hz,16000);
         }
     }
+    return frames;
 }

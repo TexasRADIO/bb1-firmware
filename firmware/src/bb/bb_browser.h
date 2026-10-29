@@ -3,7 +3,8 @@
 #include "bb_catalogue.h"
 #define BB_BROWSER_BANK_KEYS 16u
 #define BB_BROWSER_PART_KEYS 8u
-enum { BB_BROWSER_ERAS, BB_BROWSER_SONGS, BB_BROWSER_GROUPS };
+/* 1.5: ACID is Dillo-only (bass phrases with no drums) and optional: a catalogue without "acid" has no ACID banks. */
+enum { BB_BROWSER_ERAS, BB_BROWSER_SONGS, BB_BROWSER_ACID, BB_BROWSER_GROUPS };
 typedef struct {
     const bb_catalogue *catalogue; /* identity token; never a serialized pointer */
     bb_catalogue_id bank, part;

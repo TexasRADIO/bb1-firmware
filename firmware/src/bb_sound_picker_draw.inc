@@ -11,7 +11,7 @@ static void bb_sound_pick_draw(void) {
     bb_page page=(bb_page)bb_sound_pick.page;
     char title[]="DRUM A / KITS";title[5]=(char)('A'+bb_sound_pick.machine);
     bb_backdrop(0,120,0);
-    cv_text(9,6,&AF_M,page==BB_DRUMS?title:page==BB_DILLO?"DILLO / SOUNDS":"TELEGRAM / SOUNDS",BB_TEXT);
+    cv_text(9,6,&AF_M,page==BB_DRUMS?title:page==BB_DILLO?(BB_WITH_TELEGRAM?"DILLO BASS / SOUNDS":"DILLO / SOUNDS"):"DILLO LEAD / SOUNDS",BB_TEXT);
     cv_text(9,30,&AF_S,!valid?"STATE UNAVAILABLE":!view.enabled?"LAYER OFF":view.muted?"MUTED":
         page==BB_DRUMS&&bb_sound_pick.sample_count?"KIT > PATTERN":
         !bb_sound_picker_available(&bb_sound_pick,&view,bb_sound_pick.cursor)?"PATTERN MISMATCH":page==BB_DRUMS?"CHOOSE KIT":"CHOOSE SOUND",BB_DIM);

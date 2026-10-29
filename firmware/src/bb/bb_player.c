@@ -1,4 +1,5 @@
 #include "bb_player.h"
+#include "bb_factory_recipe.h"
 #include <string.h>
 #include "bb_voice_fallback.h"
 static int init(bb_player *p,const bb_browser *seed,unsigned target,int drum) {
@@ -104,6 +105,16 @@ static int launch(bb_player *p,bb_audio *a,const bb_browser *view,int kit) {
                drum==BB_FDRUM_EXPRESSION?BB_FACTORY_PATTERN_EXPRESSION:BB_FACTORY_PATTERN_INVALID;
     } else result=bb_factory_request_synth_pattern(a,view->catalogue,&choice,p->target,16,&incoming.ticket);
     p->view=*view;p->error=(uint8_t)result;
+    if(result==BB_FACTORY_PATTERN_OK && p->is_drum && choice.group==BB_BROWSER_SONGS &&
+       !(p->request.choice.group==BB_BROWSER_SONGS && p->request.choice.bank_index==choice.bank_index)) {
+        /* 1.5: a new song brings its sheet tempo and swing, as an era does; another section of the same song keeps
+         * the player's tempo. Best effort: a full command queue leaves the tempo as it is, never the drums. */
+        unsigned bpm,swing_x2;
+        if(bb_factory_read_song_tempo(view->catalogue,&choice,&bpm,&swing_x2)) {
+            bb_command t={0};t.type=BB_CMD_TEMPO;t.value=(uint16_t)bpm;(void)bb_command_push(&a->commands,&t);
+            bb_command s={0};s.type=BB_CMD_SWING_X2;s.value=(uint16_t)swing_x2;(void)bb_command_push(&a->commands,&s);
+        }
+    }
     if(result==BB_FACTORY_PATTERN_OK) {
         /* Audio may consume the prior or new request before this producer
          * returns. Resolve both identities before replacing the old mapping. */
@@ -135,6 +146,7 @@ int bb_player_move(bb_player *p,bb_audio *a,int delta) {
 }
 int bb_player_group(bb_player *p,unsigned group) {
     if(!p || !p->ready)return 0;
+    if(p->is_drum && group==BB_BROWSER_ACID)return 0;   /* ACID holds Dillo phrases only */
     return bb_browser_group(&p->view,group);
 }
 int bb_player_page(bb_player *p,int delta,int sections) {

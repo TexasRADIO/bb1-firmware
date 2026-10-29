@@ -1,6 +1,6 @@
 #include "bb_browser.h"
 #include <string.h>
-static const char *const groups[] = {"eras", "songs"};
+static const char *const groups[] = {"eras", "songs", "acid"};
 static bb_catalogue_id list(const bb_catalogue *c, unsigned group) {
     return c && group < BB_BROWSER_GROUPS ? bb_catalogue_find(c, (bb_catalogue_id)c->container.root, groups[group]) : BB_CATALOGUE_NONE;
 }
@@ -55,6 +55,7 @@ int bb_browser_init(bb_browser *out, const bb_catalogue *c) {
      * malformed bank never becomes an apparently selectable empty cell. */
     for (unsigned group = 0; group < BB_BROWSER_GROUPS; group++) {
         bb_catalogue_id seq = list(c, group); size_t count = bb_catalogue_count(c, seq);
+        if (group == BB_BROWSER_ACID && seq == BB_CATALOGUE_NONE) continue;   /* optional */
         if (bb_catalogue_kind(c, seq) != BB_CAT_ARRAY || !count || count > UINT16_MAX) return 0;
         for (unsigned i = 0; i < count; i++) {
             bb_catalogue_id b = bb_catalogue_at(c, seq, i); unsigned first;

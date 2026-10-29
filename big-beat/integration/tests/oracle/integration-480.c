@@ -28,6 +28,16 @@ static struct {unsigned active;} bb_c1_retained_control;
 static struct {struct {bb_rjt_job job;bb_rsp_plan staging;} rich;struct {unsigned phase;} persistent;} bb_c1_private_pool;
 static unsigned bb_c1_phase=3,bb_c1_909_owner_armed,fail_publish,fail_wait;
 static bb_rjt_lease bb_c1_rich_request;
+#ifndef BB_FIXA
+#define BB_FIXA 0
+#endif
+#if BB_FIXA /* fix A: the stand-in runs what CPU1 runs, the rich job then kit A's metal (bb_c1_rich_hooks.inc) */
+static int bb_c1_rich_run(uint32_t job,uint32_t *result);
+#define ORACLE_RICH_RUN(j,ticket) bb_c1_rich_run(ticket,&completion)
+extern uint32_t bb_fixa_jobs,bb_fixa_ineligible,bb_fixa_trips,bb_fixa_misses,bb_p1b_guard_trips,bb_fixa_why[8];
+#else
+#define ORACLE_RICH_RUN(j,ticket) bb_rjt_run(j,bb_c1_rich_request,&completion)
+#endif
 static unsigned injection;
 static uint32_t completion,bb_c1_retired,BB_C1_CON;
 static int bb_c1_cpu0_available(void) {
@@ -45,7 +55,7 @@ static int bb_c1_publish(void *mail,unsigned seed,unsigned ticket){
  bb_c1_mail.job=ticket;bb_rjt_job *j=&bb_c1_private_pool.rich.job;
  unsigned mode=inject_next;inject_next=0;
  if(mode==3)((unsigned char*)&j->render.kit)[1001]^=0x10u; /* corrupted after seal, before worker */
- run_failed=!bb_rjt_run(j,bb_c1_rich_request,&completion);jobs_run++;
+ run_failed=!ORACLE_RICH_RUN(j,ticket);jobs_run++;
  if(mode==1)j->render.bus[0][0]+=.25f;
  if(mode==2){j->render.kit.cb.hp.a=.5f;completion=bb_rjt_hash(j,1);}
  if(mode==4)((unsigned char*)&j->next)[40]^=0x01u;
@@ -188,5 +198,11 @@ int main(void){
  assert(dillo_energy>0&&send_energy>0); /* r9.9: Dillo and the effect sends are exercised */
  printf("sections=%u calls=%lu worker_jobs=%u submitted=%lu refused=%lu running_publications=%lu failed_calls=%lu retirements=%lu multi_span_calls=%lu sizeof_audio=%zu energy=%.17g dillo_energy=%.6g send_energy=%.6g hits_kitA=%lu hits_kitB=%lu\n",
   sections,calls,jobs_run,submitted,refused,published_running,failures,retirements,three_span_blocks,sizeof audio,energy,dillo_energy,send_energy,total_hits[0],total_hits[1]);
+#if BB_FIXA
+ fprintf(stderr,"fixa jobs=%u attached=%u prepare_refused=%u ineligible=%u trips=%u misses=%u guard_trips=%u\n",
+  bb_fixa_jobs,bb_c1_fixa_attached,bb_c1_fixa_prepare_refused,bb_fixa_ineligible,bb_fixa_trips,bb_fixa_misses,bb_p1b_guard_trips);
+ fprintf(stderr,"fixa_why window=%u kitA=%u lanes=%u launch=%u layer=%u plan=%u hit=%u cap=%u\n",bb_fixa_why[0],bb_fixa_why[1],
+  bb_fixa_why[2],bb_fixa_why[3],bb_fixa_why[4],bb_fixa_why[5],bb_fixa_why[6],bb_fixa_why[7]);
+#endif
  return 0;
 }

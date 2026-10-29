@@ -760,6 +760,12 @@ static void audio_release_source(bb_audio *a,unsigned s,unsigned source) {
 #endif
 static void audio_live_command(void *ctx,const bb_command *c) {
     bb_audio *a=ctx;
+    /* Reuse every existing owner START side effect after core bb_start().
+     * This is an atomic restart, never a queued STOP/START pair. */
+    bb_command restart;
+    if(c->type==BB_CMD_TRANSPORT_RESTART) {
+        restart=*c;restart.type=BB_CMD_TRANSPORT;restart.value=1;c=&restart;
+    }
 #if BB_WITH_PATTERN && BB_WITH_RICH_DRUM_HANDOFF
     if(c->type==BB_CMD_DRUM_PHRASE
 #if BB_SAMPLE_HOST_INTEGRATION
@@ -850,6 +856,20 @@ static void audio_live_command(void *ctx,const bb_command *c) {
     if(c->type==BB_CMD_SYNTH_KEY){audio_key(a,c);return;}
     if(c->type==BB_CMD_SYNTH_SOURCE_RELEASE) {
         audio_release_source(a,c->target,c->step);return;
+    }
+    if(c->type==BB_CMD_SYNTH_SILENCE) {
+        /* Channel-level panic ends this synth's active sound immediately.
+         * Patch, sequence, mixer, other synth and shared effect tails survive.
+         * The next live/sequence note may sound normally. Main loop never
+         * writes DSP state; this runs once in the existing audio-owner drain. */
+        audio_release_synth(a,c->target);
+#if BB_WITH_DILLO
+        if(c->target==0){bb_dillo_init(&a->dillo);bb_dillo_sound(&a->dillo,&a->core.dillo);}
+#endif
+#if BB_WITH_TELEGRAM
+        if(c->target==1){bb_telegram_init(&a->telegram);bb_telegram_sound(&a->telegram,&a->core.telegram);}
+#endif
+        return;
     }
     if(c->type==BB_CMD_SYNTH_RELEASE) {
         audio_release_synth(a,c->target);return;
@@ -1141,6 +1161,187 @@ static __attribute__((noinline)) void bb_p1b_mix(bb_audio *a,unsigned k,float pa
     }
     a->mix_gain[k]=current;
 }
+#ifndef BB_FIXA
+#define BB_FIXA 0
+#endif
+#if BB_FIXA
+/* L3 fix A (TIMING-OPTIONS-R9.9.md): while a call-level B job is out, CPU1 also renders kit A's metal lanes (CB,
+ * CH, OH, CY and their shared bank). CPU0 plans kit A's metal hits for the call from the same scheduler the B job
+ * uses, parks its own metal lanes (cg = 0, so its renderer skips them and the bank), checks every kit A metal strike
+ * it meets against the plan instead of triggering it, keeps kit A's buses for the whole call, and at the last span
+ * joins once, adds the metal values in the renderer's lane order and mixes kit A just before B, so every sample
+ * still sums Dillo, then kit A, then B. Any miss rejects the block exactly like a P1b guard trip. */
+#include "bb_phrase_strike.h"
+#include "metal_capture.h"
+extern void bb_fixa_offer(const drum808_t *,const gg_state *,const uint16_t *,unsigned,const bb_metal_hits *);
+extern int bb_fixa_job_attached(void);
+extern int bb_fixa_finish(unsigned,unsigned,unsigned,void *,drum808_t *,gg_state *,float *,float *,float *,uint32_t *,
+                          int,drum808_t *,gg_state *,float *,float *,float *);
+volatile uint32_t bb_fixa_enable=1; /* 0 restores B-only call jobs at run time, for A/B timing */
+uint32_t bb_fixa_jobs,bb_fixa_ineligible,bb_fixa_trips,bb_fixa_misses;
+static struct {
+    uint32_t active;       /* this call's B job carries kit A's metal */
+    uint32_t fault;        /* a kit A metal strike differed from the plan, or kit A's metal settings changed */
+    uint32_t next;         /* planned hits consumed so far, in order */
+    uint32_t joined;       /* last span: B already joined by kit A's join */
+    uint32_t params;       /* bb_metal_params of kit A at publication */
+    uint32_t count;
+    bb_p1b_segment seg[BB_P1B_SEGMENTS];
+    uint16_t spans[BB_METAL_SPANS];
+    bb_metal_hits hits;
+    d8_lane_t parked[BB_METAL_LANES];
+    float bus[3][128];     /* kit A's own lanes for the call, by offset from bb_p1b.first */
+} bb_fixa;
+static bb_rsp_plan bb_fixa_plan; /* CPU0 scratch for kit A's schedule */
+static int bb_fixa_lane(unsigned voice){
+    return voice==BB_FDV_CB?0:voice==BB_FDV_HH?1:voice==BB_FDV_OHH?2:voice==BB_FDV_CY?3:-1;
+}
+static int bb_fixa_launch_due(const bb_audio *a,unsigned position){
+    if(a->drum_patterns.pending[0].ready && bb_audio_lands(a->drum_patterns.pending[0].phrase,position))return 1;
+#if BB_WITH_RICH_DRUM_HANDOFF
+    if(a->rich.pending[0].ready && bb_audio_lands(a->rich.pending[0].phrase,position))return 1;
+#endif
+    return 0;
+}
+/* CPU0, first span of a call job, before begin: plan kit A's metal for [offset, offset + remaining) and offer it.
+ * 0 = kit A stays on CPU0 for this call, as before. */
+uint32_t bb_fixa_why[8]; /* diagnostic: why calls stayed on CPU0, by the BB_FIXA_NO codes below */
+#define BB_FIXA_NO(r) do{bb_fixa_why[(r)]++;return 0;}while(0)
+static int bb_fixa_prepare(bb_audio *a,unsigned frames,unsigned remaining){
+    if(!bb_fixa_enable||bb_fixa.active||!frames||frames>=remaining||remaining>BB_METAL_MAX)BB_FIXA_NO(0);
+    if(!a->rich.valid[0]||a->drum_patterns.family[0])BB_FIXA_NO(1);
+    if(!bb_metal_ready(&a->kit[0]))BB_FIXA_NO(2);
+    if(bb_fixa_launch_due(a,a->patterns.position))BB_FIXA_NO(3);
+#if BB_SAMPLE_HOST_INTEGRATION
+    /* Same native test as the phrase renderer's strike: no sample layer bound, or the 808 layer. */
+    bb_sample_audio_binding *binding=bb_audio_sample_layer(a,0);
+    if((binding&&bb_audio_sample_layer_id(a,0)!=BB_SAMPLE_808_ID)||bb_aux_voices_active(a->aux,0))BB_FIXA_NO(4);
+    if(binding)for(unsigned s=0;s<binding->count;s++)if(binding->slots[s].voice.active)BB_FIXA_NO(4);
+#endif
+    const bb_phrase_index *p=&a->rich.active[0];
+    bb_rsp_plan *plan=&bb_fixa_plan;
+    if(!bb_rsp_prepare(p,(const bb_rsp_state *)&a->rich.player[0],a->core.sample_rate,a->core.bpm,a->core.swing,
+                       remaining,a->core.frame,a->core.running,plan))BB_FIXA_NO(5);
+    bb_metal_hits *h=&bb_fixa.hits;
+    __builtin_memset(h,0,sizeof *h);
+    if(a->core.drums[0].enabled&&!a->core.drums[0].muted)
+        for(unsigned i=0;i<plan->count;i++){
+            const bb_rsp_event *e=&plan->events[i];bb_phrase_hit hit;
+            int r=bb_phrase_hit_resolve(&p->phrase,&p->controls,e->payload,&hit);
+            if(!r||e->offset>=remaining)BB_FIXA_NO(6);
+            if(r==2)continue;
+            if(hit.voice==BB_FDV_SY||hit.voice==BB_FDV_ZAP)BB_FIXA_NO(6); /* aux bank routing stays serial */
+            unsigned voice=bb_voice_fallback(hit.voice,65535u|(1u<<BB_PHRASE_SHAKER));
+            if(voice==BB_FALLBACK_NONE)BB_FIXA_NO(6);
+            int k=bb_fixa_lane(voice);
+            if(k<0)continue;
+            if(h->n>=BB_METAL_HITS||!(hit.velocity>0.0f&&hit.velocity<=1.0f))BB_FIXA_NO(7);
+            h->at[h->n]=(uint8_t)e->offset;h->k[h->n]=(uint8_t)k;h->vel[h->n]=hit.velocity;h->n++;
+        }
+    bb_fixa.spans[0]=(uint16_t)frames;bb_fixa.spans[1]=(uint16_t)(remaining-frames);
+    bb_fixa_offer(&a->kit[0],&a->groups[0],bb_fixa.spans,2u,h);
+    return 1;
+}
+/* CPU0, after begin published a job that carries kit A's metal. */
+static void bb_fixa_start(bb_audio *a){
+    bb_fixa.active=1;bb_fixa.fault=0;bb_fixa.next=0;bb_fixa.joined=0;bb_fixa.count=0;
+    bb_fixa.params=bb_metal_params(&a->kit[0]);
+    bb_metal_park(&a->kit[0],bb_fixa.parked);
+    bb_fixa_jobs++;
+}
+/* Every exit that does not adopt the job: kit A's metal returns to CPU0 as it was at publication. */
+static void bb_fixa_abandon(bb_audio *a){
+    if(!bb_fixa.active)return;
+    bb_metal_unpark(&a->kit[0],bb_fixa.parked);
+    bb_fixa.active=0;bb_fixa.joined=0;
+}
+/* bb_audio_phrase_render.c's strike: 1 = a kit A metal strike in a fix A call (checked against the plan, sounded by
+ * CPU1, never triggered on CPU0); 0 = trigger as usual. */
+int bb_fixa_active(unsigned m){return m==0&&bb_fixa.active;}
+int bb_fixa_metal_strike(unsigned m,unsigned voice,float velocity,uint64_t frame){
+    if(m!=0||!bb_fixa.active)return 0;
+    int k=bb_fixa_lane(bb_voice_fallback(voice,65535u|(1u<<BB_PHRASE_SHAKER)));
+    if(k<0)return 0;
+    const unsigned i=bb_fixa.next;uint32_t want,got;
+    __builtin_memcpy(&got,&velocity,sizeof got);
+    if(i<bb_fixa.hits.n)__builtin_memcpy(&want,&bb_fixa.hits.vel[i],sizeof want);
+    if(i>=bb_fixa.hits.n||frame<bb_p1b.first_frame||frame-bb_p1b.first_frame!=bb_fixa.hits.at[i]||
+       bb_fixa.hits.k[i]!=(uint8_t)k||want!=got){bb_fixa.fault=1;bb_fixa_misses++;}
+    else bb_fixa.next++;
+    return 1;
+}
+/* Same expressions, operand order and ramp as bb_p1b_mix, over kit A's call buses and segments. */
+static __attribute__((noinline)) void bb_fixa_mix(bb_audio *a,float pan_l,float pan_r) {
+    const unsigned k=0;
+    uint32_t current=a->mix_gain[k];
+    for(unsigned s=0;s<bb_fixa.count;s++) {
+        const bb_p1b_segment *g=&bb_fixa.seg[s];
+        const unsigned offset=g->offset,frames=g->frames,rel=offset-bb_p1b.first;
+        const uint32_t target=g->target;const float fixed=g->fixed;
+        const float *curve=g->curved?bb_p1b.curve+offset:0;
+        const float *dry_bus=bb_fixa.bus[0]+rel,*rev_bus=bb_fixa.bus[1]+rel,*dly_bus=bb_fixa.bus[2]+rel;
+        unsigned i;
+        if(current==target && !curve && a->scope.source!=BB_SCOPE_KIT_A+k) {
+            const float gain=(float)current*(1.0f/65536.0f);
+            bb_drum_mix_settled(dry_bus,dly_bus,rev_bus,
+                a->left+offset,a->right+offset,
+#if BB_WITH_EFFECTS
+                a->echo_send+offset,a->spring_send+offset,
+#else
+                0,0,
+#endif
+                frames,pan_l,pan_r,gain,fixed);
+            continue;
+        }
+        for(i=0;i<frames;i++) {
+            float dry=dry_bus[i],gain;
+            if(current<target)current+=target-current>256u?256u:target-current;
+            if(current>target)current-=current-target>256u?256u:current-target;
+            gain=(float)current*(1.0f/65536.0f);
+            float bus=curve?curve[i]:fixed;
+            if(a->scope.source==BB_SCOPE_KIT_A+k)
+                a->scope.samples[offset+i]=(dry*pan_l*gain*bus+dry*pan_r*gain*bus)*0.5f;
+            a->left[offset+i]+=dry*pan_l*gain*bus;
+            a->right[offset+i]+=dry*pan_r*gain*bus;
+#if BB_WITH_EFFECTS
+            a->echo_send[offset+i]+=dly_bus[i]*0.2f*gain*bus;
+            a->spring_send[offset+i]+=rev_bus[i]*0.2f*gain*bus;
+#endif
+        }
+    }
+    a->mix_gain[k]=current;
+}
+/* Kit A's span inside a fix A call, after CPU0 rendered its own lanes into drum_dry/rev/dly: keep them, and on the
+ * last span join and mix. 1 = continue with the next kit; 0 = stop this span (the caller returns). */
+static int bb_fixa_span(bb_audio *a,unsigned offset,unsigned frames,uint32_t target,float fixed,const float *curve,
+                        int last,float pan_l,float pan_r){
+    if(bb_fixa.count>=BB_P1B_SEGMENTS||offset<bb_p1b.first||offset+frames>bb_p1b.end){bb_p1b_guard_trip(1u<<17);return 0;}
+    bb_p1b_segment *g=&bb_fixa.seg[bb_fixa.count++];
+    g->offset=offset;g->frames=frames;g->target=target;g->fixed=fixed;g->curved=curve!=0;
+    if(curve)__builtin_memcpy(bb_p1b.curve+offset,curve,frames*sizeof(float)); /* B records the same curve later */
+    const unsigned rel=offset-bb_p1b.first;
+    __builtin_memcpy(bb_fixa.bus[0]+rel,a->drum_dry,frames*sizeof(float));
+    __builtin_memcpy(bb_fixa.bus[1]+rel,a->drum_rev,frames*sizeof(float));
+    __builtin_memcpy(bb_fixa.bus[2]+rel,a->drum_dly,frames*sizeof(float));
+    if(!last)return 1;
+    const int a_ok=!bb_fixa.fault && bb_fixa.next==bb_fixa.hits.n && bb_metal_params(&a->kit[0])==bb_fixa.params;
+    int r=bb_fixa_finish(1,bb_p1b.end-bb_p1b.first,a->drum_patterns.family_epoch[1],&a->rich.player[1],
+        &a->kit[1],&a->groups[1],a->drum_dry,a->drum_rev,a->drum_dly,&a->hits[1],
+        a_ok,&a->kit[0],&a->groups[0],bb_fixa.bus[0],bb_fixa.bus[1],bb_fixa.bus[2]);
+    if(r==1){
+        bb_fixa.active=0;bb_fixa.joined=1;
+        bb_fixa_mix(a,pan_l,pan_r);
+        return 1;
+    }
+    bb_fixa_abandon(a);
+    if(r==2){ /* verified and dropped: a prediction miss, handled as a P1b guard trip (block rejected, B reconciled) */
+        bb_fixa_trips++;bb_p1b_guard_trips++;
+        if(!bb_p1b_guard_first_mask)bb_p1b_guard_first_mask=(1u<<18)|0x80000000u;
+        bb_p1b.active=0;bb_p1b.rejected=1;bb_p1b.recover=1;
+    }
+    return 0;
+}
+#endif
 #endif
 #else
 #define BB_RICH_WORKER_ENABLED 0
@@ -1205,6 +1406,9 @@ static void audio_span(void *ctx,uint32_t frames){
  audio_span_body(ctx,frames);
 #if BB_RICH_WORKER_ENABLED
 #if BB_P1B_CALL_JOB
+#if BB_FIXA
+ if(!bb_p1b.carry)bb_fixa_abandon(ctx); /* no-op after an adopted join; otherwise kit A's metal back to CPU0 */
+#endif
  if(bb_p1b.carry)return; /* published for the whole call; joined by its last span */
  if(bb_p1b.active){bb_p1b.active=0;bb_p1b.recover=1;} /* early exit with the job out */
 #endif
@@ -1258,14 +1462,24 @@ static void audio_span_body(void *ctx,uint32_t frames) {
             __builtin_memcpy(&bb_p1b.kit,&a->kit[1],sizeof bb_p1b.kit);
             __builtin_memcpy(&bb_p1b.phrase,&a->rich.active[1],sizeof bb_p1b.phrase);
 #endif
+#if BB_FIXA
+            const int fixa_offered=bb_fixa_prepare(a,frames,remaining);
+            if(!fixa_offered)bb_fixa_ineligible++;
+#endif
             rich_worker=bb_rich_worker_begin(&a->rich.active[1],&a->rich.player[1],
                 &a->kit[1],&a->groups[1],1,remaining,a->core.frame,a->core.sample_rate,a->core.bpm,
                 a->core.swing,a->core.running,a->core.drums[1].enabled&&!a->core.drums[1].muted,
                 a->drum_patterns.family_epoch[1]);
+#if BB_FIXA
+            if(fixa_offered)bb_fixa_offer(0,0,0,0,0); /* begin consumed it, or it never reached publication */
+#endif
             if(rich_worker==-2)return;
             if(rich_worker==1) {
                 bb_p1b.active=1;bb_p1b.first=offset;bb_p1b.end=offset+remaining;bb_p1b.count=0;
                 bb_p1b.first_frame=a->core.frame;bb_p1b_call_jobs++;
+#if BB_FIXA
+                if(fixa_offered && bb_fixa_job_attached())bb_fixa_start(a);
+#endif
             } else bb_p1b_fallbacks++; /* plan refused before publication: per-span path below */
         }
         if(!bb_p1b.active)
@@ -1336,8 +1550,15 @@ static void audio_span_body(void *ctx,uint32_t frames) {
 #endif
 #if BB_WITH_TELEGRAM
     BB_PROFILE_BEGIN(BB_PROF_TELEGRAM);
-    bb_telegram_render(&a->telegram,a->lead+slice_offset,frames);
+    /* Dillo Duo lead. The band fader always advances; an idle lead span is
+     * not mixed at all, so an empty or muted lead leaves every bus and send
+     * byte-identical to the bass-only build. */
+    const uint32_t lead_active=bb_telegram_render(&a->telegram,a->lead+slice_offset,frames);
     curve=audio_band_fader(a,BB_MIX_TELEGRAM,frames,&fixed);
+    if(!lead_active) {
+        if(a->scope.source==BB_SCOPE_TELEGRAM)
+            for(i=0;i<frames;i++)a->scope.samples[offset+i]=0.0f;
+    } else {
 #if BB_WITH_EFFECTS
     const float telegram_echo=0.65f*(float)a->core.effects.value[BB_FX_TELEGRAM_ECHO]/127.0f;
     const float telegram_spring=0.65f*(float)a->core.effects.value[BB_FX_TELEGRAM_SPRING]/127.0f;
@@ -1352,6 +1573,7 @@ static void audio_span_body(void *ctx,uint32_t frames) {
         a->echo_send[offset+i]+=sample*telegram_echo*gain;
         a->spring_send[offset+i]+=sample*telegram_spring*gain;
 #endif
+    }
     }
     BB_PROFILE_END(BB_PROF_TELEGRAM,frames);
 #endif
@@ -1502,6 +1724,10 @@ static void audio_span_body(void *ctx,uint32_t frames) {
                     g->offset=offset;g->frames=frames;g->target=target;g->fixed=fixed;g->curved=curve!=0;
                     if(curve)__builtin_memcpy(bb_p1b.curve+offset,curve,frames*sizeof(float));
                     if(!p1b_last)continue; /* B mixes after its join, in span order */
+#if BB_FIXA
+                    if(bb_fixa.joined)bb_fixa.joined=0; /* kit A's join already verified and adopted B */
+                    else
+#endif
                     if(!bb_rich_worker_finish(k,bb_p1b.end-bb_p1b.first,a->drum_patterns.family_epoch[k],&a->rich.player[k],
                         &a->kit[k],&a->groups[k],a->drum_dry,a->drum_rev,a->drum_dly,&a->hits[k]))return;
                     bb_p1b.active=0;bb_p1b_joins_saved+=bb_p1b.count-1u;
@@ -1561,6 +1787,12 @@ static void audio_span_body(void *ctx,uint32_t frames) {
 #else
             bb_proposal_group_span(&a->kit[k],&a->groups[k],a->drum_dry,a->drum_rev,a->drum_dly,(int)frames);
 #endif
+        }
+#endif
+#if BB_FIXA
+        if(k==0 && bb_fixa.active) { /* kit A's own lanes only; kept for the call and mixed at its last span */
+            if(!bb_fixa_span(a,offset,frames,target,fixed,curve,p1b_last,pan_l,pan_r))return;
+            continue;
         }
 #endif
 #if BB_USE_DRUM_SPAN

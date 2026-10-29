@@ -16,18 +16,22 @@ int bb_commands_init(bb_commands *q,bb_enter_fn begin,bb_leave_fn end,void *ctx)
 }
 static int valid(const bb_command *c) {
     if(!c)return 0;
-    /* Reject unavailable instrument commands before they enter the queue. */
+    /* Reject unavailable instrument commands before they enter the queue.
+     * Dillo Duo (BB_WITH_TELEGRAM): synth 1 is Dillo's LEAD voice, so its
+     * synth commands, its band channel and its patch recall are admitted. */
+#if !BB_WITH_TELEGRAM
     switch(c->type) {
     case BB_CMD_TELEGRAM_PATCH:return 0;
     case BB_CMD_NOTE:case BB_CMD_NOTE_EDIT:case BB_CMD_NOTE_PITCH:case BB_CMD_NOTE_SHIFT:
     case BB_CMD_SYNTH_PATTERN:case BB_CMD_SYNTH_KEY:case BB_CMD_SYNTH_SOURCE_RELEASE:
-    case BB_CMD_SYNTH_RELEASE:case BB_CMD_SYNTH_TRANSPOSE:case BB_CMD_SYNTH_MUTE:
+    case BB_CMD_SYNTH_RELEASE:case BB_CMD_SYNTH_SILENCE:case BB_CMD_SYNTH_TRANSPOSE:case BB_CMD_SYNTH_MUTE:
     case BB_CMD_SYNTH_LENGTH:case BB_CMD_SYNTH_PARAMETER:
         if(c->target)return 0;break;
     case BB_CMD_BAND_LEVEL:case BB_CMD_BAND_TOGGLE:
         if(c->target==2)return 0;break;
     default:break;
     }
+#endif
     /* Drum and synth target indices are separate domains. */
     switch(c->type) {
     case BB_CMD_DRUM_STEP:case BB_CMD_DRUM_LENGTH:case BB_CMD_DRUM_MUTE:
@@ -157,6 +161,8 @@ static int valid(const bb_command *c) {
     case BB_CMD_SWING:return c->value>=50 && c->value<=75;
     case BB_CMD_SWING_X2:return c->value>=100 && c->value<=150;
     case BB_CMD_TRANSPORT:return c->value<=1;
+    case BB_CMD_TRANSPORT_RESTART:return !c->value && !c->target && !c->step && !c->voice &&
+        !c->note.note && !c->note.gate && !c->note.accent && !c->note.slide;
     case BB_CMD_DRUM_STEP:return c->target<BB_MACHINES && c->step<BB_STEPS && c->voice<BB_VOICES && (c->value==0 || c->value==1 || c->value==3);
     case BB_CMD_DRUM_TOGGLE:return c->target<BB_MACHINES && c->step<BB_STEPS && c->voice<BB_DRUM_TRACKS && c->value<=1;
     case BB_CMD_NOTE_EDIT:return c->target<BB_SYNTHS && c->step<BB_STEPS && c->voice<=BB_SLIDE && c->value<=127;
@@ -171,6 +177,8 @@ static int valid(const bb_command *c) {
     case BB_CMD_SYNTH_KEY:return c->target<BB_SYNTHS && c->step<BB_KEY_SOURCES && c->voice<=127 && c->value<=127;
     case BB_CMD_SYNTH_SOURCE_RELEASE:return c->target<BB_SYNTHS && c->step<BB_KEY_SOURCES && c->value==0;
     case BB_CMD_SYNTH_RELEASE:return c->target<BB_SYNTHS && c->value==0;
+    case BB_CMD_SYNTH_SILENCE:return c->target<BB_SYNTHS && !c->value && !c->step && !c->voice &&
+        !c->note.note && !c->note.gate && !c->note.accent && !c->note.slide;
     case BB_CMD_SYNTH_TRANSPOSE:return c->target<BB_SYNTHS && c->value<=2u*BB_TRANSPOSE_LIMIT
         && !c->step && !c->voice && !c->note.note && !c->note.gate && !c->note.accent && !c->note.slide;
     case BB_CMD_DRUM_KIT:return c->target<BB_MACHINES && c->value<BB_DRUM_KITS;
@@ -208,7 +216,7 @@ int bb_command_push(bb_commands *q,const bb_command *c) {
     if(c->type==BB_CMD_TRANSPORT && !c->value) {
         q->stop_pending=1;leave(q,token);return 1;
     }
-    if(c->type==BB_CMD_TRANSPORT && (q->stop_pending || q->stop_inflight)) {
+    if((c->type==BB_CMD_TRANSPORT || c->type==BB_CMD_TRANSPORT_RESTART) && (q->stop_pending || q->stop_inflight)) {
         leave(q,token);return 0;
     }
     if(q->count==BB_COMMAND_CAPACITY){leave(q,token);return 0;}
@@ -221,6 +229,7 @@ static void apply(bb_core *core,const bb_command *c) {
     case BB_CMD_SWING:bb_set_swing(core,c->value);break;
     case BB_CMD_SWING_X2:bb_set_swing_x2(core,c->value);break;
     case BB_CMD_TRANSPORT:if(c->value)bb_start(core);else bb_stop(core);break;
+    case BB_CMD_TRANSPORT_RESTART:bb_start(core);break;
     case BB_CMD_DRUM_STEP: {
         bb_drum_step *step=&core->drums[c->target].steps[c->step];
         uint16_t bit=(uint16_t)(1u<<c->voice);
@@ -280,7 +289,7 @@ static void apply(bb_core *core,const bb_command *c) {
 #endif
     case BB_CMD_909_PARAMETER:case BB_CMD_DRUM_TRIGGER:case BB_CMD_EVOLVE:case BB_CMD_PART_LAUNCH:case BB_CMD_SYNTH_PATTERN:case BB_CMD_DRUM_PATTERN:
     case BB_CMD_SYNTH_KEY:case BB_CMD_SYNTH_RELEASE:
-    case BB_CMD_SYNTH_SOURCE_RELEASE:case BB_CMD_SYNTH_TRANSPOSE:case BB_CMD_TRIO_BANK:break; /* audio-owner events */
+    case BB_CMD_SYNTH_SOURCE_RELEASE:case BB_CMD_SYNTH_SILENCE:case BB_CMD_SYNTH_TRANSPOSE:case BB_CMD_TRIO_BANK:break; /* audio-owner events */
     }
 }
 unsigned bb_apply_pending_live(bb_core *core,bb_commands *q,bb_live_command_fn live,void *ctx) {
@@ -292,12 +301,12 @@ unsigned bb_apply_pending_live(bb_core *core,bb_commands *q,bb_live_command_fn l
     for(i=0;i<n;i++) {
         bb_command c;token=enter(q);c=q->items[q->read];
         q->read=(q->read+1u)%BB_COMMAND_CAPACITY;q->count--;leave(q,token);
-        if(stop && c.type==BB_CMD_TRANSPORT && c.value)continue; /* superseded START */
+        if(stop && ((c.type==BB_CMD_TRANSPORT && c.value) || c.type==BB_CMD_TRANSPORT_RESTART))continue; /* superseded START */
         /* A redundant START is not a restart: keep the current beat and any
          * phrase queued for its next quantized boundary. */
         if(c.type==BB_CMD_TRANSPORT && c.value && core->running)continue;
 #if BB_SAMPLE_HOST_INTEGRATION
-        if(c.type!=BB_CMD_TRANSPORT && q->admit && !q->admit(q->admit_context,&c))continue;
+        if(c.type!=BB_CMD_TRANSPORT && c.type!=BB_CMD_TRANSPORT_RESTART && q->admit && !q->admit(q->admit_context,&c))continue;
 #endif
         apply(core,&c);
         if((c.type==BB_CMD_GROUP_LEVEL || c.type==BB_CMD_GROUP_MUTE || c.type==BB_CMD_909_PARAMETER || c.type==BB_CMD_DRUM_TRIGGER || c.type==BB_CMD_EVOLVE || c.type==BB_CMD_PART_LAUNCH || c.type==BB_CMD_SYNTH_PATTERN || c.type==BB_CMD_DRUM_PATTERN
@@ -310,9 +319,9 @@ unsigned bb_apply_pending_live(bb_core *core,bb_commands *q,bb_live_command_fn l
             || c.type==BB_CMD_KIT_PHRASE
 #endif
 #endif
-            || c.type==BB_CMD_TRANSPORT || c.type==BB_CMD_SYNTH_MUTE || c.type==BB_CMD_NOTE
+            || c.type==BB_CMD_TRANSPORT || c.type==BB_CMD_TRANSPORT_RESTART || c.type==BB_CMD_SYNTH_MUTE || c.type==BB_CMD_NOTE
             || c.type==BB_CMD_SYNTH_KEY || c.type==BB_CMD_SYNTH_RELEASE
-            || c.type==BB_CMD_SYNTH_SOURCE_RELEASE || c.type==BB_CMD_SYNTH_TRANSPOSE || c.type==BB_CMD_TRIO_BANK
+            || c.type==BB_CMD_SYNTH_SOURCE_RELEASE || c.type==BB_CMD_SYNTH_SILENCE || c.type==BB_CMD_SYNTH_TRANSPOSE || c.type==BB_CMD_TRIO_BANK
             ) && live)live(ctx,&c);
     }
     if(stop) {
@@ -329,7 +338,7 @@ unsigned bb_apply_pending_faulted(bb_core *core,bb_commands *q,bb_live_command_f
     for(i=0;i<n;i++) {
         bb_command c;token=enter(q);c=q->items[q->read];
         q->read=(q->read+1u)%BB_COMMAND_CAPACITY;q->count--;leave(q,token);
-        if(c.type==BB_CMD_TRANSPORT)continue; /* START refused; STOP applied below */
+        if(c.type==BB_CMD_TRANSPORT || c.type==BB_CMD_TRANSPORT_RESTART)continue; /* START/RESTART refused; STOP applied below */
         if(c.type==BB_CMD_DRUM_KIT || c.type==BB_CMD_DILLO_PATCH || c.type==BB_CMD_TELEGRAM_PATCH)continue;
 #if BB_SAMPLE_HOST_INTEGRATION
         if(q->admit && !q->admit(q->admit_context,&c))continue;

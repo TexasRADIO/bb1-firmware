@@ -21,4 +21,6 @@ typedef struct {
  * translate source settings, not circuit-exact Studio PCM. Output must be
  * distinct from catalogue/view/choice/data; unchanged on any failure. */
 int bb_factory_read_recipe(const bb_catalogue *,const bb_factory_choice *,bb_factory_recipe *);
+/* 1.5: a song bank's tempo and swing; 1 when present and in range. */
+int bb_factory_read_song_tempo(const bb_catalogue *,const bb_factory_choice *,unsigned *bpm,unsigned *swing_x2);
 #endif

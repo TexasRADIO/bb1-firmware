@@ -1,16 +1,17 @@
-# Building BB1 1.2
+# Building BB1 1.5
 
-For the released BB1 image, use the verifier documented in [README.md](README.md#build-it-yourself):
+Use the included [BB1 1.5 build instructions](BB1-1.5-BUILD.md) and the released `candidate` profile. Exact identities are recorded in [RELEASE-BUILD-PINS.json](RELEASE-BUILD-PINS.json) and [SOURCE-BUNDLE-MANIFEST.json](SOURCE-BUNDLE-MANIFEST.json).
 
 ```sh
-python3 -I big-beat/integration/verify_release.py . /tmp/bb1-check \
-  --expect-app 58445d2c73a8c29037996f7ce7afa2ed2478283bfd14d5eb416b5357c2b50027 \
-  --expect-package adc2619386ae32ae0b912cd12ac994e75a7a40900fc8eccb0d876128375323c8
+python3 -I big-beat/integration/verify_release.py . /tmp/bb1-1.5-check --recipe candidate \
+  --expect-tree 80f2e431b45e67a595c4d8c7f3031b89d002b00b83f134058aa4acc4739c85eb \
+  --expect-app c3a703a388e8c274585b27097a888d30b3c4f2b92c57e1077cee9e4ebf0d3380 \
+  --expect-package 2ef5f0112657e25fcce3f25d3e9be6eb6ba1832d941386cbf3543a450686dcfc
 ```
 
-This command requires the pinned external inputs listed in `big-beat/integration/inputs.json`. Some inputs currently live at fixed paths on the release build machine and are not distributed in this repository. A fresh checkout alone cannot yet reproduce the target image; see the README's build-input limitations and `big-beat/integration/build/README.md`.
+The release uses `BB_WITH_DILLO=1`, `BB_WITH_TELEGRAM=0`, `BB_FIXA=0` and `BB_AUDIO_PROFILE=0`. Choose a new output directory. The command requires the pinned external inputs in `big-beat/integration/inputs.json`; some retain fixed release-machine paths and are not distributed here. A fresh checkout alone cannot yet reproduce the target image. See `BB1-1.5-BUILD.md` and `big-beat/integration/build/README.md` for dependency limits and identities.
 
-The instructions below are retained upstream Felucca documentation. Their general build script, feature flags, emulator and installation links do not describe the released BB1 1.2 build. They are preserved as historical developer reference, not as an alternative BB1 release recipe.
+The following material is retained upstream Felucca documentation. Its general build script, feature flags, emulator and installation links describe upstream Felucca rather than the released BB1 1.5 recipe. It remains a developer reference. The BB1 command above is the release reproduction route.
 
 ## Retained upstream Felucca build reference
 

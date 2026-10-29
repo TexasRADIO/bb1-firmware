@@ -1150,6 +1150,8 @@ static uint32_t chain_prepare(void)
     return 0;
 }
 
+static int bb_global_settings_acquire(void);
+static void bb_global_settings_release(void);
 static void settings_poll(void)
 {
 #if FELUCCA_FLASH
@@ -1158,14 +1160,19 @@ static void settings_poll(void)
     slc_store_poll();                              /* SLICE's slices edited on the SLICES page */
 #endif
     if (!persist_pending || !flash_ok || transport_busy() ||
-        (persist_pending == 2u && (uint32_t)(fm1_ms - persist_retry_ms) < 1000u))
-        return;
+        (persist_pending == 2u && (uint32_t)(fm1_ms - persist_retry_ms) < 1000u)) {
+        bb_global_settings_release();return;
+    }
     p = persist_saved;
     settings_export(&p);
     if (!memcmp(&p, &persist_saved, sizeof p)) {
         persist_pending = 0;
+        bb_global_settings_release();
         return;                                    /* unchanged: no erase cycle */
     }
+    int gate=bb_global_settings_acquire();
+    if(!gate)return;
+    if(gate<0){persist_pending=2;persist_retry_ms=fm1_ms;return;}
     if (st_save(OBJ_SETTINGS, &p, sizeof p) == 0) {
         persist_saved = p;
         persist_pending = 0;
@@ -1173,6 +1180,7 @@ static void settings_poll(void)
         persist_pending = 2;
         persist_retry_ms = fm1_ms;
     }
+    bb_global_settings_release();
 #endif
 }
 

@@ -85,6 +85,49 @@ static int bb_remote_command(const char *p) {
         }
         con_puts("\r\n");return 1;
     }
+#if BB_WITH_TELEGRAM
+    /* Dillo Duo lead (T4): load a song section's lead line on the lead player, and mute/unmute the lead. */
+    if(str_eq(p,"bbtest lead on") || str_eq(p,"bbtest lead off")) {
+        uintptr_t token=bb_target_enter(0);
+        int safe=!bb_remote.active && bb_remote_idle();
+        bb_target_leave(0,token);
+        int accepted=safe && bb_send_synth(1,BB_CMD_SYNTH_MUTE,str_eq(p,"bbtest lead off"),0);
+        con_puts(accepted?"bbtest lead queued\r\n":"bbtest refused\r\n");
+        return 1;
+    }
+    {
+        static const char prefix[]="bbtest lead song ";
+        unsigned i=0,v[2]={0,0},n=0;
+        while(prefix[i]&&p[i]==prefix[i])i++;
+        if(!prefix[i]) {
+            const char *t=p+i;
+            for(n=0;n<2;n++) {
+                unsigned d=0;
+                while(*t>='0'&&*t<='9'&&d<5){v[n]=v[n]*10u+(unsigned)(*t-'0');t++;d++;}
+                if(!d||(n==0&&*t!=' ')||(n==1&&*t)){con_puts("bbtest selection invalid\r\n");return 1;}
+                if(n==0)t++;
+            }
+            uintptr_t token=bb_target_enter(0);
+            int safe=bb_remote_library_safe();
+            bb_target_leave(0,token);
+            if(!safe){con_puts("bbtest refused\r\n");return 1;}
+            bb_library_sync();
+            bb_player *player=&bb_library[1];
+            bb_browser next=player->view;
+            if(!player->ready||player->is_drum||bb_player_pending(player)||!bb_browser_group(&next,BB_BROWSER_SONGS)||
+               v[0]>=bb_browser_bank_count(&next)||!bb_browser_move_bank(&next,(int)v[0]-(int)next.bank_index)||
+               v[1]>=bb_browser_part_count(&next)||
+               !bb_browser_move_part_page(&next,(int)(v[1]/BB_BROWSER_PART_KEYS)-(int)next.part_page)||
+               !bb_browser_part_key(&next,v[1]%BB_BROWSER_PART_KEYS,0)){con_puts("bbtest selection invalid\r\n");return 1;}
+            bb_browser old=player->view;
+            player->view=next;
+            int result=bb_library_confirm(player);
+            if(result==BB_FACTORY_PATTERN_OK){bb_dirty=1;con_puts("bbtest lead selection accepted; ticket=");con_hex(player->request.ticket,8);}
+            else {player->view=old;con_puts("bbtest lead selection refused; result=");con_hex((unsigned)result,2);}
+            con_puts("\r\n");return 1;
+        }
+    }
+#endif
     if(str_eq(p,"bbtest drum-b on") || str_eq(p,"bbtest drum-b off")) {
         uintptr_t token=bb_target_enter(0);
         int safe=!bb_remote.active && bb_remote_idle();

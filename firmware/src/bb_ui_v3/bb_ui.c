@@ -870,7 +870,7 @@ static void page_home(const bb_ui *u, const bb_ui_in *in, uint32_t now)
         u_text_fit(35, y, &AF_S, l->part ? l->part : "", BB_UI_GREY, BB_UI_BG, 88);
         u_text_fit(126, y, &AF_S, (l->flags & BB_UI_LN_OFF) ? "SELECT, PRESETS" : l->name ? l->name : "", BB_UI_GREY, BB_UI_BG,
                    l->next && l->next[0] ? 57 : 106);         /* an off lane says how to add a kit */
-        u_brand(35, y + 13, NM_LIST,
+        u_brand(35, y + 15, NM_LIST,   /* 2 px lower than 1.2 so the section line's descenders clear it (P7) */
                 (l->flags & BB_UI_LN_OFF) ? "ADD KIT" : l->pattern,
                 (l->flags & BB_UI_LN_OFF) ? BB_UI_GREY : BB_UI_TEXT,
                 BB_UI_BG, 196, 0);

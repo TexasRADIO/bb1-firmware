@@ -19,6 +19,13 @@ void bb_sample_scene_set_predecessor(uint32_t header,uint32_t payload,unsigned k
     pred_header=header;pred_payload=payload;pred_kits=kits<=8?kits:0;
 }
 /* how many kit IDs a scene pinned to (h,p) may use under the installed library (header,payload,count); 0 = refused */
+/* 1.5 (Joe, 29 Oct: RAISE): a scene saved with the 1.0/1.1 library at that firmware's 0.25 sampled-kit level
+ * loads at today's default. Only converted scenes are touched; a level chosen under the current library is kept. */
+#define BB_SAMPLE_OLD_DEFAULT_GAIN 0.25f
+static float sample_scene_gain(const uint8_t *p,uint32_t header,uint32_t payload,float gain){
+    int converted=!(bb_wire_get32(p+16)==header&&bb_wire_get32(p+20)==payload);
+    return converted&&gain==BB_SAMPLE_OLD_DEFAULT_GAIN?BB_SAMPLE_DEFAULT_GAIN:gain;
+}
 static unsigned sample_scene_kits(const uint8_t *p,uint32_t header,uint32_t payload,unsigned count){
     uint32_t h=bb_wire_get32(p+16),q=bb_wire_get32(p+20);
     if(h==header&&q==payload)return count;
@@ -66,7 +73,7 @@ int bb_sample_scene_decode(const void *input,size_t bytes,uint32_t rate,
        bb_wire_get32(p+8)!=bytes||bb_wire_get32(p+12)!=sample_scene_crc(p,bytes)||p[29]||p[30]||p[31])return 0;
     bb_sample_scene_identity next={0};next.pack_header_crc=header;next.pack_payload_crc=payload;
     next.kit=p[5];next.echo=p[6];next.spring=p[7];next.kind=p[28];
-    uint32_t gain=bb_wire_get32(p+24);memcpy(&next.gain,&gain,4);
+    uint32_t gain=bb_wire_get32(p+24);memcpy(&next.gain,&gain,4);next.gain=sample_scene_gain(p,header,payload,next.gain);
     uint8_t staged_mix[16];
     if(!sample_scene_identity_valid(&next)||
        !gg_scene_decode_staged(p+32,bytes-32,rate,w,staged_mix))return 0;
@@ -117,7 +124,7 @@ int bb_sample_pair_scene_decode(const void *input,size_t bytes,uint32_t rate,
         for(unsigned i=40;i<48;i++)if(p[i])return 0;
         for(unsigned k=0;k<2;k++){
             next[k].pack_header_crc=header;next[k].pack_payload_crc=payload;
-            uint32_t gain=bb_wire_get32(p+(k?36:24));memcpy(&next[k].gain,&gain,4);
+            uint32_t gain=bb_wire_get32(p+(k?36:24));memcpy(&next[k].gain,&gain,4);next[k].gain=sample_scene_gain(p,header,payload,next[k].gain);
         }
         next[0].kit=p[5];next[0].echo=p[6];next[0].spring=p[7];next[0].kind=p[28];
         next[1].kind=p[29];next[1].kit=p[30];next[1].echo=p[31];next[1].spring=p[32];

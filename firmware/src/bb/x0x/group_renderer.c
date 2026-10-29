@@ -16,3 +16,4 @@ __attribute__((noinline)) int bb_coefficient_check(const void *kit,unsigned stag
  return 1;
 }
 #include "group_renderer_generated.inc"
+#include "metal_capture.inc"

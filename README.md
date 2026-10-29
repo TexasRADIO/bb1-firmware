@@ -77,9 +77,10 @@
 |---|---|
 | **KIT A + KIT B** | Two independent drum machines running together, each with its own pattern, kit and level. A Linn groove under an 808? Go on. |
 | **Eight machines** | The **808**, synthesised in real time, plus seven sampled machines: **LinnDrum**, **DrumTraks**, **DMX**, **LM-1**, **Simmons**, **Rhythm King** and **Drumulator**. Swap the machine under a pattern and it lands on the next bar. |
-| **Dillo** | A monophonic bass synth with eight presets, from rubbery acid to hollow dub. Every era brings its own line. |
+| **Dillo** | A monophonic bass synth with nine presets, including Square Acid, from rubbery acid to hollow dub. Every era brings its own line. |
 | **Echo & spring** | A three-head tape echo and a spring reverb, shared by everything. Hold **REC + FX** for a dub throw. |
-| **67 songs** | Drum patterns in the style of records you know, section by section. |
+| **67 songs** | 233 playable drum sections, with catalogue tempos and swing. |
+| **205 ACID phrases** | 27 Dillo banks, with accents and slides, alongside songs and eras. |
 | **21 eras** | Big Beat originals, from Motorik to rave, each with its own Dillo bassline. |
 | **138 classic rhythms** | The preset rhythms of four vintage rhythm boxes: waltzes, bossa novas, rock and everything between. |
 | **Changes on the beat** | New kits and patterns wait for the bar line. The screen says **NEXT** until they land. |
@@ -87,7 +88,7 @@
 ## Get it on your FM-1
 
 1. Plug the FM-1 into a computer with a USB **data** cable, and open **[thebigbeat.app/fm1/install](https://thebigbeat.app/fm1/install/)** in Chrome or Edge.
-2. Press **Install BB1** once. The installer handles the firmware and sounds together, checking the existing library before writing it. Allow about five minutes. Your projects, presets and settings stay where they are.
+2. Press **Install BB1** once. The installer handles the firmware and sounds together, checking the existing library before writing it. Allow about five minutes. The installer preserves the user-data regions. Keep a backup: preserved bytes do not guarantee compatibility with older firmware.
 3. With **MASTER** down, press **HOME**, then **PLAY**. Bring **MASTER** up gently.
 
 Want it gone? Go back to M-VAVE's official firmware any time with M-VAVE's own updater and their `FM-1.fwsc`. BB1 can't export its music to the computer yet, so copy out anything you want to keep before you switch.
@@ -109,7 +110,9 @@ Want it gone? Go back to M-VAVE's official firmware any time with M-VAVE's own u
 ## Known limits
 
 - **Saving:** on an FM-1 that came with its own firmware, a scene can still hold that firmware's data. BB1 shows **SCENE n HAS OTHER DATA** and writes nothing until you hold **SAVE** for two seconds, which replaces it. BB1 never loads that old data. This has been tested on an FM-1: save, load, a power cycle, a second save, and a return to 1.1 and back.
-- **Headroom:** dense two-drum playback has stayed inside the audio deadline in every recorded test, but above the preferred processing headroom. Not every arrangement has been tested.
+- **Headroom:** the released lead-off candidate passed its recorded two-drum tests within the audio deadline, above the preferred processing headroom. Experimental Duo/Fix A tests exceeded the deadline and are not included. Not every arrangement has been tested.
+- **Tempo display:** the browser header can retain 120 after a song load even when the song row and engine use the song’s tempo. This display inconsistency remains open.
+- **Rollback:** returning to 1.2 resets global preferences, including MIDI settings. 1.2 scenes load in 1.5; 1.2 refuses scenes saved by experimental builds with the lead enabled. Keep a compatible backup.
 - **Substitute voices:** a missing voice plays a substitute, and the pattern itself is unchanged. On a native 808 drum B, synth percussion plays as cowbell and zap as high tom.
 - **The browser player** runs the released engine with the native 808 and the seven-machine sound library. It lets you try the layout, controls and sound; browser results do not prove FM-1 hardware timing or scene persistence.
 
@@ -118,23 +121,21 @@ Want it gone? Go back to M-VAVE's official firmware any time with M-VAVE's own u
 Everything here is the complete source of the released firmware. One command rebuilds it and proves it matches, **given the pinned build inputs** (see below):
 
 ```sh
-python3 -I big-beat/integration/verify_release.py . /tmp/bb1-check \
-  --expect-app 58445d2c73a8c29037996f7ce7afa2ed2478283bfd14d5eb416b5357c2b50027 \
-  --expect-package adc2619386ae32ae0b912cd12ac994e75a7a40900fc8eccb0d876128375323c8
+python3 -I big-beat/integration/verify_release.py . /tmp/bb1-1.5-check --recipe candidate \
+  --expect-tree 80f2e431b45e67a595c4d8c7f3031b89d002b00b83f134058aa4acc4739c85eb \
+  --expect-app c3a703a388e8c274585b27097a888d30b3c4f2b92c57e1077cee9e4ebf0d3380 \
+  --expect-package 2ef5f0112657e25fcce3f25d3e9be6eb6ba1832d941386cbf3543a450686dcfc
 ```
 
-Those are the identities of **BB1 1.2** (`bb1-1.2.fwsc`, 610,086 bytes). Its sound library, with the seven sampled machines, is `154ef6b92553af5803c3e003dc5d2c379aed4e0503f24f08ad8b024cff7d821e` (245,760 bytes); BB1 1.0 and 1.1 used `f4bbf1a409d8aadb3429232e49dfb06b121070532787d31078db9630b6e7efcc`. BB1 1.1 (app `d5469d59…`, package `00113792…`) and BB1 1.0 (app `a5e34e31…`, package `5345b617…`) are earlier commits. Their sources are also on the install page as `bb1-source-1.1.tar` and `bb1-source-1.0.tar`.
+Those are the identities of **BB1 1.5: Acid Dillo** (`bb1-1.5.fwsc`, 610,086 bytes), built from the lead's `c04aa9f` source with the `candidate` recipe: Dillo enabled, Telegram and Fix A disabled. Duo remains future work. The seven-machine sound library is unchanged from 1.2: `154ef6b92553af5803c3e003dc5d2c379aed4e0503f24f08ad8b024cff7d821e` (245,760 bytes). Earlier releases remain available for rollback.
 
-It runs the host test suites, the audio oracle (worker and serial render over all 601 catalogue sections), a 601-section level sweep, the from-source target build and the deterministic packaging, with negative cases. Exit 0 means the bytes match the release, bit for bit.
+The verifier runs host suites, the worker/serial oracle, level checks, the from-source target build and deterministic packaging, including negative cases. Exit 0 proves the expected bytes match. It does not prove hardware acceptance. Exact install/readback and two 65-second two-drum runs passed on the FM-1 with zero fault or miss counters; their retained maximum was 5,475.3 µs against a 5,802.7 µs deadline. The second run retained the first run's boot-cumulative maximum. Physical ACID, three-focus and Square Acid walkthroughs remain unperformed on this candidate while Joe is remote. See `BB1-1.5-HARDWARE-RECEIPT.json` and [the build instructions](BB1-1.5-BUILD.md).
 
-**Build inputs, honestly:** the verifier checks each external input against `big-beat/integration/inputs.json` by SHA-256 before it runs. Today it looks for them at fixed paths on our build machine, and some aren't published here:
-- the JieLi `pi32v2` toolchain;
-- the linker overlay, the asset symbols and object;
-- the pinned Docker build image.
-
-So a fresh checkout can read, test and audit everything, but it can't yet repeat the bit-for-bit target build without those inputs. Making the inputs relocatable, and documenting where each comes from, is on our list. The JieLi SDK files inside the package are Apache-2.0 and public.
+**Build inputs:** external inputs are checked against `big-beat/integration/inputs.json` by SHA-256. The JieLi `pi32v2` toolchain, linker overlay, asset symbols/object and pinned Docker image are external dependencies. Some paths still refer to our build machine. A fresh checkout cannot reproduce the target bytes without those exact inputs and path mappings; they are not bundled or downloaded by the verification command. The included SDK package notices remain Apache-2.0. [BUILDING.md](BUILDING.md) puts the BB1 release route first and keeps upstream Felucca instructions as reference.
 
 ## Licence
+
+The Acid Tabs phrases credit **J. McConaghy / Acid-Tabs.com**, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); phrases were renamed, revoiced and retimed for Dillo. Further provenance and permissions are in `BIG-BEAT-LICENSING.md`.
 
 GNU GPL v3. See `LICENSE`, `LICENSING.md`, `LICENSES/` and `BIG-BEAT-LICENSING.md`. BB1 is a Felucca-family firmware; upstream notices are kept in `LICENSING.md`. M-VAVE, FM-1, Roland, TR-808, Linn, LinnDrum, LM-1, DrumTraks, Sequential, DMX, Oberheim, Simmons, E-mu, Drumulator and Rhythm King are trademarks of their respective owners. BB1 is independent and not affiliated with or endorsed by them. **No warranty:** you install it at your own risk.
 

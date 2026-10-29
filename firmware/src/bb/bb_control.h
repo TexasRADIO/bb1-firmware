@@ -50,7 +50,13 @@ typedef enum {
 #if BB_WITH_RICH_DRUM_HANDOFF
     ,BB_CMD_KIT_PHRASE /* Owned phrase slot and ticket; note.gate=registered kit ID. */
 #endif
+    ,BB_CMD_TRANSPORT_RESTART /* append only; atomic MIDI Start proposal */
+    ,BB_CMD_SYNTH_SILENCE /* MIDI CC120: owner clears active voice, keeps patch/sequence */
 } bb_command_type;
+/* RESTART: all payload fields zero. Audio owner resets sequence frame/phase,
+ * ticks/cursors even while running, using existing START side effects. Held
+ * live keys and sounding tails survive; no STOP is synthesized. STOP wins
+ * over a queued RESTART; faulted audio rejects it. Panel START stays idempotent. */
 /* SAMPLE_MIX: target=0,step=sample ID,voice=BB_SAMPLE_MIX_*,value=setting;
  * note bytes encode sample-selection completion serial little endian. The
  * audio owner rejects stale IDs/serials. Not an 808 pot or a pattern edit. */

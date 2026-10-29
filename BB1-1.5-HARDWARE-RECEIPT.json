@@ -1,0 +1,80 @@
+{
+  "source": "c04aa9ff7b5407558b247c891c0944a0c7179e1d",
+  "recipe": "candidate",
+  "BB_WITH_TELEGRAM": 0,
+  "BB_FIXA": 0,
+  "source_receipt_sha256": "1e5227c882fb64a6e812defc933469accbca614770c1844576dfbad132c35ce7",
+  "readback": {
+    "passed": true,
+    "app_sha256": "c3a703a388e8c274585b27097a888d30b3c4f2b92c57e1077cee9e4ebf0d3380",
+    "app_bytes": 545516,
+    "sound_sha256": "154ef6b92553af5803c3e003dc5d2c379aed4e0503f24f08ad8b024cff7d821e",
+    "user_data_unchanged": true
+  },
+  "native_runs": [
+    {
+      "test": "T1",
+      "passed": true,
+      "stopped": true,
+      "audio_seconds": 65.20163265306122,
+      "baseline_callback_max_ticks": 22234,
+      "final_callback_max_ticks": 131407,
+      "callback_budget_ticks": 139264,
+      "new_peak_observed_in_interval": true,
+      "max_us": 5475.291666666667,
+      "budget_us": 5802.666666666667,
+      "final_fields": {
+        "bb_playing": 0,
+        "bb_master_q12": 0,
+        "bb_faults": 0,
+        "audio_budget_exceeds": 0,
+        "audio_dma_misses": 0,
+        "audio_timing_anomalies": 0,
+        "p1b_guard_trips": 0,
+        "p1b_fallbacks": 0,
+        "c1_live_failed": 0,
+        "bb_guard_faults": 0,
+        "bb_bpm": 87,
+        "c1_live_jobs": 22608,
+        "c1_live_selected": 1
+      },
+      "raw_sha256": "15f5d744e55942a782f261c297e0c3fd2650254c9701a427bbd3803f879816a4"
+    },
+    {
+      "test": "T2",
+      "passed": true,
+      "stopped": true,
+      "audio_seconds": 65.23065759637188,
+      "baseline_callback_max_ticks": 131407,
+      "final_callback_max_ticks": 131407,
+      "callback_budget_ticks": 139264,
+      "new_peak_observed_in_interval": false,
+      "max_us": 5475.291666666667,
+      "budget_us": 5802.666666666667,
+      "final_fields": {
+        "bb_playing": 0,
+        "bb_master_q12": 0,
+        "bb_faults": 0,
+        "audio_budget_exceeds": 0,
+        "audio_dma_misses": 0,
+        "audio_timing_anomalies": 0,
+        "p1b_guard_trips": 0,
+        "p1b_fallbacks": 0,
+        "c1_live_failed": 0,
+        "bb_guard_faults": 0,
+        "bb_bpm": 127,
+        "c1_live_jobs": 45354,
+        "c1_live_selected": 1
+      },
+      "raw_sha256": "a8ff4cb21eacf65413bb4735491532c81c2b80126632ec14664528e70aa8b08a"
+    }
+  ],
+  "scope_limits": [
+    "T2 maximum is retained boot-cumulative upper bound from T1; no new isolated Egypt peak observed.",
+    "Native tests exercised two drums with Dillo source-boot bass and effects; bbtest song changes drums, not the catalogued song bass accompaniment.",
+    "Physical ACID browsing, all three SELECT focuses and Square Acid panel walkthrough were not performed while Joe was remote; emulator/source evidence is separate.",
+    "No Duo, Fix A, internal lead or T4 validation; no claim of meeting the preferred 4640 us target.",
+    "Earlier 78a966e Duo failures are historical and separate from this c04 candidate."
+  ],
+  "device_actions_by_source_preparer": false
+}

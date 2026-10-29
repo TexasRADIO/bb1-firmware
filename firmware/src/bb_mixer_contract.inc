@@ -10,7 +10,7 @@ static const bb_mixer_descriptor *bb_mix_control(unsigned page,unsigned slot){
 #if defined(BB_TWO_DRUM_HOST_EXPERIMENT)
         {BB_MX_DRUM,0,"DRUM A"},{BB_MX_DRUM,1,"DRUM B"},{BB_MX_BUS,BB_MIX_DILLO,"DILLO"},
 #else
-        {BB_MX_BUS,BB_MIX_DRUMS,"DRUMS"},{BB_MX_BUS,BB_MIX_DILLO,"DILLO"},{BB_MX_BUS,BB_MIX_TELEGRAM,"TELE"},
+        {BB_MX_BUS,BB_MIX_DRUMS,"DRUMS"},{BB_MX_BUS,BB_MIX_DILLO,"DILLO"},{BB_MX_BUS,BB_MIX_TELEGRAM,"LEAD"},
 #endif
         {BB_MX_TEMPO,0,"BPM"}};
     if(slot>=4u)return NULL;

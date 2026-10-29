@@ -118,7 +118,7 @@ static void bb_pb_draw(void) {
     }
     for(unsigned strip=0;strip<240;strip+=120) {
         bb_pb_art(strip);
-        bb_pb_text(7,4,strip,&AF_M,drums?"BIG BEAT":owner.page==BB_DILLO?"DILLO":"TELEGRAM",bb_instrument_ink());
+        bb_pb_text(7,4,strip,&AF_M,drums?"BIG BEAT":owner.page==BB_DILLO?"DILLO":"DILLO LEAD",bb_instrument_ink());
         bb_pb_text(151,7,strip,&AF_S,bb_face.requested.running?"PLAY":"STOP",BB_GREEN);
         char bpm[12];fmt_int(bpm,bb_face.requested.bpm);bb_pb_text(195,4,strip,&AF_M,bpm,BB_TEXT);
         bb_pb_text(7,27,strip,&AF_S,"ALGORITHM / PATTERN",BB_DIM);

@@ -84,7 +84,8 @@ static void bb_v3_common(bb_ui_in *in, uint8_t page)
     in->now_ms = fm1_ms;
     in->page = page;
     in->instr = bb_nav_row < 2u ? bb_nav_row : (uint8_t)BB_UI_INST_DILLO;
-    in->instr_name = bb_nav_row == 0u ? "KIT A" : bb_nav_row == 1u ? "KIT B" : "DILLO";
+    in->instr_name = bb_nav_row == 0u ? "KIT A" : bb_nav_row == 1u ? "KIT B" :
+                     bb_nav_synth() ? "LEAD" : BB_WITH_TELEGRAM ? "BASS" : "DILLO";
     while (*s && n + 1u < sizeof bb_v3_pname) bb_v3_pname[n++] = *s++;
     if (b && b[0] && n + 3u < sizeof bb_v3_pname) {
         bb_v3_pname[n++] = ' '; bb_v3_pname[n++] = ' ';
@@ -227,7 +228,7 @@ static void bb_v3_pattern(bb_ui_in *in)
             while (*kit && n + 1u < sizeof bb_v3_sub) bb_v3_sub[n++] = *kit++;
             bb_v3_sub[n] = 0;
         } else {
-            const char *g = p->view.group ? "SONG \xB7 " : "ERA \xB7 ";
+            const char *g = p->view.group == BB_BROWSER_ACID ? "ACID \xB7 " : p->view.group ? "SONG \xB7 " : "ERA \xB7 ";
             while (*g) bb_v3_sub[n++] = *g++;
             bb_v3_cat(bb_catalogue_find(&bb_factory_catalogue, choice.part, "name"), bb_v3_sub + n, sizeof bb_v3_sub - n);
         }
@@ -410,16 +411,26 @@ static void bb_v3_play_drums(bb_ui_in *in)
 #endif
 }
 
-/* Dillo PLAY: the patch, the sequence as a piano roll, the filter */
+/* The focused Dillo side's sound name (Duo: 0 BASS, 1 LEAD). */
+static const char *bb_v3_patch_name(unsigned sy)
+{
+    if (bb_patch_from_scene[sy] == 2) return "Era sound";
+    if (bb_patch_from_scene[sy]) return "Scene sound";
+#if BB_WITH_TELEGRAM
+    if (sy) return bb_telegram_bank[bb_patch_index[1] % BB_TELEGRAM_PATCHES].name;
+#endif
+    return bb_dillo_bank[bb_patch_index[0] % BB_DILLO_PATCHES].name;
+}
+/* Dillo PLAY (BASS or LEAD): the patch, the sequence as a piano roll, the filter */
 static void bb_v3_play_dillo(bb_ui_in *in)
 {
-    const bb_sequence *seq = &bb_face.requested.synths[0];
+    const unsigned sy = bb_nav_synth();
+    const bb_sequence *seq = &bb_face.requested.synths[sy];
     unsigned k, lo = 255, len = seq->length ? seq->length : 16u, lim0, lim1, v;
-    in->patch = bb_patch_from_scene[0] == 2 ? "Era sound" : bb_patch_from_scene[0] ? "Scene sound" :
-                bb_dillo_bank[bb_patch_index[0] % BB_DILLO_PATCHES].name;
+    in->patch = bb_v3_patch_name(sy);
     in->scale = bb_nav_scale_hint();
     if (!in->scale)
-        in->scale = bb_patch_edited[0] ? "EDITED" : "";
+        in->scale = bb_patch_edited[sy] ? "EDITED" : "";
     for (k = 0; k < 16u && k < len; k++)
         if (seq->notes[k].gate && seq->notes[k].note < lo)
             lo = seq->notes[k].note;
@@ -431,12 +442,12 @@ static void bb_v3_play_dillo(bb_ui_in *in)
         if (n->accent) in->note_acc |= (uint16_t)(1u << k);
         if (n->slide) in->note_slide |= (uint16_t)(1u << k);
     }
-    in->step = (uint8_t)(bb_synth_playhead[0] % 16u);
-    v = bb_synth_parameter_get(&bb_face.requested, 0, BB_PARAM_CUTOFF);
-    if (bb_synth_parameter_limits(0, BB_PARAM_CUTOFF, &lim0, &lim1) && lim1 > lim0)
+    in->step = (uint8_t)(bb_synth_playhead[sy] % 16u);
+    v = bb_synth_parameter_get(&bb_face.requested, sy, BB_PARAM_CUTOFF);
+    if (bb_synth_parameter_limits(sy, BB_PARAM_CUTOFF, &lim0, &lim1) && lim1 > lim0)
         in->cutoff = (uint8_t)((v < lim0 ? 0u : v > lim1 ? lim1 - lim0 : v - lim0) * 255u / (lim1 - lim0));
-    v = bb_synth_parameter_get(&bb_face.requested, 0, BB_PARAM_RESONANCE);
-    if (bb_synth_parameter_limits(0, BB_PARAM_RESONANCE, &lim0, &lim1) && lim1 > lim0)
+    v = bb_synth_parameter_get(&bb_face.requested, sy, BB_PARAM_RESONANCE);
+    if (bb_synth_parameter_limits(sy, BB_PARAM_RESONANCE, &lim0, &lim1) && lim1 > lim0)
         in->reso = (uint8_t)((v < lim0 ? 0u : v > lim1 ? lim1 - lim0 : v - lim0) * 255u / (lim1 - lim0));
     in->octave = bb_nav.key_octave;
 }
@@ -448,7 +459,8 @@ static void bb_v3_home(bb_ui_in *in)
 {
     unsigned r;
     for (r = 0; r < 3u; r++) {
-        bb_player *p = r < 2u ? &bb_drum_library[r] : &bb_library[0];
+        const unsigned sy = r < 2u ? 0u : bb_nav_synth();   /* lane 3: Dillo, the focused side */
+        bb_player *p = r < 2u ? &bb_drum_library[r] : &bb_library[sy];
         bb_ui_lane *l = &in->lane[r];
         bb_catalogue_id bank = p->playing.ticket ? p->playing.choice.bank : BB_CATALOGUE_NONE;
         bb_catalogue_id part = p->playing.ticket ? p->playing.choice.part : BB_CATALOGUE_NONE;
@@ -465,12 +477,11 @@ static void bb_v3_home(bb_ui_in *in)
             bb_v3_home_part[r] = part;
         }
         l->name = bb_v3_home_section[r];
-        l->flags = (uint8_t)((r == bb_nav_row ? BB_UI_LN_FOCUS : 0u) |
+        l->flags = (uint8_t)((r == bb_nav_row || (r == 2u && bb_nav_row == 3u) ? BB_UI_LN_FOCUS : 0u) |
                             (r < 2u ? (!bb_face.requested.drums[r].enabled ? BB_UI_LN_OFF : 0u) |
                                       (bb_face.requested.drums[r].muted ? BB_UI_LN_MUTED : 0u) :
-                                      (bb_face.requested.synths[0].muted ? BB_UI_LN_MUTED : 0u)));
-        l->part = r < 2u ? bb_ui_kit_name(r) :
-            bb_dillo_bank[bb_patch_index[0] % BB_DILLO_PATCHES].name;
+                                      (bb_face.requested.synths[sy].muted ? BB_UI_LN_MUTED : 0u)));
+        l->part = r < 2u ? bb_ui_kit_name(r) : bb_v3_patch_name(sy);
         if (bb_v3_home_bank[r] != bank || bb_v3_home_group[r] != group || !bb_v3_home_pattern[r][0]) {
             if (bank != BB_CATALOGUE_NONE)
                 bb_v3_bank_title(&p->playing.choice, bb_v3_home_pattern[r], sizeof bb_v3_home_pattern[r]);
@@ -567,8 +578,7 @@ static void bb_v3_knobs(bb_ui_in *in)
     const char *t = "";
     switch (bb_nav.page) {
     case BB_NAV_SOUND:
-        t = bb_nav_is_drum() ? bb_ui_voice_name() : bb_patch_from_scene[0] == 2 ? "Era sound" :
-            bb_patch_from_scene[0] ? "Scene sound" : bb_dillo_bank[bb_patch_index[0] % BB_DILLO_PATCHES].name;
+        t = bb_nav_is_drum() ? bb_ui_voice_name() : bb_v3_patch_name(bb_nav_synth());
         break;
 #if BB_WITH_SESSION
     case BB_NAV_SAVE: {

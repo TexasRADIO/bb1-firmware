@@ -150,6 +150,21 @@ def host_tests():
             *[f'firmware/src/bb/{f}.c' for f in ('sample_scene', 'group_scene', 'bb_family_scene', 'bb_session', 'bb_core',
               'bb909_patch', 'bb_crc32', 'bb_wire', 'group_gain', 'bb909_controls')], '-lm'],
             expect=r'scene conversion: \d+ checks, 0 failures')
+    # 1.5 ACID bank: Dillo reads every ACID phrase, the drum reader refuses them, ERAS/SONGS unchanged
+    if (SRC / 'firmware/src/bb/bb_browser.c').read_text().count('"acid"'):
+        res['acid_bank'] = compile_and_run('acid_bank', [*SAN, *HOST['HOST_WARN'], '-Wno-unused-parameter', '-Dsection(x)=used',
+            *HOST['HOST_DEFS'], *HOST['HOST_INC'], str(T / 'acid_bank/acid_bank.c'),
+            *[f'firmware/src/bb/{f}.c' for f in ('bb_factory', 'bb_factory_recipe', 'bb_browser', 'bb_catalogue', 'bb_paged_container',
+              'bb_paged_records', 'bb_catalogue_page', 'bb_crc32', 'bb_core', 'bb_factory_pattern', 'bb_factory_drum',
+              'bb_note_expression_catalogue', 'bb_note_expression')], '-lm'],
+            expect=r'acid bank: \d+ banks, \d+ phrases, \d+ checks, 0 failures')
+    # 1.5 song tempo: every song bank reads its sheet tempo/swing through the player's browser walk
+    if 'bb_factory_read_song_tempo' in (SRC / 'firmware/src/bb/bb_factory_recipe.c').read_text():
+        res['song_tempo'] = compile_and_run('song_tempo', [*SAN, *HOST['HOST_WARN'], '-Wno-unused-parameter', '-Dsection(x)=used',
+            *HOST['HOST_DEFS'], *HOST['HOST_INC'], str(T / 'song_tempo/song_tempo.c'),
+            *[f'firmware/src/bb/{f}.c' for f in ('bb_factory', 'bb_factory_recipe', 'bb_browser', 'bb_catalogue', 'bb_paged_container',
+              'bb_paged_records', 'bb_catalogue_page', 'bb_crc32', 'bb_core')], '-lm'],
+            expect=r'song tempo: \d+ songs, \d+ checks, 0 failures')
     # L3 fix A gate (fix A trees only, those with x0x/metal_capture.inc): kit A's metal lanes via the compact capture,
     # merged per sample in CB->CY order, are bit-identical to the released full render (outputs, whole kit, groups);
     # the pre-sum and state mutations must fail (#4 6483954898, 6485319810, 6485803291, 6488119452)
@@ -168,6 +183,10 @@ def host_tests():
             res['fixA_call'] = compile_and_run('call_exact', cal, expect=r'call gate: \d+ calls compared .*, 0 failures')
             for m in ('SEGFLAGS', 'HITSHIFT', 'EQUALORDER'):
                 res[f'fixA_call_{m.lower()}_fails'] = compile_and_run(f'call_exact_{m.lower()}', [f'-DMUTATE_{m}', *cal], expect=r' [1-9][0-9]* failures', returncode=1)
+        # the core-1 job container gives the direct result and refuses tampering (hal/bb_c1_metal_job.h)
+        if (SRC / 'firmware/hal/bb_c1_metal_job.h').exists():
+            res['fixA_job'] = compile_and_run('metal_job', [*cap[:-3], '-Wno-unused-function', str(T / 'fixA/metal_job.c'), 'firmware/src/bb/group_gain.c', '-lm'],
+                                              expect=r'fix A job: \d+ calls, \d+ tamper rounds, \d+ B job, \d+ checks, 0 failures')
     if (OUT / 'route-matrix.csv').read_bytes() != (HERE / 'route-matrix.csv').read_bytes():
         res['route_matrix'] = 'DIFFERS from the checked-in route-matrix.csv'
     else:

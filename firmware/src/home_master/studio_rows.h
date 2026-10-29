@@ -6,12 +6,19 @@
 #define BB_STUDIO_ROWS_H
 #include "bb_player.h"
 #include "bb_sound_picker.h"
+#if BB_WITH_TELEGRAM
+enum { ST_DRUM_A, ST_DRUM_B, ST_DILLO, ST_LEAD, ST_ROWS };   /* Dillo Duo: BASS, then LEAD */
+#else
 enum { ST_DRUM_A, ST_DRUM_B, ST_DILLO, ST_ROWS };
+#endif
 typedef struct { bb_page page; unsigned target; const char *label; } st_route;
 static inline int st_resolve(unsigned row, st_route *out) {
     static const st_route routes[ST_ROWS] = {
         {BB_DRUMS,0,"BIG BEAT A"}, {BB_DRUMS,1,"BIG BEAT B"},
-        {BB_DILLO,0,"DILLO"}
+        {BB_DILLO,0,BB_WITH_TELEGRAM?"DILLO BASS":"DILLO"},
+#if BB_WITH_TELEGRAM
+        {BB_TELEGRAM,1,"DILLO LEAD"},
+#endif
     };
     if (!out || row >= ST_ROWS) return 0;
     *out=routes[row]; return 1;
@@ -30,6 +37,9 @@ static inline int st_from_editor(bb_page page,unsigned target,unsigned *row) {
     if (!row) return 0;
     if (page==BB_DRUMS && target<2) { *row=target;return 1; }
     if (page==BB_DILLO && target==0) { *row=ST_DILLO;return 1; }
+#if BB_WITH_TELEGRAM
+    if (page==BB_TELEGRAM) { *row=ST_LEAD;return 1; }
+#endif
     return 0;
 }
 /* Never substitute A when B's player is absent, unready or misbound. */
@@ -57,7 +67,7 @@ static inline int st_level(unsigned row,unsigned value,bb_command *out) {
     if (!out || value>127 || !st_resolve(row,&r)) return 0;
     bb_command c={0};
     c.type=r.page==BB_DRUMS ? BB_CMD_DRUM_LEVEL : BB_CMD_BAND_LEVEL;
-    c.target=(uint8_t)(r.page==BB_DRUMS ? r.target : BB_MIX_DILLO);
+    c.target=(uint8_t)(r.page==BB_DRUMS ? r.target : r.page==BB_TELEGRAM ? BB_MIX_TELEGRAM : BB_MIX_DILLO);
     c.value=(uint16_t)value; *out=c; return 1;
 }
 static inline int st_mute(unsigned row,unsigned muted,bb_command *out) {

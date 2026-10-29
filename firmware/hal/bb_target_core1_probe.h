@@ -59,6 +59,15 @@ static bb_c1_private_pool_t bb_c1_private_pool __attribute__((aligned(64)));
 /* Immutable request copy for worker; CPU0 lease/commit state stays separate.
  * No caller publishes this new job until owner integration is qualified. */
 static bb_rjt_lease bb_c1_rich_request;
+#ifndef BB_FIXA
+#define BB_FIXA 0
+#endif
+#if BB_FIXA
+static int bb_c1_rich_run(uint32_t job,uint32_t *result); /* bb_c1_rich_hooks.inc: rich job, then kit A's metal */
+#define BB_C1_RICH_RUN(job,result) bb_c1_rich_run(job,result)
+#else
+#define BB_C1_RICH_RUN(job,result) bb_rjt_run(&bb_c1_private_pool.rich.job,bb_c1_rich_request,result)
+#endif
 static bb_rt_state bb_c1_retained_state;
 static bb_rt_chain bb_c1_retained_request;
 /* CPU0-only lease metadata. Midpoint only advances CPU0's slice ledger;
@@ -111,14 +120,14 @@ bb_c1_fixed_work(uint32_t seed,uint32_t nonce,uint32_t job,uint32_t *result) {
            bb_c1_rich_request.ticket!=job || bb_c1_rich_request.committed)return 0;
         #if BB_AUDIO_PROFILE
         uint32_t started=fm1_ticks();
-        int ok=bb_rjt_run(&bb_c1_private_pool.rich.job,bb_c1_rich_request,result);
+        int ok=BB_C1_RICH_RUN(job,result);
         uint32_t elapsed=fm1_ticks()-started;
         bb_c1_mail.timed_job=job;bb_c1_mail.timed_ticks=elapsed;
         bb_c1_mail.timed_check=bb_c1_result_check(job,elapsed);
         /* RAM caller publishes done only AFTER this returns and csync. */
         return ok;
 #else
-        return bb_rjt_run(&bb_c1_private_pool.rich.job,bb_c1_rich_request,result);
+        return BB_C1_RICH_RUN(job,result);
 #endif
     }
     else if(seed==BB_C1_RETAINED_JOB) {

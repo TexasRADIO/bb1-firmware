@@ -1,3 +1,4 @@
+#include "bb_midi_settings_hold.inc"
 /* Big Beat first playable panel. Upstream stock UI remains only for recovery.
  * The audio and UI never share writable pattern state. */
 #include "bb/bb_panel.h"
@@ -451,7 +452,8 @@ static void bb_synth_input(uint32_t pressed,uint32_t notes) {
     if((delta=bb_read_encoder(EN_PRESET))!=0) {
         if(rec)bb_pitch_edit(synth,delta);
         else {
-            unsigned index=(unsigned)bb_limit((int)bb_patch_index[synth]+bb_limit(delta,-8,8),0,7);
+            unsigned index=(unsigned)bb_limit((int)bb_patch_index[synth]+bb_limit(delta,-8,8),0,
+                (int)(synth?BB_TELEGRAM_PATCHES:BB_DILLO_PATCHES)-1); /* every bank slot, not just the first eight */
             if(bb_send_synth(synth,synth?BB_CMD_TELEGRAM_PATCH:BB_CMD_DILLO_PATCH,index,0)) {
                 bb_patch_index[synth]=(uint8_t)index;bb_patch_edited[synth]=0;bb_patch_from_scene[synth]=0;
             }
@@ -478,7 +480,7 @@ static void bb_synth_input(uint32_t pressed,uint32_t notes) {
         if(synth) {
             if(bb_send_synth(synth,BB_CMD_SYNTH_PARAMETER,!bb_face.requested.telegram.glide,BB_PARAM_GLIDE)) {
                 bb_patch_edited[synth]=1;
-                bb_say(bb_face.requested.telegram.glide?"TELEGRAM: GLIDE ON":"TELEGRAM: GLIDE OFF");
+                bb_say(bb_face.requested.telegram.glide?"LEAD: GLIDE ON":"LEAD: GLIDE OFF");
             }
         } else if(bb_send_synth(0,BB_CMD_SYNTH_PARAMETER,!bb_face.requested.dillo.wave,BB_PARAM_WAVE)) {
             bb_patch_edited[0]=1;
@@ -802,6 +804,7 @@ static int bb_library_preview_part_key(bb_player *player,unsigned key) {
 #endif
 }
 static int bb_library_preview_group(bb_player *player,unsigned group) {
+    if(player->is_drum && group==BB_BROWSER_ACID)return 0;   /* ACID holds Dillo phrases only */
 #if BB_WITH_RICH_DRUM_BROWSER && BB_SAMPLE_HOST_INTEGRATION
     unsigned kit;
     return bb_library_preview_kit(player,&kit)?
@@ -884,7 +887,8 @@ static int bb_library_input(uint32_t pressed,uint32_t *notes,int rec) {
      * REC+PRESETS explicitly selects the pattern family without launching. */
     if((!bb_sound_picker_enabled||rec) && (delta=bb_read_encoder(EN_PRESET))!=0) {
         unsigned group=(unsigned)bb_limit((int)player->view.group+bb_limit(delta,-1,1),0,BB_BROWSER_GROUPS-1);
-        (void)bb_library_preview_group(player,group);bb_dirty=1;selection_changed=1;
+        (void)bb_library_preview_group(player,group);   /* a refused group (ACID on a drum layer, or none) keeps the current one */
+        bb_dirty=1;selection_changed=1;
     }
     if(!drums)bb_synth_knobs_input(synth,rec);
     else {
@@ -949,6 +953,7 @@ static int bb_library_input(uint32_t pressed,uint32_t *notes,int rec) {
 #include "home_master/input.inc"
 #include "bb_design_help.inc"
 #include "bb_nav_firmware.inc"
+#include "bb_midi_ui_input.inc"
 /* Navigation v2.1: the page-flag input path below is replaced by bb_nav
  * (bb_nav_firmware.inc). The former handlers it called (bb_aux_input,
  * hm_native_input, bb_aux_browse_input, bb_sound_pick_input,
@@ -958,6 +963,10 @@ static int bb_library_input(uint32_t pressed,uint32_t *notes,int rec) {
  * drops them. Their musical calls are reached from bb_nav's routes. */
 static void bb_target_input_impl(void) {
     uint32_t pressed=fm1_input_edges(0),notes=fm1_input_note_edges();
+    if(bb_midi_global_settings_holding()){
+        for(unsigned k=0;k<7;k++)(void)bb_read_encoder(k);
+        bb_nav_cancel(&bb_nav);bb_nav_project();return;
+    }
     if(pressed || notes)fm1_led_anim_stop();
 #if BB_WITH_SESSION
     if(bb_session_poll()) {
@@ -979,6 +988,7 @@ static void bb_target_input_impl(void) {
 #if BB_WITH_EVOLVE
     bb_evo_sync();
 #endif
+    if(bb_midi_ui_input(pressed,notes))return;
     bb_nav_scan(pressed,notes);
 }
 /* A quiet REC hold is read-only help. Any musical gesture suppresses help
@@ -1043,7 +1053,7 @@ static void bb_target_input(void) {
         uint32_t both=(1u<<panel.btn[B_OCTDN])|(1u<<panel.btn[B_OCTUP]);
         int paused=0;
 #if BB_WITH_SESSION
-        paused=bb_session_busy();
+        paused=bb_session_busy()||bb_midi_global_settings_holding();
 #endif
         bb_midi_input(paused,ui.uboot || (fm1_in.buttons&both)==both);
     }
@@ -1195,7 +1205,7 @@ static void bb_instrument_tabs(void) {
         BB_TELEGRAM,
 #endif
     };
-    static const char *const titles[]={"DRUMS","DILLO","TELEGRAM"};
+    static const char *const titles[]={"DRUMS",BB_WITH_TELEGRAM?"BASS":"DILLO","LEAD"}; /* Dillo Duo: Dillo's two sides */
     unsigned count=sizeof pages/sizeof *pages;
     int width=222/(int)count;
     for(unsigned row=0;row<count;row++) {
@@ -1573,9 +1583,10 @@ static void bb_library_draw(int pulse) {
     } else cv_text(9,28,&AF_S,drums?(p->view.group?(bb_face.machine?"DRUM B / SONG":"DRUM A / SONG"):
         (bb_face.machine?"DRUM B / ERA":"DRUM A / ERA")):
 #if BB_WITH_TELEGRAM
-        synth?(p->view.group?"TELEGRAM / SONG":"TELEGRAM / ERA"):
+        synth?(p->view.group==BB_BROWSER_ACID?"DILLO LEAD / ACID":p->view.group?"DILLO LEAD / SONG":"DILLO LEAD / ERA"):
 #endif
-        (p->view.group?"DILLO / SONG":"DILLO / ERA"),BB_DIM);
+        (p->view.group==BB_BROWSER_ACID?(BB_WITH_TELEGRAM?"DILLO BASS / ACID":"DILLO / ACID"):
+         p->view.group?(BB_WITH_TELEGRAM?"DILLO BASS / SONG":"DILLO / SONG"):(BB_WITH_TELEGRAM?"DILLO BASS / ERA":"DILLO / ERA")),BB_DIM);
     int muted=drums?machine->muted:bb_face.requested.synths[synth].muted;
     int enabled=!drums || machine->enabled;
     unsigned level=drums?machine->level:bb_face.requested.band_level[synth+1u];
@@ -1664,6 +1675,7 @@ static void bb_library_draw(int pulse) {
 #include "bb_playbook_face.inc"
 #include "bb_sample_sends_draw.inc"
 #include "bb_ui_v3_firmware.inc"
+#include "bb_midi_ui_draw.inc"
 static void bb_target_draw(void) {
     if(bb_asset_hold_request)return;
     bb_pb_own_workspace();
@@ -1673,6 +1685,7 @@ static void bb_target_draw(void) {
     unsigned k,head=bb_face.requested.page==BB_DRUMS || bb_mix_page?bb_playhead[bb_face.machine]:bb_synth_playhead[bb_selected_synth()];uint8_t pulse;
     bb_machine *m=&bb_face.requested.drums[bb_face.machine];
     if(ui.uboot){ui_draw_update();bb_dirty=1;return;}
+    if(bb_midi_ui_draw())return;
     if(bb_v3_draw())return;                       /* every player-facing page (bb_ui_v3_route.h) */
     if(bb_nav.page==BB_NAV_GLOBAL&&!bb_help_visible) {
         /* Navigation v2.1: GLOBAL face; meters refresh twice a second. */
@@ -1787,7 +1800,7 @@ static void bb_target_draw(void) {
 #if defined(BB_TWO_DRUM_HOST_EXPERIMENT)
         mixer_parts=bb_mix_page!=BB_MIX_KITS_PAGE?"DRUM A / B / DILLO":"TWO INDEPENDENT DRUMS";
 #elif BB_WITH_TELEGRAM
-        mixer_parts=bb_mix_page!=BB_MIX_KITS_PAGE?"DRUMS / DILLO / TELEGRAM":"DRUM LAYER LEVELS";
+        mixer_parts=bb_mix_page!=BB_MIX_KITS_PAGE?"DRUMS / BASS / LEAD":"DRUM LAYER LEVELS";
 #elif BB_WITH_DILLO
         mixer_parts=bb_mix_page!=BB_MIX_KITS_PAGE?"DRUMS / DILLO":"DRUM LAYER LEVELS";
 #else
@@ -1799,7 +1812,7 @@ static void bb_target_draw(void) {
         unsigned synth=bb_selected_synth();char pitch[6];
         const bb_sequence *seq=&bb_face.requested.synths[synth];
         bb_pitch_name(pitch,bb_keys_page[synth]?bb_keys_base[synth]:seq->notes[bb_selected_note[synth]].note);
-        cv_text(9,64,&AF_L,synth?"TELEGRAM":"DILLO",bb_instrument_ink());
+        cv_text(9,64,&AF_L,synth?"DILLO LEAD":BB_WITH_TELEGRAM?"DILLO BASS":"DILLO",bb_instrument_ink());
         bb_number(142,73,bb_face.requested.bpm,&AF_S,BB_TEXT);
         cv_text(165,73,&AF_S,"BPM",BB_DIM);
         cv_text(196,73,&AF_S,seq->muted?"MUTE":bb_face.requested.running?"PLAY":"READY",seq->muted?BB_DIM:BB_GREEN);

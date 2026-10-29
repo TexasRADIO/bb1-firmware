@@ -11,8 +11,8 @@
 #define BB_VOICES 16
 #define BB_STEPS 64
 #define BB_SYNTHS 2
-#define BB_DILLO_PATCHES 8
-#define BB_TELEGRAM_PATCHES 8
+#define BB_DILLO_PATCHES 9
+#define BB_TELEGRAM_PATCHES 16
 typedef enum { BB_DRUMS, BB_DILLO, BB_TELEGRAM } bb_page;
 /* Mixer ownership is independent of sound recipes and note patterns. */
 typedef enum { BB_MIX_DRUMS, BB_MIX_DILLO, BB_MIX_TELEGRAM, BB_MIX_CHANNELS } bb_mix_channel;
