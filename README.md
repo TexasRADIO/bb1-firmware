@@ -108,7 +108,7 @@ Want it gone? Go back to M-VAVE's official firmware any time with M-VAVE's own u
 
 ## Known limits
 
-- **Saving:** on an FM-1 that came with its own firmware, a scene can still hold that firmware's data. BB1 shows **SCENE n HAS OTHER DATA** and writes nothing until you hold **SAVE** for two seconds, which replaces it. BB1 never loads that old data. Replacing it is new in 1.2 and hasn't been tried on an FM-1 yet.
+- **Saving:** on an FM-1 that came with its own firmware, a scene can still hold that firmware's data. BB1 shows **SCENE n HAS OTHER DATA** and writes nothing until you hold **SAVE** for two seconds, which replaces it. BB1 never loads that old data. This has been tested on an FM-1: save, load, a power cycle, a second save, and a return to 1.1 and back.
 - **Headroom:** dense two-drum playback has stayed inside the audio deadline in every recorded test, but above the preferred processing headroom. Not every arrangement has been tested.
 - **Substitute voices:** a missing voice plays a substitute, and the pattern itself is unchanged. On a native 808 drum B, synth percussion plays as cowbell and zap as high tom.
 - **The browser player** runs the released engine with the native 808 and the seven-machine sound library. It lets you try the layout, controls and sound; browser results do not prove FM-1 hardware timing or scene persistence.
