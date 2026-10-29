@@ -3,8 +3,8 @@
 For the released BB1 image, use the verifier documented in [README.md](README.md#build-it-yourself):
 
 ```sh
-python3 -I big-beat/integration/verify_release.py . /tmp/bb1-check \\
-  --expect-app 58445d2c73a8c29037996f7ce7afa2ed2478283bfd14d5eb416b5357c2b50027 \\
+python3 -I big-beat/integration/verify_release.py . /tmp/bb1-check \
+  --expect-app 58445d2c73a8c29037996f7ce7afa2ed2478283bfd14d5eb416b5357c2b50027 \
   --expect-package adc2619386ae32ae0b912cd12ac994e75a7a40900fc8eccb0d876128375323c8
 ```
 
