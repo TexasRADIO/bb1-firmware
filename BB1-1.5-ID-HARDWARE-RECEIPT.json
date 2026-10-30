@@ -1,0 +1,32 @@
+{
+  "version": "1.5",
+  "display_name": "BB-1 1.5",
+  "identity_product": "FM-1_92200105",
+  "app_sha256": "ce17d90b317a7a476be6e0026084717fb81f613bb8244a529eb5c790e7e2f6bf",
+  "package_sha256": "0efa13388f688927fb46e40fa5acc508f3a3fc04a37cd3184910ef7d7d43571a",
+  "runtime_identity_verified": true,
+  "full_application_readback_pass": true,
+  "all_saved_user_bytes_preserved": true,
+  "saved_user_bytes": 77824,
+  "soundA_bytes_preserved": 245760,
+  "regionB_bytes_preserved": 81920,
+  "normal_boot": 26,
+  "STOP_master0_BBfault0": true,
+  "new_ID_exit_and_return": {
+    "passed": true,
+    "route": "FM-1_92200105 -> official Felucca 1.5.1 FM-1_915 -> FM-1_92200105",
+    "foreign_app_readback_pass": true,
+    "final_app_readback_pass": true,
+    "all_saved_user_and_both_sound_regions_unchanged": true,
+    "boot_counters": [
+      24,
+      25,
+      26
+    ]
+  },
+  "historical_engine_timing": "original1.5-only; not repeated for ID-only update",
+  "oldID_stock_transition": "historical; not claimed as newID stock qualification",
+  "cold_power_cycle": false,
+  "physical_presence": "user remote; explicitly authorises remote installs",
+  "final_state": "STOP/master0/BBfault0/flash1"
+}

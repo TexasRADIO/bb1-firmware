@@ -79,14 +79,16 @@ Everything here is the complete source of the released firmware. One command reb
 
 ```sh
 python3 -I big-beat/integration/verify_release.py . /tmp/bb1-1.5-check --recipe candidate \
-  --expect-tree 80f2e431b45e67a595c4d8c7f3031b89d002b00b83f134058aa4acc4739c85eb \
-  --expect-app c3a703a388e8c274585b27097a888d30b3c4f2b92c57e1077cee9e4ebf0d3380 \
-  --expect-package 2ef5f0112657e25fcce3f25d3e9be6eb6ba1832d941386cbf3543a450686dcfc
+  --expect-tree 08457b66eae409bcbae3735033a49d3785efaa4884df6c2cc457996c1dad6ae6 \
+  --expect-app ce17d90b317a7a476be6e0026084717fb81f613bb8244a529eb5c790e7e2f6bf \
+  --expect-package 0efa13388f688927fb46e40fa5acc508f3a3fc04a37cd3184910ef7d7d43571a
 ```
 
-Those are the identities of **BB1 1.5: Acid Dillo** (`bb1-1.5.fwsc`, 610,086 bytes), built from the lead's `c04aa9f` source with the `candidate` recipe: Dillo enabled, Telegram and Fix A disabled. Duo remains future work. The seven-machine sound library is unchanged from 1.2: `154ef6b92553af5803c3e003dc5d2c379aed4e0503f24f08ad8b024cff7d821e` (245,760 bytes). Earlier releases remain available for rollback.
+Those are the identities of **BB-1 1.5**, with the identity-only correction (`bb1-1.5-id.fwsc`, 610,086 bytes), built from the lead's `c04aa9f` engine plus the shared BB1 identity contract with the `candidate` recipe: Dillo enabled, Telegram and Fix A disabled. Duo remains future work. The seven-machine sound library is unchanged from 1.2: `154ef6b92553af5803c3e003dc5d2c379aed4e0503f24f08ad8b024cff7d821e` (245,760 bytes). Earlier releases remain available for rollback.
 
-The verifier runs host suites, the worker/serial oracle, level checks, the from-source target build and deterministic packaging, including negative cases. Exit 0 proves the expected bytes match. It does not prove hardware acceptance. Exact install/readback and two 65-second two-drum runs passed on the FM-1 with zero fault or miss counters; their retained maximum was 5,475.3 µs against a 5,802.7 µs deadline. The second run retained the first run's boot-cumulative maximum. Physical ACID, three-focus and Square Acid walkthroughs remain unperformed on this candidate while Joe is remote. See `BB1-1.5-HARDWARE-RECEIPT.json` and [the build instructions](BB1-1.5-BUILD.md).
+The corrected runtime and package both report `FM-1_92200105`; the friendly release name remains **BB-1 1.5**. This supplements version 1.5 and changes no musical features. The original `v1.5` tag and `bb1-1.5.fwsc` remain available as historical rollback; use the corrected source archive and current main for the ID-corrected build. The USB product stays **Big Beat**.
+
+The verifier runs host suites, the worker/serial oracle, level checks, the from-source target build and deterministic packaging, including negative cases. Exit 0 proves the expected bytes match. It does not prove hardware acceptance. The original 1.5 engine's exact install/readback and two 65-second two-drum runs passed on the FM-1 with zero fault or miss counters; their retained maximum was 5,475.3 µs against a 5,802.7 µs deadline. The second run retained the first run's boot-cumulative maximum. Physical ACID, three-focus and Square Acid walkthroughs remain unperformed on this candidate while Joe is remote. The identity-only build has separate runtime/app/data readback evidence in `BB1-1.5-ID-HARDWARE-RECEIPT.json`; its other 74 native objects are unchanged. See the historical `BB1-1.5-HARDWARE-RECEIPT.json` and [the current build instructions](BB1-1.5-ID-BUILD.md).
 
 **Build inputs:** external inputs are checked against `big-beat/integration/inputs.json` by SHA-256. The JieLi `pi32v2` toolchain, linker overlay, asset symbols/object and pinned Docker image are external dependencies. Some paths still refer to our build machine. A fresh checkout cannot reproduce the target bytes without those exact inputs and path mappings; they are not bundled or downloaded by the verification command. The included SDK package notices remain Apache-2.0. [BUILDING.md](BUILDING.md) puts the BB1 release route first and keeps upstream Felucca instructions as reference.
 
