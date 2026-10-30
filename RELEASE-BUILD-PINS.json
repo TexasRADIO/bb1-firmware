@@ -1,6 +1,5 @@
 {
-  "source_commit": "c04aa9ff7b5407558b247c891c0944a0c7179e1d",
-  "source_tree_sha256": "80f2e431b45e67a595c4d8c7f3031b89d002b00b83f134058aa4acc4739c85eb",
+  "source_tree_sha256": "08457b66eae409bcbae3735033a49d3785efaa4884df6c2cc457996c1dad6ae6",
   "review": "e98a2bfc115c3e19b2733753b2abe15f25793a71",
   "recipe": "candidate",
   "BB_WITH_DILLO": 1,
@@ -9,7 +8,7 @@
   "BB_AUDIO_PROFILE": 0,
   "fixa_proof": "no command override; #ifndef/#define0 in bb_audio.c and bb_c1_rich_hooks.inc; FixA diagnostic symbols absent",
   "target": {
-    "sha256": "c3a703a388e8c274585b27097a888d30b3c4f2b92c57e1077cee9e4ebf0d3380",
+    "sha256": "ce17d90b317a7a476be6e0026084717fb81f613bb8244a529eb5c790e7e2f6bf",
     "bytes": 545516,
     "code_free": 36048,
     "ram_free": 31636,
@@ -18,14 +17,19 @@
     "ok": true
   },
   "package": {
-    "sha256": "2ef5f0112657e25fcce3f25d3e9be6eb6ba1832d941386cbf3543a450686dcfc",
+    "sha256": "0efa13388f688927fb46e40fa5acc508f3a3fc04a37cd3184910ef7d7d43571a",
     "bytes": 610086,
     "negative_cases": 8,
-    "rollback_sha256": "f3383921a500e4c0d771adcab968b6f905d278ab79b5edc616cdc5e921e5865b",
+    "rollback_sha256": "2ef5f0112657e25fcce3f25d3e9be6eb6ba1832d941386cbf3543a450686dcfc",
     "ok": true
   },
-  "actual_lead_package_equal": true,
   "sound_library_sha256": "154ef6b92553af5803c3e003dc5d2c379aed4e0503f24f08ad8b024cff7d821e",
-  "documentation_revision": "acid-tabs-credit-and-root-native-receipt",
-  "native_receipt_sha256": "1e5227c882fb64a6e812defc933469accbca614770c1844576dfbad132c35ce7"
+  "documentation_revision": "1.5-identity-only-supplement",
+  "engine_source_commit": "c04aa9ff7b5407558b247c891c0944a0c7179e1d",
+  "identity_product": "FM-1_92200105",
+  "display_name": "BB-1 1.5",
+  "version": "1.5",
+  "identity_only_supplement": true,
+  "identity_only_native_leaf_objects_unchanged": 74,
+  "historical_engine_native_receipt_sha256": "1e5227c882fb64a6e812defc933469accbca614770c1844576dfbad132c35ce7"
 }

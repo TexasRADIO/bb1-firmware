@@ -1,15 +1,15 @@
 # Building BB1 1.5
 
-Use the included [BB1 1.5 build instructions](BB1-1.5-BUILD.md) and the released `candidate` profile. Exact identities are recorded in [RELEASE-BUILD-PINS.json](RELEASE-BUILD-PINS.json) and [SOURCE-BUNDLE-MANIFEST.json](SOURCE-BUNDLE-MANIFEST.json).
+Use the included [BB-1 1.5 identity-corrected build instructions](BB1-1.5-ID-BUILD.md) and the released `candidate` profile. Exact identities are recorded in [RELEASE-BUILD-PINS.json](RELEASE-BUILD-PINS.json) and [SOURCE-BUNDLE-MANIFEST.json](SOURCE-BUNDLE-MANIFEST.json).
 
 ```sh
 python3 -I big-beat/integration/verify_release.py . /tmp/bb1-1.5-check --recipe candidate \
-  --expect-tree 80f2e431b45e67a595c4d8c7f3031b89d002b00b83f134058aa4acc4739c85eb \
-  --expect-app c3a703a388e8c274585b27097a888d30b3c4f2b92c57e1077cee9e4ebf0d3380 \
-  --expect-package 2ef5f0112657e25fcce3f25d3e9be6eb6ba1832d941386cbf3543a450686dcfc
+  --expect-tree 08457b66eae409bcbae3735033a49d3785efaa4884df6c2cc457996c1dad6ae6 \
+  --expect-app ce17d90b317a7a476be6e0026084717fb81f613bb8244a529eb5c790e7e2f6bf \
+  --expect-package 0efa13388f688927fb46e40fa5acc508f3a3fc04a37cd3184910ef7d7d43571a
 ```
 
-The release uses `BB_WITH_DILLO=1`, `BB_WITH_TELEGRAM=0`, `BB_FIXA=0` and `BB_AUDIO_PROFILE=0`. Choose a new output directory. The command requires the pinned external inputs in `big-beat/integration/inputs.json`; some retain fixed release-machine paths and are not distributed here. A fresh checkout alone cannot yet reproduce the target image. See `BB1-1.5-BUILD.md` and `big-beat/integration/build/README.md` for dependency limits and identities.
+The release uses `BB_WITH_DILLO=1`, `BB_WITH_TELEGRAM=0`, `BB_FIXA=0` and `BB_AUDIO_PROFILE=0`. Choose a new output directory. The command requires the pinned external inputs in `big-beat/integration/inputs.json`; some retain fixed release-machine paths and are not distributed here. A fresh checkout alone cannot yet reproduce the target image. See `BB1-1.5-ID-BUILD.md` and `big-beat/integration/build/README.md` for dependency limits and identities.
 
 The following material is retained upstream Felucca documentation. Its general build script, feature flags, emulator and installation links describe upstream Felucca rather than the released BB1 1.5 recipe. It remains a developer reference. The BB1 command above is the release reproduction route.
 
