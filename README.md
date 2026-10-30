@@ -28,6 +28,16 @@
   ECHO    ═══════════════════════════════▶  REC + FX
 ```
 
+## Screens
+
+Screens captured directly from the released BB1 1.5 browser player at the FM-1's native **240 × 240** resolution.
+
+| Studio | Drum grid | Tape echo |
+|---|---|---|
+| ![BB1 Studio overview with the Late-70s Machine Pop pattern selected](docs/media/bb1-studio-240.png) | ![BB1 drum grid showing the kick pattern and four drum level controls](docs/media/bb1-sequencer-240.png) | ![BB1 tape echo screen with time, feedback, head selection and echo level](docs/media/bb1-effects-240.png) |
+
+These are firmware screen captures from the browser player, not photographs of the physical FM-1. [Capture details and original PNGs](docs/media/SCREENSHOTS.md).
+
 ## What's in the box
 
 |  |  |
@@ -91,6 +101,12 @@ The corrected runtime and package both report `FM-1_92200105`; the friendly rele
 The verifier runs host suites, the worker/serial oracle, level checks, the from-source target build and deterministic packaging, including negative cases. Exit 0 proves the expected bytes match. It does not prove hardware acceptance. The original 1.5 engine's exact install/readback and two 65-second two-drum runs passed on the FM-1 with zero fault or miss counters; their retained maximum was 5,475.3 µs against a 5,802.7 µs deadline. The second run retained the first run's boot-cumulative maximum. Physical ACID, three-focus and Square Acid walkthroughs remain unperformed on this candidate while Joe is remote. The identity-only build has separate runtime/app/data readback evidence in `BB1-1.5-ID-HARDWARE-RECEIPT.json`; its other 74 native objects are unchanged. See the historical `BB1-1.5-HARDWARE-RECEIPT.json` and [the current build instructions](BB1-1.5-ID-BUILD.md).
 
 **Build inputs:** external inputs are checked against `big-beat/integration/inputs.json` by SHA-256. The JieLi `pi32v2` toolchain, linker overlay, asset symbols/object and pinned Docker image are external dependencies. Some paths still refer to our build machine. A fresh checkout cannot reproduce the target bytes without those exact inputs and path mappings; they are not bundled or downloaded by the verification command. The included SDK package notices remain Apache-2.0. [BUILDING.md](BUILDING.md) puts the BB1 release route first and keeps upstream Felucca instructions as reference.
+
+## OleBigBeat
+
+Drum machines, acid bass and a love of rhythm. Makers of BB1 for the M-VAVE FM-1. Two beats. One little box.
+
+Find us on the FM-1 Discord as **OleBigBeat**, or at [thebigbeat.app/fm1](https://thebigbeat.app/fm1/).
 
 ## Licence
 
