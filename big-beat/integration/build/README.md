@@ -1,4 +1,12 @@
-# From-source FM-1 build (integration lead)
+# From-source FM-1 build: historical boot42 notes
+
+For released **BB-1 1.5**, start with [BUILDING.md](../../../BUILDING.md) and
+[BB1-1.5-ID-BUILD.md](../../../BB1-1.5-ID-BUILD.md). They specify the current
+`candidate` profile and corrected identity. This page retains the earlier
+boot42 measurements; its source, recipe and image hashes are historical.
+Current external input pins, including Docker, are in
+[`big-beat/integration/inputs.json`](../inputs.json). A fresh checkout still
+needs those separately supplied inputs and path mappings.
 
 One script builds the complete app image from a source tree. **Every object is compiled from source;**
 no object is reused from an earlier build. The recorded compiler command lines are replayed, with only
@@ -21,10 +29,11 @@ Boot42 itself was not built this way. It was linked from retained boot41-lineage
 ## Run
 
 ```bash
-claude-code/integration/build/run_build.sh SOURCE_TREE claude-code/integration/build/cmds-r4-onepass RECIPE_DIR OUT_DIR
+bash big-beat/integration/build/run_build.sh SOURCE_TREE \
+  big-beat/integration/build/cmds-r4-onepass RECIPE_DIR OUT_DIR
 ```
 
-- Runs in the pinned image `sha256:2d0e361d…afac3` with the Jieli toolchain `jieli-linux-toolchains-20260730.1`, network off and every input read-only.
+- The historical boot42 image was `sha256:2d0e361d…afac3`. For current release image/input identities use `big-beat/integration/inputs.json`; do not substitute the historical pin. The helper uses the JieLi toolchain `jieli-linux-toolchains-20260730.1`, with network off and inputs read-only.
 - Needs Docker and the Orange Base toolchain, linker overlay and 909 asset folders (paths in `run_build.sh`).
 - Writes `OUT_DIR/report.json` (per-unit source and object SHA-256, image hash and fit) and `OUT_DIR/candidate/` (`app.elf`, `app.bin`, `symbols`).
 - Never packages, installs or contacts a device.
