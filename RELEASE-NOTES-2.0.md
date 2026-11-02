@@ -1,6 +1,10 @@
-# FOLKS! HOW MANY DRUM MACHINES CAN YOU FIT IN ONE LITTLE BOX?
+# Big Beat Studio BB1 2.0
 
-**WITH BIG BEAT, YOU CAN PLAY TWO AT ONCE!**
+Big Beat Studio BB1 is free rhythm-machine firmware for the M-VAVE FM-1.
+
+## FOLKS! HOW MANY DRUM MACHINES CAN YOU FIT IN ONE LITTLE BOX?
+
+**WITH BIG BEAT STUDIO BB1, YOU CAN PLAY TWO AT ONCE!**
 
 Put an **808** on one side and a **LinnDrum** on the other! Bring in the **DMX! DrumTraks! Linn LM-1! Simmons! Rhythm King! Drumulator!**
 
@@ -16,7 +20,7 @@ Dillo brings **205 ACID phrases across 27 banks**, with accents, slides and hand
 
 ## BUT WAIT — THERE’S MORE!
 
-BIG BEAT 2.0 now brings you:
+BIG BEAT STUDIO BB1 2.0 now brings you:
 
 - **31 MORE DRUM KITS!**
 - **A SONG ARRANGER WITH NAMED SECTIONS!**
@@ -29,7 +33,7 @@ You get the rhythm machine — AND the new features!
 
 No instalments. No subscription. No shipping and handling.
 
-**BIG BEAT 2.0. TWO BEATS. ONE LITTLE BOX.**
+**BIG BEAT STUDIO BB1 2.0. TWO BEATS. ONE LITTLE BOX.**
 
 *For the M-VAVE FM-1. Hardware required.*
 
