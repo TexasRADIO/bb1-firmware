@@ -3,16 +3,9 @@
 static const char *const voices[]={"BD","SD","LT","MT","HT","LC","MC","HC","RS","C",
     "CP","MA","CB","CY","OHH","HH","RD","SY","ZAP","ACCENT","ACC"};
 const char *bb_factory_drum_voice_name(unsigned n) {return n<BB_FDV_COUNT?voices[n]:NULL;}
-static int text_is(const bb_catalogue *c,bb_catalogue_id id,const char *wanted) {
-    const uint8_t *bytes;size_t count,n=0;while(wanted[n])n++;
-    return bb_catalogue_text(c,id,&bytes,&count) && count==n && !memcmp(bytes,wanted,n);
-}
-static int nonempty(const bb_catalogue *c,bb_catalogue_id id) {
-    const uint8_t *bytes;size_t count;return bb_catalogue_text(c,id,&bytes,&count) && count;
-}
-static int number(const bb_catalogue *c,bb_catalogue_id id,unsigned max,unsigned *out) {
-    uint32_t n;if(!bb_catalogue_unsigned(c,id,max,&n))return 0;*out=(unsigned)n;return 1;
-}
+#define text_is(a,b,c) bb_catalogue_text_is(a,b,c)
+#define nonempty(a,b) bb_catalogue_has_text(a,b)
+#define number(a,b,c,d) bb_catalogue_uint(a,b,c,d)
 static int decoded_is(const uint8_t *bytes,size_t count,const char *wanted) {
     size_t n=0;while(wanted[n])n++;
     return count==n && !memcmp(bytes,wanted,n);

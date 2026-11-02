@@ -13,6 +13,7 @@ typedef struct {
  bb_delayed queue;
  uint32_t phase,generation,primary,delayed;
  uint8_t step,pending,odd,swing,sounded;
+ bb_ratchet_snapshot ratchets;
 } bb_rsp_state;
 typedef struct {uint32_t payload;uint16_t offset;} bb_rsp_event;
 typedef struct {
@@ -40,8 +41,20 @@ static int bb_rsp_advance(const bb_phrase_index *p,const bb_rsp_state *state,
  unsigned offset=0;
  while(offset<frames){
   uint64_t frame=first+offset;bb_delayed_event event;int status;
+  if(s->pending&&s->ratchets.active){
+   if(bb_delayed_remove_mask(q,BB_RATCHET_GROUP)!=BB_DELAYED_OK)return 0;
+   s->ratchets.active=0;
+  }
   while((status=bb_delayed_peek(q,&event))==BB_DELAYED_OK&&event.frame==frame){
-   if(bb_delayed_pop(q,frame,&event)!=BB_DELAYED_OK||!bb_rsp_add(out,offset,event.payload))return 0;
+   if(bb_delayed_pop(q,frame,&event)!=BB_DELAYED_OK)return 0;
+   if(event.payload&BB_RATCHET_GROUP){
+    unsigned step=event.payload&63u;
+    if(step>=p->phrase.length)return 0;
+    for(unsigned at=p->start[step];at<p->start[step+1];at++){
+     uint32_t payload;int hit=bb_phrase_ratchet_group_hit(p,&s->ratchets,event.payload,p->ordinal[at],&payload);
+     if(hit<0||(hit&&!bb_rsp_add(out,offset,payload)))return 0;
+    }
+   }else if(!bb_rsp_add(out,offset,event.payload))return 0;
   }
   if(status!=BB_DELAYED_OK&&status!=BB_DELAYED_WAIT)return 0;
   if(status==BB_DELAYED_OK&&event.frame<frame)return 0;
@@ -56,6 +69,7 @@ static int bb_rsp_advance(const bb_phrase_index *p,const bb_rsp_state *state,
     unsigned ordinal=p->ordinal[at];
     if(!bb_rsp_add(out,offset,p->phrase.events[ordinal]|(ordinal<<16)))return 0;
    }
+   bb_phrase_ratchet_snapshot(p,s->step,&s->ratchets);
    if(bb_phrase_index_delays(p,s->step+1,frame,duration,rate,q)!=BB_DELAYED_OK)return 0;
    s->sounded=1;s->pending=0;status=bb_delayed_peek(q,&event);
   }

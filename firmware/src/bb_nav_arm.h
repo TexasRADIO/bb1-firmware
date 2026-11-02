@@ -14,7 +14,7 @@ typedef struct { uint8_t kind; uint32_t ticket; } bb_nav_arm_state;
 /* What the main loop observes for one drum layer, each scan. */
 typedef struct {
     uint32_t request_ticket;   /* the layer's current pattern request (0 = none)            */
-    uint32_t status_seen;      /* the ticket the audio owner has reported on                */
+    uint32_t status_seen;      /* terminal owner ticket; adapter passes0 while only QUEUED  */
     uint8_t  status_applied;   /* that report is BB_PATTERN_APPLIED (else REJECTED/CANCELLED) */
     uint8_t  pick_pending;     /* the sound picker still has a request in flight            */
     uint8_t  pick_this_layer;  /* the picker's request is for this layer                    */

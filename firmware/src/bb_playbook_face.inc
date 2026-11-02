@@ -103,7 +103,7 @@ static void bb_pb_draw(void) {
     bb_sound_picker_view sound;int sound_ready=bb_sound_picker_observe(&owner,&bb_sound,&sound);
     bb_group_view groups;int drums=owner.page==BB_DRUMS;
     int groups_ready=drums&&bb_group_input(&bb_sound.commands,bb_sound.groups,owner.machine,BB_GROUP_READ,0,0,&groups)!=BB_GROUP_REFUSED;
-    const char *sound_name=!sound_ready?"STATE UNAVAILABLE":sound.active_index<0?"CUSTOM SOUND":bb_sound_picker_name((bb_page)owner.page,(unsigned)sound.active_index);
+    const char *sound_name=!sound_ready?BB_TX(TX_STATE_UNAVAILABLE):sound.active_index<0?"CUSTOM SOUND":bb_sound_picker_name((bb_page)owner.page,(unsigned)sound.active_index);
     bb_player *player=bb_library_current();char pattern[128]="CURRENT PATTERN",part[128]="";
     if(player->playing.ticket&&player->playing.ticket==player->status.applied) {
         const bb_factory_choice *choice=&player->playing.choice;

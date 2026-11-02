@@ -1,9 +1,11 @@
+#include "../src/bb/bb_optional_storage.h"
 #include "group_validate.h"
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "bb909_audio_route.h"
 #include "bb909_controls.h"
 static bb909_controls bb_c1_909_controls;
-static uint32_t bb_c1_909_control_epoch,bb_c1_909_control_rejected;
+static uint32_t bb_c1_909_control_epoch;
+static uint32_t bb_c1_909_control_rejected BB_OPTIONAL_BSS("bb_c1_909_control_rejected");
 static bb909_request bb_c1_909_pending;
 /* The CPU0-only borrowed pointer never enters the request or worker. */
 static int bb909_group_overlap(const void *a,size_t an,const void *b,size_t bn){

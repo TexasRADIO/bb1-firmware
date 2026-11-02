@@ -14,6 +14,7 @@
  * An element whose hash differs from what is on the screen is dirty; dirty elements
  * are drawn in list order (most important first) until the pixel budget is spent. */
 #include "bb_ui.h"
+#include "bb/bb_text_block.h"
 /* size switches (README "Size"): each 0 drops a feature and its data */
 #ifndef BB_UI_HELP
 #define BB_UI_HELP 1            /* the HELP overlay (hold HOME) */
@@ -842,6 +843,11 @@ static void page_steps(const bb_ui_in *in)
             u_rect(x, 132, 13, 40, c_scale(c, 102));
         else
             u_frame(x, 132, 13, 40, BB_UI_FAINT, 1);
+        if ((st >> i & 1u) && in->ratchet[i] == BB_UI_RATCHET_MIXED)   /* mixed: one bar, unlike the x2-x4 ticks */
+            u_rect(x + 2, 167, 8, 2, (ac >> i & 1u) ? BB_UI_BG : BB_UI_TEXT);
+        else if ((st >> i & 1u) && in->ratchet[i] > 1u)          /* 2.0 ratchets: one tick per extra strike, x2..x4 */
+            for (uint32_t t = 0; t + 1u < in->ratchet[i] && t < 3u; t++)
+                u_rect(x + 2 + 3 * (int32_t)t, 166, 2, 4, (ac >> i & 1u) ? BB_UI_BG : BB_UI_TEXT);
         if (i == head)
             u_rect(x, 175, 13, 2, BB_UI_TEXT);
     }
@@ -868,7 +874,7 @@ static void page_home(const bb_ui *u, const bb_ui_in *in, uint32_t now)
         u_rect(8, y - 2, (l->flags & BB_UI_LN_FOCUS) ? 5 : 3, 37, c);
         u_text(18, y, &AF_S, r ? "B" : "A", c, BB_UI_BG);
         u_text_fit(35, y, &AF_S, l->part ? l->part : "", BB_UI_GREY, BB_UI_BG, 88);
-        u_text_fit(126, y, &AF_S, (l->flags & BB_UI_LN_OFF) ? "SELECT, PRESETS" : l->name ? l->name : "", BB_UI_GREY, BB_UI_BG,
+        u_text_fit(126, y, &AF_S, (l->flags & BB_UI_LN_OFF) ? BB_TX(TX_SELECT_PRESETS) : l->name ? l->name : "", BB_UI_GREY, BB_UI_BG,
                    l->next && l->next[0] ? 57 : 106);         /* an off lane says how to add a kit */
         u_brand(35, y + 15, NM_LIST,   /* 2 px lower than 1.2 so the section line's descenders clear it (P7) */
                 (l->flags & BB_UI_LN_OFF) ? "ADD KIT" : l->pattern,
@@ -885,8 +891,13 @@ static void page_home(const bb_ui *u, const bb_ui_in *in, uint32_t now)
     u_text_fit(178, 137, &AF_S, d->name ? d->name : "", BB_UI_GREY, BB_UI_BG, 54);
     u_brand(19, 154, NM_LIST, d->pattern, BB_UI_TEXT, BB_UI_BG, 212, 0);
     if (d->next && d->next[0])
-        u_text_fit(19, 172, &AF_S, "NEXT PATTERN QUEUED", BB_UI_DILLO, BB_UI_BG, 205);
-    u_text_fit(8, 184, &AF_S, "EDIT PLAY  PRESETS SOUND  ALGO PAT", BB_UI_GREY, BB_UI_BG, 224);
+        u_text_fit(19, 172, &AF_S, BB_TX(TX_NEXT_PATTERN_QUEUED), BB_UI_DILLO, BB_UI_BG, 205);
+    /* N7: until a first pattern is loaded, the three moves that make a beat, in the NEXT line's slot (free then;
+     * y 184 sits under the step strip and knob meters) */
+    if (in->quick_start && !(d->next && d->next[0]))
+        u_text_fit(19, 169, &AF_S, BB_TX(TX_START_TURN_ALGO_EDIT_PLAY), BB_UI_KIT_A, BB_UI_BG, 213);
+    /* The old key legend at y 184 sat under the step strip and knob meters and was never visible; the page
+     * strip, the quick start and REC-hold help now carry that guidance (2.0 review). */
 }
 #endif
 
@@ -1026,6 +1037,14 @@ static void draw_browser(const bb_ui_in *in, uint32_t now)
         u_brand(16, ry + 4, NM_LIST, in->item[k], fg, bg, 156, 0);
     }
 }
+/* Turning browses, EDIT commits (2.0 navigation N2/N3): the same words on KIT and PATTERN while the
+ * highlighted item is not the loaded one. */
+static void draw_browse_hint(const bb_ui_in *in, uint16_t c, int32_t sy)
+{
+    u_text_r(232, sy, &AF_S, "BROWSE", BB_UI_GREY, BB_UI_BG);
+    u_text_r(232, sy + 15, &AF_S, "EDIT TO", c, BB_UI_BG);
+    u_text_r(232, sy + 30, &AF_S, in->running ? "QUEUE" : "LOAD", c, BB_UI_BG);
+}
 static void page_kit(const bb_ui *u, const bb_ui_in *in, uint32_t now)
 {
     uint16_t c = inst_c(in);
@@ -1035,6 +1054,8 @@ static void page_kit(const bb_ui *u, const bb_ui_in *in, uint32_t now)
         u_text_r(232, 126, &AF_S, "NEXT BAR", c, BB_UI_BG);
     } else if (in->loading) {
         u_text_r(232, 126, &AF_S, "LOADING", breath_c(c, now), BB_UI_BG);
+    } else if (in->browser_state == BB_UI_BROWSER_BROWSE) {
+        draw_browse_hint(in, c, list_y(in));
     }
     if (!BB_UI_BACKDROP) draw_mini(u, in, MINI34_X, MINI34_Y, 34, &MINI34_BOX);
 }
@@ -1050,11 +1071,28 @@ static void page_pattern(const bb_ui *u, const bb_ui_in *in, uint32_t now)
 {
     uint16_t c = inst_c(in);
     uint32_t i, total = 0;
-    int32_t x = 8, tx = 8;
+    int32_t x = 8, tx = 8, sy = list_y(in);
     draw_browser(in, now);
-    if (list_queued(in)) {
-        draw_ring(207, 110, in->progress, c);
-        u_text_r(232, 126, &AF_S, "NEXT BAR", c, BB_UI_BG);
+    if (in->browser_state == BB_UI_BROWSER_BROWSE) {
+        draw_browse_hint(in, c, sy);
+    } else if (in->browser_state == BB_UI_BROWSER_REQUESTED) {
+        u_text_r(232, sy, &AF_S, "REQUEST", c, BB_UI_BG);
+        u_text_r(232, sy + 30, &AF_S, "WAIT", breath_c(c, now), BB_UI_BG);
+    } else if (in->browser_state == BB_UI_BROWSER_PLAYING || in->browser_state == BB_UI_BROWSER_LOADED) {
+        u_text_r(232, sy, &AF_S, in->browser_state == BB_UI_BROWSER_PLAYING ? "PLAYING" : "LOADED", c, BB_UI_BG);
+    }
+    if (in->browser_state == BB_UI_BROWSER_QUEUED ||
+        (in->browser_state == BB_UI_BROWSER_NONE && list_queued(in))) {
+        u_text_r(232, sy, &AF_S, "QUEUED", c, BB_UI_BG);
+        if (sy > 74) {
+            /* Wrapped titles leave two rows: use words instead of putting
+             * a progress ring over the selected-part/substitution line. */
+            u_text_r(232, sy + 15, &AF_S, "NEXT", c, BB_UI_BG);
+            u_text_r(232, sy + 30, &AF_S, "BAR", c, BB_UI_BG);
+        } else {
+            draw_ring(207, 110, in->progress, c);
+            u_text_r(232, 126, &AF_S, "NEXT BAR", c, BB_UI_BG);
+        }
     }
     for (i = 0; i < in->sections && i < BB_UI_SECTIONS; i++)
         total += in->sec_bars[i] ? in->sec_bars[i] : 1u;
@@ -1258,51 +1296,96 @@ static void page_attract(const bb_ui *u, const bb_ui_in *in)
 
 #if BB_UI_HELP
 /* ---------------------------------------------------------------- HELP (hold HOME) */
-typedef struct { uint8_t kc, kc2; const char *mid, *act; } u_help_row;
+/* 2.0 help flash: mid and act are text IDs in the BBTX flash block (bb/bb_text_block.h); 0 = none / end */
+typedef struct { uint8_t kc, kc2; uint16_t mid, act; } u_help_row;
 #define NOKC 0xFFu
 static const u_help_row HELP_STUDIO[] = {
-    {KC_HOME, NOKC, 0, "Studio"}, {KC_ARP, NOKC, 0, "Play keys"}, {KC_SEQ, NOKC, 0, "Write steps"},
-    {KC_SELECT, NOKC, 0, "Instrument"}, {KC_ALGO, NOKC, 0, "Pattern"}, {KC_PRESETS, NOKC, 0, "Kit"},
-    {KC_KEYS, NOKC, 0, "Mute lanes, sections"}, {KC_REC, KC_HOME, "+", "All notes off"}, {0, 0, 0, 0}};
+    {KC_EDIT, NOKC, 0, TX_SONG}, {KC_ARP, NOKC, 0, TX_PLAY_KEYS}, {KC_SEQ, NOKC, 0, TX_WRITE_STEPS},
+    {KC_SELECT, NOKC, 0, TX_INSTRUMENT}, {KC_ALGO, NOKC, 0, TX_PATTERN}, {KC_PRESETS, NOKC, 0, TX_KIT},
+    {KC_KEYS, NOKC, 0, TX_MUTE_LANES_SECTIONS}, {KC_REC, KC_HOME, TX_X, TX_ALL_NOTES_OFF_2}, {0, 0, 0, 0}};
 static const u_help_row HELP_PLAY[] = {
-    {KC_KEYS, NOKC, 0, "Drums, kits, mutes"}, {KC_SEQ, NOKC, 0, "Write steps"}, {KC_EDIT, NOKC, 0, "Confirm"},
-    {KC_SCL, NOKC, 0, "Swing / scale"}, {KC_REC, KC_KEYS, "+", "Accent"}, {KC_REC, KC_GLO, "+", "Tap tempo"},
-    {KC_K14, NOKC, 0, "Group levels"}, {KC_REC, KC_HOME, "+", "All notes off"}, {0, 0, 0, 0}};
+    {KC_KEYS, NOKC, 0, TX_DRUMS_KITS_MUTES}, {KC_SEQ, NOKC, 0, TX_WRITE_STEPS}, {KC_REC, KC_SEQ, TX_X, TX_RECORD_DRUMS},
+    {KC_K14, NOKC, 0, TX_GROUP_LEVELS},
+    {KC_SCL, NOKC, 0, TX_SWING_SCALE}, {KC_REC, KC_KEYS, TX_X, TX_ACCENT}, {KC_REC, KC_EDIT, TX_X, TX_UNDO_PATTERN_EDIT},
+    {KC_REC, KC_HOME, TX_X, TX_ALL_NOTES_OFF_2}, {0, 0, 0, 0}};
 static const u_help_row HELP_STEPS[] = {
-    {KC_KEYS, NOKC, 0, "Steps 1-16"}, {KC_ARP, NOKC, 0, "Play keys"}, {KC_OCTPM, NOKC, 0, "Step bank"},
-    {KC_REC, KC_SEQ, "+", "Next bank"}, {KC_REC, KC_PRESETS, "+", "Voice"}, {KC_EDIT, NOKC, 0, "Step type"},
-    {KC_REC, KC_HOME, "+", "All notes off"}, {0, 0, 0, 0}};
+    {KC_KEYS, NOKC, 0, TX_STEPS_1_16}, {KC_ARP, NOKC, 0, TX_PLAY_KEYS}, {KC_OCTPM, NOKC, 0, TX_STEP_BANK},
+    {KC_REC, KC_SEQ, TX_X, TX_RECORD_DRUMS}, {KC_REC, KC_PRESETS, TX_X, TX_VOICE}, {KC_EDIT, NOKC, 0, TX_STEP_TYPE},
+    {KC_REC, KC_EDIT, TX_X, TX_UNDO},                        /* 2.0: the first step edit makes an editable copy */
+#if defined(BB_WITH_RATCHETS) && BB_WITH_RATCHETS
+    {KC_KEYS, KC_K4, TX_HELD, TX_RATCHET_X1_X4},           /* 2.0: drum steps; 8th row ends at y 194, above the footer */
+#endif
+    {0, 0, 0, 0}};
 static const u_help_row HELP_BROWSE[] = {
-    {KC_PRESETS, NOKC, 0, "Kit"}, {KC_ALGO, NOKC, 0, "Pattern"}, {KC_EDIT, NOKC, 0, "Confirm"},
-    {KC_PLAY, NOKC, 0, "Start / stop"}, {KC_KEYS, NOKC, 0, "Quick pick"}, {KC_OCTPM, NOKC, 0, "List page"},
-    {KC_HOME, NOKC, 0, "Studio"}, {0, 0, 0, 0}};
+    {KC_PRESETS, NOKC, 0, TX_KIT}, {KC_ALGO, NOKC, 0, TX_PATTERN}, {KC_EDIT, NOKC, 0, TX_CONFIRM},
+    {KC_PLAY, NOKC, 0, TX_START_STOP}, {KC_KEYS, NOKC, 0, TX_QUICK_PICK}, {KC_OCTPM, NOKC, 0, TX_LIST_PAGE},
+    {KC_HOME, NOKC, 0, TX_STUDIO}, {0, 0, 0, 0}};
 static const u_help_row HELP_FX[] = {
-    {KC_EDIT, NOKC, 0, "Next effect"}, {KC_K14, NOKC, 0, "Effect controls"}, {KC_REC, KC_FX, "+", "Dub throw (hold)"},
-    {KC_HOME, NOKC, 0, "Studio"}, {0, 0, 0, 0}};
+    {KC_EDIT, KC_OCTPM, TX_X_2, TX_NEXT_EFFECT}, {KC_K14, NOKC, 0, TX_EFFECT_CONTROLS}, {KC_REC, KC_FX, TX_X, TX_DUB_THROW_HOLD},
+    {KC_HOME, NOKC, 0, TX_STUDIO}, {0, 0, 0, 0}};
+/* 2.0 review M2: SOUND, SAVE, EVOLVE and GLOBAL had no table and fell back to HELP_BROWSE (KIT/PATTERN rows).
+ * Each row names what the code does on that page (bb_nav.c key roles and bb_nav_firmware.inc actions). */
+static const u_help_row HELP_SOUND[] = {
+    {KC_KEYS, NOKC, 0, TX_CHOOSE_VOICE}, {KC_K14, NOKC, 0, TX_SOUND_CONTROLS}, {KC_OCTPM, NOKC, 0, TX_BASIC_COLOUR},
+    {KC_REC, KC_ENV, TX_X, TX_REVERT_DILLO}, {KC_HOME, NOKC, 0, TX_STUDIO}, {0, 0, 0, 0}};
+static const u_help_row HELP_SAVE[] = {
+    {KC_KEYS, NOKC, 0, TX_SLOT_1_4}, {KC_EDIT, NOKC, 0, TX_STORE}, {KC_REC, KC_KEYS, TX_X, TX_LOAD_SLOT},
+    {KC_REC, KC_SAVE, TX_X, TX_QUICK_SAVE}, {KC_HOME, NOKC, 0, TX_STUDIO}, {0, 0, 0, 0}};
+static const u_help_row HELP_EVOLVE[] = {
+    {KC_KEYS, NOKC, 0, TX_PARTS_TO_EVOLVE}, {KC_REC, KC_KEYS, TX_X, TX_LOCK_A_PART}, {KC_EDIT, NOKC, 0, TX_CAPTURE_APPLY},
+    {KC_K14, NOKC, 0, TX_MODE_CONTROLS}, {KC_REC, KC_LFO, TX_X, TX_EVOLVE_ON_OFF}, {KC_HOME, NOKC, 0, TX_STUDIO}, {0, 0, 0, 0}};
+static const u_help_row HELP_GLOBAL[] = {
+    {KC_K14, NOKC, 0, TX_TEMPO_SWING_KEY}, {KC_REC, KC_GLO, TX_X, TX_TAP_TEMPO_2}, {KC_KEYS, NOKC, 0, TX_1_MIDI_2_CLOCK},
+    {KC_KEYS, NOKC, 0, TX_5_DILLO_VIEW}, {KC_HOME, NOKC, 0, TX_STUDIO}, {0, 0, 0, 0}};
+#if defined(BB_WITH_USER_KITS) && BB_WITH_USER_KITS
+/* 2.0 kit builder: BUILD and SAVE AS share the KIT layout ("KIT  BUILD", "KIT  SAVE AS"); rows = bb_nav.c roles */
+static const u_help_row HELP_BUILD[] = {
+    {KC_KEYS, NOKC, 0, TX_LANE_CHOOSE_HEAR}, {KC_PRESETS, NOKC, 0, TX_LANE_S_KIT}, {KC_K4, NOKC, 0, TX_LANE_S_VOICE},
+    {KC_K1, KC_K3, TX_X_3, TX_LEVEL_TUNE_DECAY}, {KC_EDIT, NOKC, 0, TX_SAVE_AS_USER_1_4},
+    {KC_KEYS, NOKC, 0, TX_SAVE_AS_SLOT_1_4}, {KC_HOME, NOKC, 0, TX_BACK_ONE_LEVEL}, {0, 0, 0, 0}};
+#endif
+static int help_is(const char *name, const char *word)
+{
+    while (*word) if (!name || *name++ != *word++) return 0;
+    return 1;
+}
 static const char *const PAGE_WORD[BB_UI_PAGES] = {"STUDIO", "PLAY", "STEPS", "PLAY", "KIT", "PATTERN", "FX", "", ""};
 static void page_help(const bb_ui_in *in, uint32_t page)
 {
     const u_help_row *r = page == BB_UI_STUDIO ? HELP_STUDIO : page == BB_UI_PLAY_DRUMS || page == BB_UI_PLAY_DILLO ?
                         HELP_PLAY : page == BB_UI_STEPS ? HELP_STEPS : page == BB_UI_FX ? HELP_FX : HELP_BROWSE;
+    if (page == BB_UI_KNOBS)                                      /* one KNOBS layout, four pages: name decides */
+        r = help_is(in->page_name, "SOUND") ? HELP_SOUND : help_is(in->page_name, "SAVE") ? HELP_SAVE :
+            help_is(in->page_name, "EVOLVE") ? HELP_EVOLVE : help_is(in->page_name, "GLOBAL") ? HELP_GLOBAL : r;
+#if defined(BB_WITH_USER_KITS) && BB_WITH_USER_KITS
+    if (help_is(in->page_name, "KIT  ")) r = HELP_BUILD;
+#endif
     int32_t y = 34, x;
     char t[24] = "HELP \xB7 ";
     uint32_t n = 7, i;
     const char *w = page < BB_UI_PAGES && PAGE_WORD[page][0] ? PAGE_WORD[page] : in->page_name ? in->page_name : "";
+#if defined(BB_WITH_USER_KITS) && BB_WITH_USER_KITS
+    if (r == HELP_BUILD)                                         /* "KIT  BUILD" / "KIT  SAVE AS": name the sub-page */
+        w = in->page_name + 5;
+#endif
     for (i = 0; w[i] && n < sizeof t - 1u; i++)
         t[n++] = w[i];
     t[n] = 0;
     u_text(8, STATUS_TXT_Y, &AF_S, t, BB_UI_TEXT, BB_UI_BG);
     u_rect(8, 23, 224, 1, BB_UI_FAINT);
-    for (; r->act; r++, y += 20) {
-        if (!u_vis(0, y, 240, 20))
-            continue;
-        x = cv_keycap(8 - g_cx, y - g_cy, r->kc, BB_UI_TEXT, BB_UI_BG, BB_UI_BG) + g_cx;
-        if (r->kc2 != NOKC) {
-            x = u_text(x + 4, y - 1, &AF_S, r->mid, BB_UI_GREY, BB_UI_BG);
-            cv_keycap(x + 4 - g_cx, y - g_cy, r->kc2, BB_UI_TEXT, BB_UI_BG, BB_UI_BG);
+    if (!bb_tx_ready())                                          /* block missing or stale: say so, rows need it */
+        u_text(8, y - 1, &AF_S, BB_TX_FALLBACK, BB_UI_GREY, BB_UI_BG);
+    else
+        for (; r->act; r++, y += 20) {
+            if (!u_vis(0, y, 240, 20))
+                continue;
+            x = cv_keycap(8 - g_cx, y - g_cy, r->kc, BB_UI_TEXT, BB_UI_BG, BB_UI_BG) + g_cx;
+            if (r->kc2 != NOKC) {
+                x = u_text(x + 4, y - 1, &AF_S, bb_tx(r->mid), BB_UI_GREY, BB_UI_BG);
+                cv_keycap(x + 4 - g_cx, y - g_cy, r->kc2, BB_UI_TEXT, BB_UI_BG, BB_UI_BG);
+            }
+            u_text(120, y - 1, &AF_S, bb_tx(r->act), BB_UI_GREY, BB_UI_BG);
         }
-        u_text(120, y - 1, &AF_S, r->act, BB_UI_GREY, BB_UI_BG);
-    }
     u_text(8, 212, &AF_S, "Let go of HOME to return", BB_UI_GREY, BB_UI_BG);
 }
 
@@ -1321,9 +1404,24 @@ static uint32_t eff_page(const bb_ui *u, const bb_ui_in *in)
 #endif
     return in->page < BB_UI_PAGES ? in->page : BB_UI_STUDIO;
 }
+/* 2.0 D4: one shared feedback timer (pop_t / pop_k), so no new state: pop_k 0..3 = that knob's pop-up for
+ * BB_UI_POPUP_MS, BB_UI_POP_LEGEND = the key legend for BB_UI_LEGEND_MS; the latest event wins */
 static uint32_t pop_on(const bb_ui *u, const bb_ui_in *in)
 {
-    return u->pop_t && in->now_ms - (u->pop_t & ~1u) < BB_UI_POPUP_MS ? u->pop_k : BB_UI_NO;
+    return u->pop_t && u->pop_k < 4u && in->now_ms - (u->pop_t & ~1u) < BB_UI_POPUP_MS ? u->pop_k : BB_UI_NO;
+}
+/* the legend shows over the key band (the key map, or PLAY's OUT / DSP row) for about 2 s after BB_EV_LEGEND; HOME
+ * leaves the band to the quick start and the Dillo NEXT line, which reach into it */
+static uint32_t legend_on(const bb_ui *u, const bb_ui_in *in, uint32_t page)
+{
+    if (!u->pop_t || u->pop_k != BB_UI_POP_LEGEND || in->now_ms - (u->pop_t & ~1u) >= BB_UI_LEGEND_MS ||
+        !in->legend || !in->legend[0] || page >= BB_UI_ATTRACT)
+        return 0;
+#if BB_UI_HOME
+    if (page == BB_UI_STUDIO && (in->quick_start || (in->lane[2].next && in->lane[2].next[0])))
+        return 0;
+#endif
+    return 1;
 }
 static uint32_t has_keys(uint32_t page) { return page != BB_UI_PLAY_DRUMS; }   /* v3 PLAY: lanes + master instead */
 #if BB_UI_ALL_PAGES
@@ -1395,6 +1493,22 @@ static void draw_backdrop(const bb_ui *u, const bb_ui_in *in, uint32_t page)
 }
 #endif
 
+static void page_arrange(const bb_ui *u,const bb_ui_in *in,uint32_t now){
+    uint16_t colour=inst_c(in);(void)u;(void)now;
+    u_text(8,30,&AF_S,in->running?"PLAYING":in->small_items?"SOURCE":"LOADED",BB_UI_GREY,BB_UI_BG);
+    u_name(64,30,&AF_S,in->pattern_name?in->pattern_name:"NONE",BB_UI_TEXT,BB_UI_BG,132);
+    u_text(8,48,&AF_S,"NEXT",BB_UI_GREY,BB_UI_BG);
+    u_name(64,48,&AF_S,in->next_name?in->next_name:"NONE",colour,BB_UI_BG,160);
+    u_name(8,66,&AF_S,in->subtitle?in->subtitle:"",BB_UI_GREY,BB_UI_BG,224);
+    for(unsigned i=0;i<in->items&&i<4;i++){
+        int32_t y=86+(int32_t)i*18;uint16_t bg=i==in->cursor?c_scale(colour,56):BB_UI_BG;
+        if(i==in->cursor)u_rect(5,y,230,18,bg);
+        u_text(8,y+3,&AF_S,i==in->playing_item?"P":i==in->queued_item?"N":" ",colour,bg);
+        if(in->small_items){u_rect(5,y,230,18,bg);u_name(8,y+3,&AF_S,in->item[i],BB_UI_TEXT,bg,224);}
+        else u_brand(24,y+3,NM_LIST,in->item[i],i==in->cursor?colour:BB_UI_TEXT,bg,208,0);
+    }
+    u_name(8,165,&AF_S,in->title?in->title:"",BB_UI_GREY,BB_UI_BG,224);
+}
 static void page_draw(const bb_ui *u, const bb_ui_in *in)
 {
     uint32_t page = eff_page(u, in), now = in->now_ms, pk = pop_on(u, in);
@@ -1420,6 +1534,7 @@ static void page_draw(const bb_ui *u, const bb_ui_in *in)
     case BB_UI_PLAY_DILLO: page_dillo(u, in); break;
     case BB_UI_KIT: page_kit(u, in, now); break;
     case BB_UI_PATTERN: page_pattern(u, in, now); break;
+    case BB_UI_ARRANGE: page_arrange(u,in,now); break;
 #if BB_UI_HOME
     case BB_UI_STUDIO: page_home(u, in, now); break;
 #else
@@ -1439,8 +1554,12 @@ static void page_draw(const bb_ui *u, const bb_ui_in *in)
         draw_keys(in, now);
     draw_knobs(in, pk);
     BB_UI_HOOK_LAYER(1);
-    if (pk != BB_UI_NO && page != BB_UI_KNOBS)
+    if (pk != BB_UI_NO)                                          /* 2.0 D4: every page, KNOBS and SONG included */
         draw_popup(in, pk);
+    if (legend_on(u, in, page)) {                                /* 2.0 D4: the key legend, transient, over the key band */
+        u_rect(0, KEYS_Y, 240, 15, BB_UI_BG);
+        u_text_fit(8, KEYS_Y, &AF_S, in->legend, BB_UI_GREY, BB_UI_BG, 224);
+    }
     if (in->fault)
         draw_toast(u, in);
     else if (in->notice)
@@ -1512,10 +1631,10 @@ static void els_frame_lo(els_t *l, const bb_ui *u, const bb_ui_in *in, uint32_t 
 {
     uint32_t k, pk = pop_on(u, in);
     for (k = 0; k < 4u; k++)
-        el(l, pop_x(k), POP_Y, POP_W, POP_H, pk == k && page != BB_UI_KNOBS ? h_u(knob_hash(in, k, 9), 1) : 0u);
+        el(l, pop_x(k), POP_Y, POP_W, POP_H, pk == k ? h_u(knob_hash(in, k, 9), 1) : 0u);
     for (k = 0; k < 4u; k++)
         el(l, KNOB_X(k) - 2, 199, 56, 41, knob_hash(in, k, pk));
-    el(l, 0, KEYS_Y, 240, 15, has_keys(page) ? keys_hash(in, now) : 0u);
+    el(l, 0, KEYS_Y, 240, 15, legend_on(u, in, page) ? h_s(H0, in->legend) : has_keys(page) ? keys_hash(in, now) : 0u);
     el(l, 0, 0, 148, 23, h_u(h_s(h_s(H0, in->page_name), in->instr_name), (uint32_t)in->instr << 8 | in->accent));
     el(l, 186, 0, 54, 23, h_u(h_u(H0, in->bpm_x10), (uint32_t)in->running << 8 |
                              (!in->running && (in->queued & BB_UI_Q_START) ? 1u + breath_q(now) : 0u)));
@@ -1635,6 +1754,16 @@ static void els_page(els_t *l, const bb_ui *u, const bb_ui_in *in, uint32_t page
         el(l, 0, 138, 100, 38, (uint8_t)in->octave);
         el(l, 0, 24, MINI34_BOX.x0, 36, h_s(h_s(H0, in->patch), in->scale));
         break;
+    case BB_UI_ARRANGE:
+        el(l,0,24,200,22,h_u(h_s(H0,in->pattern_name),in->running));
+        el(l,0,46,240,18,h_s(H0,in->next_name));
+        el(l,0,64,240,20,h_s(H0,in->subtitle));
+        for(i=0;i<4;i++){
+            h=h_u(h_s(H0,i<in->items?in->item[i]:0),in->small_items);
+            h=h_u(h,(i==in->cursor)|((i==in->playing_item)<<1)|((i==in->queued_item)<<2));
+            el(l,0,86+(int32_t)i*18,240,18,h);
+        }
+        el(l,0,163,240,16,h_s(H0,in->title));break;
     case BB_UI_KIT:
     case BB_UI_PATTERN: {
         uint32_t rows = list_rows(in), first = list_first(in), qbit = list_queued(in);
@@ -1652,8 +1781,13 @@ static void els_page(els_t *l, const bb_ui *u, const bb_ui_in *in, uint32_t page
                h_u(h, (idx == in->cursor) | (idx == in->playing_item) << 1 | q << 2 | (q ? breath_q(now) << 4 : 0u) |
                       (uint32_t)in->instr << 9));
         }
-        el(l, 176, 92, 64, 50, h_u(H0, qbit ? 1u + (in->progress >> 3) :
-                                       in->loading && page == BB_UI_KIT ? 0x100u + breath_q(now) : 0u) ^ in->instr);
+        if (page == BB_UI_PATTERN) {
+            h = h_u(h_u(H0, in->browser_state), in->running);
+            if ((in->browser_state == BB_UI_BROWSER_QUEUED || in->browser_state == BB_UI_BROWSER_NONE) && qbit)
+                h = h_u(h, 1u + (in->progress >> 3));
+            if (in->browser_state == BB_UI_BROWSER_REQUESTED) h = h_u(h, breath_q(now));
+        } else h = h_u(H0, qbit ? 1u + (in->progress >> 3) : in->loading ? 0x100u + breath_q(now) : 0u);
+        el(l, 176, page == BB_UI_PATTERN ? 74 : 92, 64, page == BB_UI_PATTERN ? 76 : 50, h ^ in->instr);
         if (page == BB_UI_PATTERN) {
             h = h_u(H0, (uint32_t)in->sections << 16 | (uint32_t)in->sec_cur << 8 | in->sec_next);
             for (i = 0; i < in->sections && i < BB_UI_SECTIONS; i++)
@@ -1770,6 +1904,10 @@ const bb_ui_stats *bb_ui_frame(bb_ui *u, const bb_ui_in *in)
         u->pop_t = now | 1u;
         u->pop_k = in->knob_turning;
     }
+    if (ev & BB_EV_LEGEND) {                /* 2.0 D4: page entered, or a key the page does not use */
+        u->pop_t = now | 1u;
+        u->pop_k = BB_UI_POP_LEGEND;
+    }
     if ((ev & (BB_EV_KNOB | BB_EV_INPUT | BB_EV_TAP)) || in->page != BB_UI_STUDIO || in->help || in->fault)
         u->idle_t = now;
     /* ---- the Armadillo: the rings (installed timing) and the roll, one ordered step at a time */
@@ -1785,7 +1923,7 @@ const bb_ui_stats *bb_ui_frame(bb_ui *u, const bb_ui_in *in)
     }
     /* ---- what changed */
     page = eff_page(u, in);
-    if (page != u->page && !(ev & BB_EV_KNOB) && in->knob_turning >= 4u)
+    if (page != u->page && !(ev & (BB_EV_KNOB | BB_EV_LEGEND)) && in->knob_turning >= 4u)
         u->pop_t = 0;                       /* a pop-up belongs to its page's knob */
     els_page(&l, u, in, page);
     u->st.full = 0;

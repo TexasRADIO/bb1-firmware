@@ -41,6 +41,24 @@ static uint32_t bb_v3_ctx, bb_v3_ctx_t;     /* what the page shows (name, choice
 static char bb_v3_ktext[4][16], bb_v3_pname[24], bb_v3_title[48], bb_v3_sub[48];
 static char bb_v3_items[BB_UI_LIST][40], bb_v3_secs[BB_UI_SECTIONS][24], bb_v3_now[48], bb_v3_sec[24];
 static char bb_v3_nextname[24];
+/* 2.0 D4: the key legend (bb_nav_legend; 61 characters at most) and what shows it, in the pool, not ordinary RAM */
+static char bb_v3_legend[64] __attribute__((section(".pool")));
+static uint32_t bb_v3_leg_seen __attribute__((section(".pool")));   /* page + legend last shown */
+static uint32_t bb_v3_keys_prev __attribute__((section(".pool")));  /* logical keys held at the last frame */
+/* BB_EV_LEGEND: the page (or its bank: the legend changes) was entered, or a key was pressed that the page gives no
+ * job (bb_nav_key_role NONE, with REC as held). HOME held is HELP (bb_nav), so it is not a legend trigger. */
+static uint32_t bb_v3_legend_event(uint8_t page)
+{
+    uint32_t h = h_s(h_u(H0, page), bb_v3_legend), keys = bb_nav_keys_logical(fm1_in.notes), down = keys & ~bb_v3_keys_prev, ev = 0;
+    int rec = !!(fm1_in.buttons & (1u << panel.btn[B_REC]));
+    uint8_t k, a;
+    if (h != bb_v3_leg_seen) { bb_v3_leg_seen = h; ev = BB_EV_LEGEND; }
+    for (k = 0; k < BB_NAV_KEYS; k++)
+        if ((down >> k & 1u) && bb_nav_key_role(&bb_nav, k, rec, &a) == BB_NAV_K_NONE)
+            ev = BB_EV_LEGEND;
+    bb_v3_keys_prev = keys;
+    return ev;
+}
 
 static void bb_v3_copy(char *d, unsigned n, const char *s)
 {
@@ -80,7 +98,9 @@ static uint8_t bb_v3_page(void)
 static void bb_v3_common(bb_ui_in *in, uint8_t page)
 {
     unsigned k, n = 0;
-    const char *s = bb_nav_page_name(&bb_nav), *b = bb_nav_bank_name(&bb_nav);
+    const char *b = bb_nav_bank_name(&bb_nav);
+    /* N1: name the opening control unless a bank name needs the room ("FX  ECHO", "SOUND  COLOUR"). */
+    const char *s = b && b[0] ? bb_nav_page_name(&bb_nav) : bb_nav_page_label(&bb_nav);
     in->now_ms = fm1_ms;
     in->page = page;
     in->instr = bb_nav_row < 2u ? bb_nav_row : (uint8_t)BB_UI_INST_DILLO;
@@ -134,6 +154,10 @@ static void bb_v3_common(bb_ui_in *in, uint8_t page)
         in->key_led[k] = bb_nav_l.key[k];                     /* BB_NAV_LED_* = BB_UI_LED_* */
     in->keys_down = 0;
     in->keys_red = 0;
+    /* 2.0 D4: what the keys do here, from the same role table as the LEDs; black keys only if it would not fit */
+    if (text_w(&AF_S, (bb_nav_legend(&bb_nav, bb_v3_legend, sizeof bb_v3_legend, 1), bb_v3_legend)) > 224)
+        (void)bb_nav_legend(&bb_nav, bb_v3_legend, sizeof bb_v3_legend, 0);
+    in->legend = bb_v3_legend;
 }
 
 /* KIT: the picker's list, the highlighted kit / sound as the title, the loaded one marked */
@@ -148,7 +172,7 @@ static void bb_v3_kit(bb_ui_in *in)
         const char *loaded = valid && view.active_index >= 0 ?
             bb_sound_picker_item_name(&bb_sound_pick, (unsigned)view.active_index) : 0;
         unsigned n = 0;
-        const char *p = !valid ? "STATE UNAVAILABLE" : !view.enabled ? "LAYER OFF" : view.muted ? "MUTED" :
+        const char *p = !valid ? BB_TX(TX_STATE_UNAVAILABLE) : !view.enabled ? "LAYER OFF" : view.muted ? "MUTED" :
                         bb_sound_pick.page == BB_DRUMS ? "LOADED " : "SOUND ";
         while (*p && n + 1u < sizeof bb_v3_sub) bb_v3_sub[n++] = *p++;
         if (valid && view.enabled && !view.muted) {
@@ -159,6 +183,8 @@ static void bb_v3_kit(bb_ui_in *in)
         bb_v3_sub[n] = 0;
     }
     in->subtitle = bb_v3_sub;
+    /* N2/N3: the highlighted kit is not the loaded one, so EDIT will load or queue it. */
+    in->browser_state = valid && view.active_index != (int)bb_sound_pick.cursor ? BB_UI_BROWSER_BROWSE : BB_UI_BROWSER_NONE;
     in->items = 0;
     for (i = 0; i < BB_UI_LIST && first + i < count; i++) {
         bb_v3_copy(bb_v3_items[i], sizeof bb_v3_items[i], bb_sound_picker_item_name(&bb_sound_pick, first + i));
@@ -173,6 +199,49 @@ static void bb_v3_kit(bb_ui_in *in)
     in->loading = bb_sound_pick.pending;
     in->progress = (uint8_t)(bb_ticks ? ((bb_ticks - 1u) % 16u) * 16u : 0u);   /* the ring fills to the bar */
 }
+
+#if BB_WITH_USER_KITS
+/* ---- 2.0 kit builder screens (mock-ups claude-code/kit-builder-20/mock/01-08), in the KIT list layout.
+ * A lane row: "SD  DMX" (+ the voice it plays when not its own, SUB for a substitute; MISSING for a kit not installed).
+ * The list face has letters, digits and ' , - . only, so the words, not the ~ and ? of the K4 label. */
+static BB_UK_SMALL void bb_uk_v3_lane(char *t, unsigned c)
+{
+    unsigned v = bb_uk_lane_voice[c % BB_UK_VOICES], sv = bb_uk.draft.v[v].voice % BB_UK_VOICES, n = 0;
+    int m = bb_uk_find(bb_uk.draft.key[bb_uk.draft.v[v].machine]);
+    const char *w = m < 0 ? "MISSING" : bb_uk_machine_name((unsigned)m);
+    t[n++] = bb_uk_code[v][0]; t[n++] = bb_uk_code[v][1]; t[n++] = ' '; t[n++] = ' ';
+    while (*w && n < 30u) t[n++] = *w++;
+    if (sv != v) { t[n++] = ' '; t[n++] = bb_uk_code[sv][0]; t[n++] = bb_uk_code[sv][1]; }
+    if (m >= 0 && bb_uk.sub >> v & 1u) { t[n++] = ' '; t[n++] = 'S'; t[n++] = 'U'; t[n++] = 'B'; }
+    t[n] = 0;
+}
+/* BUILD (black 1) and SAVE AS (EDIT) fill the KIT list: BUILD = the kit's name, the lanes around the focus;
+ * SAVE AS = the four slots. 0: the existing KIT fill applies (its USER 1-4 rows come from the sound picker). */
+static BB_UK_SMALL int bb_uk_v3_kit(bb_ui_in *in)
+{
+    unsigned i, first = 0, count = BB_UK_SLOTS, cur = bb_uk.save_slot, build = bb_nav.bank == BB_NAV_KIT_BUILD;
+    if (bb_nav.page != BB_NAV_KIT || bb_nav_row || !bb_nav.bank) return 0;
+    in->playing_item = (uint8_t)(bb_uk.origin < BB_UK_SLOTS ? bb_uk.origin : BB_UI_NO);
+    in->queued_item = (uint8_t)BB_UI_NO;
+    if (build) {
+        in->title = bb_uk_name();
+        in->subtitle = bb_uk.miss ? BB_TX(TX_KIT_NOT_INSTALLED_808_STANDS_IN) : bb_uk.edits ? BB_TX(TX_EDITED_EDIT_SAVE_AS) : BB_TX(TX_EDIT_SAVE_AS);
+        count = BB_UK_VOICES; cur = bb_uk.lane; first = cur < 2u ? 0u : cur > 14u ? 12u : cur - 2u;
+        in->playing_item = (uint8_t)BB_UI_NO;
+    } else {
+        in->title = "SAVE AS";
+        in->subtitle = BB_TX(TX_KEYS_1_4_SLOT_EDIT_STORE_STOPPED);
+    }
+    for (i = 0; i < BB_UI_LIST && first + i < count; i++) {
+        if (build) bb_uk_v3_lane(bb_v3_items[i], first + i);
+        else bb_v3_copy(bb_v3_items[i], sizeof bb_v3_items[i], bb_sound_picker_user_name(first + i));
+        in->item[i] = bb_v3_items[i];
+    }
+    in->items = (uint8_t)i;
+    in->cursor = (uint8_t)(cur - first);
+    return 1;
+}
+#endif
 
 #if BB_WITH_BROWSER && BB_WITH_RICH_DRUM_BROWSER && BB_SAMPLE_HOST_INTEGRATION
 /* Voice substitutions for the highlighted pattern on the kit it will play with (the chosen NEXT KIT,
@@ -221,6 +290,17 @@ static void bb_v3_pattern(bb_ui_in *in)
     bb_v3_title[0] = bb_v3_sub[0] = 0;
     if (bb_browser_current(&p->view, &choice)) {
         bb_v3_bank_title(&choice, bb_v3_title, sizeof bb_v3_title);
+        /* A moved cursor is not a launch. Only the matching owner's request
+         * may say REQUESTED/QUEUED; a different queued choice stays marked in
+         * the list/status bar without mislabelling this highlighted title. */
+        int kit_intent = p->is_drum && p->target < BB_MACHINES && bb_kit_intent[p->target].valid;
+        int request_here = p->request.ticket && choice.group == p->request.choice.group &&
+                           choice.bank == p->request.choice.bank && choice.part == p->request.choice.part;
+        int playing_here = p->playing.ticket && choice.group == p->playing.choice.group &&
+                           choice.bank == p->playing.choice.bank && choice.part == p->playing.choice.part;
+        in->browser_state = pend && request_here ? (pend == 2u ? BB_UI_BROWSER_QUEUED : BB_UI_BROWSER_REQUESTED) :
+                            !kit_intent && playing_here ? (in->running ? BB_UI_BROWSER_PLAYING : BB_UI_BROWSER_LOADED) :
+                            BB_UI_BROWSER_BROWSE;
         if (p->is_drum && p->target < BB_MACHINES && bb_kit_intent[p->target].valid) {
             const char *g = "NEXT KIT: ";
             const char *kit = bb_library_kit_name(bb_kit_intent[p->target].id);
@@ -308,7 +388,7 @@ static void bb_v3_lanes(bb_ui_in *in, unsigned bar)
             for (t = 0; t < 17u; t++) {
                 bb_phrase_cell cell = {0};
                 int gg;
-                if (!bb_phrase_view_cell(&bb_rich_views[bb_face.machine], bb_rich_sources[t], step, &cell) || !cell.hits)
+                if (!bb_phrase_view_cell(bb_rich_view(bb_face.machine), bb_rich_sources[t], step, &cell) || !cell.hits)
                     continue;
                 if ((gg = gg_808_sound(bb_rich_sounds[t])) < 0)
                     continue;
@@ -358,7 +438,7 @@ static void bb_v3_play_drums(bb_ui_in *in)
             bb_v3_bank_title(&p->request.choice, bb_v3_nextname, sizeof bb_v3_nextname);
     }
 #endif
-    in->pattern_name = bb_v3_now[0] ? bb_v3_now : "CURRENT PATTERN";
+    in->pattern_name = bb_v3_now[0] ? bb_v3_now : BB_TX(TX_CURRENT_PATTERN);
     in->section_name = bb_v3_sec;
     in->next_name = bb_v3_nextname[0] ? bb_v3_nextname : 0;
     /* position: the phrase playhead (rich) or the layer's playhead, in bars of 16 */
@@ -415,7 +495,7 @@ static void bb_v3_play_drums(bb_ui_in *in)
 static const char *bb_v3_patch_name(unsigned sy)
 {
     if (bb_patch_from_scene[sy] == 2) return "Era sound";
-    if (bb_patch_from_scene[sy]) return "Scene sound";
+    if (bb_patch_from_scene[sy]) return BB_TX(TX_SCENE_SOUND);
 #if BB_WITH_TELEGRAM
     if (sy) return bb_telegram_bank[bb_patch_index[1] % BB_TELEGRAM_PATCHES].name;
 #endif
@@ -458,6 +538,9 @@ static uint8_t bb_v3_home_group[3], bb_v3_home_pending_group[3];
 static void bb_v3_home(bb_ui_in *in)
 {
     unsigned r;
+    /* N7: no pattern loaded on any lane and stopped: show the first moves instead of the key legend. */
+    in->quick_start = (uint8_t)(!in->running && !bb_drum_library[0].playing.ticket && !bb_drum_library[1].playing.ticket &&
+                                !bb_library[0].playing.ticket);
     for (r = 0; r < 3u; r++) {
         const unsigned sy = r < 2u ? 0u : bb_nav_synth();   /* lane 3: Dillo, the focused side */
         bb_player *p = r < 2u ? &bb_drum_library[r] : &bb_library[sy];
@@ -486,7 +569,7 @@ static void bb_v3_home(bb_ui_in *in)
             if (bank != BB_CATALOGUE_NONE)
                 bb_v3_bank_title(&p->playing.choice, bb_v3_home_pattern[r], sizeof bb_v3_home_pattern[r]);
             else
-                bb_v3_copy(bb_v3_home_pattern[r], sizeof bb_v3_home_pattern[r], "CHOOSE PATTERN");
+                bb_v3_copy(bb_v3_home_pattern[r], sizeof bb_v3_home_pattern[r], BB_TX(TX_CHOOSE_PATTERN));
             bb_v3_home_bank[r] = bank;
             bb_v3_home_group[r] = group;
         }
@@ -512,6 +595,15 @@ static void bb_v3_home(bb_ui_in *in)
 /* STEPS (drums): every lane x 16 steps of the shown bank, the selected voice big. Rich phrases
  * fold their 17 source voices onto the firmware's own 11 lanes (bb_rich_lanes); the selected lane
  * shows exactly the selected source. */
+/* bb_ratchet_get: declared in bb_nav_firmware.inc, included earlier by bb_target_ui.c */
+static void bb_v3_ratchets(bb_ui_in *in, unsigned base)   /* the selected voice's counts on the 16 visible steps */
+{
+    unsigned v = bb_ratchet_voice();                         /* lane, or the rich source: not in->voice (a lane) */
+    for (unsigned k = 0; k < 16u; k++) {
+        int n = bb_ratchet_get(bb_face.machine, v, base + k);   /* 0: copies of this hit disagree (or no cell) */
+        in->ratchet[k] = (uint8_t)(n >= 1 && n <= 4 ? n : BB_UI_RATCHET_MIXED);
+    }
+}
 static void bb_v3_steps(bb_ui_in *in)
 {
     const bb_machine *m = &bb_face.requested.drums[bb_face.machine];
@@ -528,7 +620,7 @@ static void bb_v3_steps(bb_ui_in *in)
         for (v = 0; v < 17u; v++)
             for (k = 0; k < 16u; k++) {
                 bb_phrase_cell cell = {0};
-                if (base + k < len && bb_phrase_view_cell(&bb_rich_views[bb_face.machine], bb_rich_sources[v], base + k, &cell) &&
+                if (base + k < len && bb_phrase_view_cell(bb_rich_view(bb_face.machine), bb_rich_sources[v], base + k, &cell) &&
                     cell.hits) {
                     unsigned lane = bb_rich_lanes[v];
                     if (lane == in->voice && v != sel) continue;          /* the big row is the selected source */
@@ -537,6 +629,7 @@ static void bb_v3_steps(bb_ui_in *in)
                 }
             }
         in->voice_name = bb_rich_names[sel];
+        bb_v3_ratchets(in, base);
         return;
     }
 #endif
@@ -549,6 +642,7 @@ static void bb_v3_steps(bb_ui_in *in)
             if (m->steps[step].accents >> v & 1u) in->vacc[v] |= (uint16_t)(1u << k);
         }
     }
+    bb_v3_ratchets(in, base);
 }
 
 #if BB_WITH_EFFECTS
@@ -586,16 +680,39 @@ static void bb_v3_knobs(bb_ui_in *in)
         while (*w) o[n++] = *w++;
         o[n++] = (char)('1' + bb_scene_slot % 9u);
         if (bb_claim_armed(&bb_session_claim, bb_scene_slot)) {   /* other data: the held-SAVE prompt */
-            w = " HAS OTHER DATA";
+            w = BB_TX(TX_HAS_OTHER_DATA);
             while (*w) o[n++] = *w++;
             edit = bb_claim_prompt(&bb_session_claim);
         }
         o[n] = 0;
-        if (bb_face.requested.running) edit = "STOP TO STORE OR LOAD";
+        if (bb_face.requested.running) edit = BB_TX(TX_STOP_TO_STORE_OR_LOAD);
         break;
     }
 #endif
-    case BB_NAV_EVOLVE: t = bb_nav_row == 0u ? "EVOLVE  DRUM A" : bb_nav_row == 1u ? "EVOLVE  DRUM B" : "EVOLVE  DILLO"; break;
+    case BB_NAV_EVOLVE: t = bb_nav_row == 0u ? BB_TX(TX_EVOLVE_DRUM_A) : bb_nav_row == 1u ? BB_TX(TX_EVOLVE_DRUM_B) : BB_TX(TX_EVOLVE_DILLO);
+#if BB_WITH_EVOLVE && BB_WITH_RICH_DRUM_RENDER
+        /* 2.0 D4: EUCLID / RANDOM (black 3) turn the generator's own values (bb_gen_knob), not EVOLVE's: name and
+         * show those, so the knob bar and the turned-knob pop-up say what the knob really changes */
+        if (bb_gen_state.mode) {
+            static const char *const eu[4] = {"HITS", "STEPS", "ROTATE", "ACCENTS"};
+            static const char *const ra[4] = {"DENSITY", "ACCENT", "ANCHOR", "SEED"};
+            static const uint16_t top[2][4] = {{64, 64, 64, 64}, {100, 100, 100, 9999}};
+            unsigned e = bb_gen_state.mode == 1u, k, v[4];
+            if (e) { v[0] = bb_gen_state.hits; v[1] = bb_gen_state.steps; v[2] = bb_gen_state.rotation; v[3] = bb_gen_state.accents; }
+            else { v[0] = bb_gen_state.density; v[1] = bb_gen_state.accent; v[3] = bb_gen_state.seed;
+                   v[2] = bb_face.requested.page == BB_DRUMS ? bb_gen_state.anchor : bb_gen_state.slide; }
+            t = e ? "EUCLID" : "RANDOM";
+            for (k = 0; k < 4u; k++) {
+                bb_ui_knob *kn = &in->knob[k];
+                kn->label = e ? eu[k] : k == 2u && bb_face.requested.page != BB_DRUMS ? "SLIDE" : ra[k];
+                fmt_int(bb_v3_ktext[k], (int32_t)v[k]);
+                kn->text = bb_v3_ktext[k];
+                kn->bar = (uint8_t)(v[k] >= top[!e][k] ? 255u : v[k] * 255u / top[!e][k]);
+                kn->flags = 0;
+            }
+        }
+#endif
+        break;
     case BB_NAV_GLOBAL: t = "GLOBAL"; break;
     default: t = bb_nav_bank_name(&bb_nav); break;                  /* FX: SPRING / SENDS */
     }
@@ -603,6 +720,29 @@ static void bb_v3_knobs(bb_ui_in *in)
     in->title = bb_v3_title;
     bb_v3_copy(bb_v3_sub, sizeof bb_v3_sub, edit && edit[0] ? edit : "");
     in->subtitle = bb_v3_sub[0] ? bb_v3_sub : 0;
+}
+
+/* a turned knob: its pop-up. A value that changes because the page, the focus (labels) or the
+ * chosen kit / pattern / patch changed is not a turn; only the same knob on the same thing is.
+ * 2.0 D4: shared with SONG (bb_arr_draw), so every page's knobs show NAME + value when turned. */
+static void bb_v3_turns(bb_ui_in *in, uint8_t page)
+{
+    unsigned k;
+    uint32_t ctx = h_s(h_s(h_s(h_u(H0, page), in->title), in->pattern_name), in->patch);
+    for (k = 0; k < 4u; k++) {
+        const bb_ui_knob *kn = &in->knob[k];
+        if (bb_v3_shown && page == bb_v3_kpage && ctx == bb_v3_ctx && fm1_ms - bb_v3_ctx_t >= BB_V3_SETTLE_MS &&
+            kn->label && kn->label == bb_v3_klab[k] && kn->bar != bb_v3_kpos[k]) {
+            in->events |= BB_EV_KNOB;
+            in->ev_knob = (uint8_t)k;
+        }
+        bb_v3_kpos[k] = kn->bar;
+        bb_v3_klab[k] = kn->label;
+    }
+    if (page != bb_v3_kpage || ctx != bb_v3_ctx || !bb_v3_shown)
+        bb_v3_ctx_t = fm1_ms;
+    bb_v3_kpage = page;
+    bb_v3_ctx = ctx;
 }
 
 /* bb_target_draw: draw this frame with v3; 0 = a service screen (update boot, diagnostics) */
@@ -634,13 +774,16 @@ static int bb_v3_draw(void)
     switch (page) {
     case BB_UI_STUDIO: bb_v3_home(in); break;
     case BB_UI_KIT:
+#if BB_WITH_USER_KITS
+        if (bb_sound_pick_visible() && bb_uk_v3_kit(in)) break;
+#endif
         if (bb_sound_pick_visible()) bb_v3_kit(in);
-        else { bb_v3_copy(bb_v3_title, sizeof bb_v3_title, "SOUND LIST NOT READY"); in->title = bb_v3_title; }
+        else { bb_v3_copy(bb_v3_title, sizeof bb_v3_title, BB_TX(TX_SOUND_LIST_NOT_READY)); in->title = bb_v3_title; }
         break;
 #if BB_WITH_BROWSER
     case BB_UI_PATTERN:
         if (bb_library_page && bb_library_current()->ready) bb_v3_pattern(in);
-        else { bb_v3_copy(bb_v3_title, sizeof bb_v3_title, "PATTERNS NOT READY"); in->title = bb_v3_title; }
+        else { bb_v3_copy(bb_v3_title, sizeof bb_v3_title, BB_TX(TX_PATTERNS_NOT_READY)); in->title = bb_v3_title; }
         break;
 #endif
     case BB_UI_PLAY_DRUMS: bb_v3_play_drums(in); break;
@@ -651,26 +794,8 @@ static int bb_v3_draw(void)
     case BB_UI_KNOBS: bb_v3_knobs(in); break;
     default: bb_v3_play_dillo(in); break;
     }
-    /* a turned knob: its pop-up. A value that changes because the page, the focus (labels) or the
-     * chosen kit / pattern / patch changed is not a turn; only the same knob on the same thing is */
-    {
-        unsigned k;
-        uint32_t ctx = h_s(h_s(h_s(h_u(H0, page), in->title), in->pattern_name), in->patch);
-        for (k = 0; k < 4u; k++) {
-            const bb_ui_knob *kn = &in->knob[k];
-            if (bb_v3_shown && page == bb_v3_kpage && ctx == bb_v3_ctx && fm1_ms - bb_v3_ctx_t >= BB_V3_SETTLE_MS &&
-                kn->label && kn->label == bb_v3_klab[k] && kn->bar != bb_v3_kpos[k]) {
-                in->events |= BB_EV_KNOB;
-                in->ev_knob = (uint8_t)k;
-            }
-            bb_v3_kpos[k] = kn->bar;
-            bb_v3_klab[k] = kn->label;
-        }
-        if (page != bb_v3_kpage || ctx != bb_v3_ctx || !bb_v3_shown)
-            bb_v3_ctx_t = fm1_ms;
-        bb_v3_kpage = page;
-        bb_v3_ctx = ctx;
-    }
+    in->events |= bb_v3_legend_event(page);
+    bb_v3_turns(in, page);
     bb_v3_last_ms = fm1_ms;
     bb_v3_shown = 1;
     bb_dirty = 0;

@@ -108,8 +108,11 @@ int bb_rich_worker_begin(const bb_phrase_index *phrase,const void *player,
  bb_c1_drum_copy(&j->render.kit,kit,sizeof *kit);
  bb_c1_drum_copy(&j->render.groups,groups,sizeof *groups);
  if(!bb_rnp_resolve(phrase,plan,machine,frames,audible,&j->render))return -1;
- bb_c1_drum_copy(&j->next,&plan->next,sizeof j->next);
- bb_c1_rich_lease=(bb_rjt_lease){ticket,epoch,frames,j->next.generation,0};
+ /* Opt 2: the tail and the entries in use. The private pool is a union shared
+  * with other jobs, so with the tail check every unused entry is zeroed here. */
+ bb_rjt_next_copy(&j->next,&plan->next,BB_RJT_QUEUE_TAIL_CHECK?BB_DELAYED_CAPACITY:0u);
+ bb_c1_rich_lease=(bb_rjt_lease){ticket,epoch,frames,j->next.generation,0,j->next.queue.count,0};
+ /* Opt 3: the seal records the kit control digest in CPU0's lease, and CPU1's request carries it. */
  if(!bb_rjt_seal(j,&bb_c1_rich_lease)){return bb_c1_rich_fail_before_publish(BB_C1_LIVE_PREPARE_BAD);}
 #if BB_FIXA
  /* Kit A's metal rides this ticket only if it is fully representable; otherwise B alone, as before. */
@@ -156,7 +159,7 @@ int bb_rich_worker_finish(unsigned machine,unsigned frames,unsigned epoch,
  uint32_t checked;
  if(!bb_rjt_valid(j,&bb_c1_rich_lease)||old_generation!=bb_c1_rich_lease.generation||
     !bb_rjt_fixed_coefficients_match(kit,&j->render.kit)||
-    !bb_rjt_checked_output_hash(j,&checked))return bb_c1_live_fail(BB_C1_LIVE_PAYLOAD_BAD);
+    !bb_rjt_checked_output_hash(j,&bb_c1_rich_lease,&checked))return bb_c1_live_fail(BB_C1_LIVE_PAYLOAD_BAD);
 #if BB_FIXA
  /* A plain finish never adopts a ticket that carries kit A's metal: bb_fixa_finish owns those. */
  if(bb_c1_metal_request)return bb_c1_live_fail(BB_C1_LIVE_TARGET_BAD);
@@ -164,8 +167,8 @@ int bb_rich_worker_finish(unsigned machine,unsigned frames,unsigned epoch,
  if(result!=checked)return bb_c1_live_fail(BB_C1_LIVE_PAYLOAD_BAD);
  /* Complete validation before all live writes. No shared scratch aliases. */
  *hit_count+=(j->next.primary-old_primary)+(j->next.delayed-old_delayed);
- bb_c1_drum_copy(player,&j->next,sizeof j->next);
- bb_c1_drum_copy(kit,&j->render.kit,sizeof *kit);bb_c1_drum_copy(groups,&j->render.groups,sizeof *groups);
+ bb_rjt_next_adopt((bb_rsp_state *)player,&j->next); /* opt 2 */
+ bb_rjt_kit_adopt(kit,&j->render.kit);bb_c1_drum_copy(groups,&j->render.groups,sizeof *groups); /* opt 3 */
  for(unsigned i=0;i<frames;i++){dry[i]=j->render.bus[0][i];rev[i]=j->render.bus[1][i];dly[i]=j->render.bus[2][i];}
  bb_c1_rich_lease.committed=1;bb_c1_rich_active=0;bb_c1_live.busy=0;bb_c1_live.jobs++;return 1;
 }
@@ -203,7 +206,7 @@ int bb_fixa_finish(unsigned machine,unsigned frames,unsigned epoch,void *player,
  uint32_t checked,expected;
  if(!bb_rjt_valid(j,&bb_c1_rich_lease)||old_generation!=bb_c1_rich_lease.generation||
     !bb_rjt_fixed_coefficients_match(kit,&j->render.kit)||
-    !bb_rjt_checked_output_hash(j,&checked)||!bb_c1_fixa_expected(checked,&expected)||result!=expected)
+    !bb_rjt_checked_output_hash(j,&bb_c1_rich_lease,&checked)||!bb_c1_fixa_expected(checked,&expected)||result!=expected)
   return bb_c1_live_fail(BB_C1_LIVE_PAYLOAD_BAD);
  bb_c1_metal_job *m=&bb_c1_metal_private;
  const uint32_t ticket=bb_c1_metal_request;
@@ -216,8 +219,8 @@ int bb_fixa_finish(unsigned machine,unsigned frames,unsigned epoch,void *player,
  if(!bb_c1_metal_commit(m,ticket,bb_c1_metal_output_check(m),kit_a,groups_a,a_dry,a_rev,a_dly))
   return bb_c1_live_fail(BB_C1_LIVE_PAYLOAD_BAD);
  *hit_count+=(j->next.primary-old_primary)+(j->next.delayed-old_delayed);
- bb_c1_drum_copy(player,&j->next,sizeof j->next);
- bb_c1_drum_copy(kit,&j->render.kit,sizeof *kit);bb_c1_drum_copy(groups,&j->render.groups,sizeof *groups);
+ bb_rjt_next_adopt((bb_rsp_state *)player,&j->next); /* opt 2 */
+ bb_rjt_kit_adopt(kit,&j->render.kit);bb_c1_drum_copy(groups,&j->render.groups,sizeof *groups); /* opt 3 */
  for(unsigned i=0;i<frames;i++){dry[i]=j->render.bus[0][i];rev[i]=j->render.bus[1][i];dly[i]=j->render.bus[2][i];}
  bb_c1_metal_request=0;
  bb_c1_rich_lease.committed=1;bb_c1_rich_active=0;bb_c1_live.busy=0;bb_c1_live.jobs++;return 1;
@@ -241,7 +244,7 @@ int bb_rich_worker_discard(void){
  if(!completed)return 0; /* timeout/bad completion latched: CPU1 fault */
  bb_rjt_job *j=&bb_c1_private_pool.rich.job;
  uint32_t checked;
- if(!bb_rjt_valid(j,&bb_c1_rich_lease)||!bb_rjt_checked_output_hash(j,&checked))
+ if(!bb_rjt_valid(j,&bb_c1_rich_lease)||!bb_rjt_checked_output_hash(j,&bb_c1_rich_lease,&checked))
   return bb_c1_live_fail(BB_C1_LIVE_PAYLOAD_BAD);
 #if BB_FIXA
  if(!bb_c1_fixa_expected(checked,&checked))return bb_c1_live_fail(BB_C1_LIVE_PAYLOAD_BAD);
@@ -250,3 +253,16 @@ int bb_rich_worker_discard(void){
  if(result!=checked)return bb_c1_live_fail(BB_C1_LIVE_PAYLOAD_BAD);
  bb_c1_rich_lease.committed=1;bb_c1_rich_active=0;bb_c1_live.busy=0;return 1;
 }
+
+#if BB_WITH_DILLO_KIT_VIEW
+/* CPU0 reads only after the caller's successful checked join. The resolved
+ * render list contains actual native fallback voices, not source guesses.
+ * No worker execution, publication, DSP state or mailbox alteration here. */
+void bb_rich_worker_activity(uint32_t *counts,unsigned size){
+ const bb_rjt_job *j=&bb_c1_private_pool.rich.job;
+ if(!counts||!bb_c1_rich_lease.committed||bb_c1_live.failed)return;
+ for(unsigned i=0;i<j->render.count;i++){
+  unsigned voice=j->render.hits[i].voice;if(voice<size)counts[voice]++;
+ }
+}
+#endif

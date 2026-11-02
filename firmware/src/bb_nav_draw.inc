@@ -79,6 +79,18 @@ static unsigned bb_nav_knob_text(unsigned k,char out[16]) {
         if(bb909_control_max(bb_face.voice,prm)<0){out[0]=0;return 0;}
         unsigned v=bb_c1_909_controls.value[bb_face.voice][prm];fmt_int(out,(int32_t)v);return v;
     }
+#if BB_WITH_USER_KITS
+    /* BUILD: the focused lane: LEVEL TUNE DECAY as stored (0..127; sampled tune 64 = as recorded, decay 127 = whole
+     * sample; the 808's own pots), VOICE as its two-letter code, "~" for a substitute, "?" for a missing kit. */
+    case BB_NAV_R_UK_LEVEL: case BB_NAV_R_UK_TUNE: case BB_NAV_R_UK_DECAY: case BB_NAV_R_UK_VOICE: {
+        const bb_uk_voice *e=bb_uk_lane_entry();
+        unsigned lane=bb_uk_lane_voice[bb_uk.lane%BB_UK_VOICES],v=role==BB_NAV_R_UK_LEVEL?e->level:role==BB_NAV_R_UK_TUNE?e->tune:e->decay;
+        if(role!=BB_NAV_R_UK_VOICE){fmt_int(out,(int32_t)v);return v;}
+        out[0]=bb_uk_code[e->voice%BB_UK_VOICES][0];out[1]=bb_uk_code[e->voice%BB_UK_VOICES][1];
+        out[2]=(bb_uk.miss|bb_uk.sub)>>lane&1u?' ':0;out[3]=bb_uk.miss>>lane&1u?'?':'~';out[4]=0;
+        return e->voice*7u;
+    }
+#endif
     default: break;
     }
 #if BB_WITH_EFFECTS
@@ -131,7 +143,7 @@ static const char *bb_nav_scale_hint(void) {
     while(*s)text[n++]=*s++;
     s=roots[bb_nav.root%12u];while(*s)text[n++]=*s++;
     text[n++]=' ';s=bb_nav_scale_name(bb_nav.scale);while(*s)text[n++]=*s++;
-    s=" / SCL: NEXT";while(*s)text[n++]=*s++;text[n]=0;
+    s=BB_TX(TX_SCL_NEXT);while(*s)text[n++]=*s++;text[n]=0;
     return text;
 }
 /* Section keys line for STUDIO / PATTERN when a pattern has more than 11. */

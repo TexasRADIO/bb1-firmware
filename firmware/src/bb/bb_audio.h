@@ -4,6 +4,23 @@
 #error "Group audio bridge is host-only pending worker, persistence and resource integration"
 #endif
 #include "group_gain.h"
+#include "bb_midi_output.h"
+#ifndef BB_WITH_SLOOP_KITS
+#define BB_WITH_SLOOP_KITS 0
+#endif
+#if BB_WITH_SLOOP_KITS
+/* Explicit target build-profile opt-in, not a hardware/release acceptance flag. */
+#if (!defined(BB_GROUP_HOST_SERIAL_TEST) || defined(BB_GROUP_TARGET_CANDIDATE)) && \
+    (!defined(BB_SLOOP_TARGET_BUILD) || BB_SLOOP_TARGET_BUILD != 1)
+#error "SLOOP target requires BB_SLOOP_TARGET_BUILD=1 in the selected build recipe"
+#endif
+#include "sloop/sloop_layer.h"
+#define SL_NKITS 31u
+#define BB_SLOOP_ID_FIRST 128u
+#define BB_SLOOP_ID_LIMIT (BB_SLOOP_ID_FIRST+SL_NKITS)
+extern const char *const bb_sloop_review_names[SL_NKITS];
+#endif
+
 #ifndef BB_SAMPLE_HOST_INTEGRATION
 #define BB_SAMPLE_HOST_INTEGRATION 0
 #endif
@@ -14,6 +31,15 @@
 /* BB_SAMPLE_DUAL_NATIVE_MEASURE is an offline compiler/resource profile only.
  * It confers no package, installation, timing or release qualification. */
 #define BB_SAMPLE_808_ID 254u /* disjoint from sample IDs and direct-binding255 */
+#ifndef BB_WITH_USER_KITS
+#define BB_WITH_USER_KITS 0
+#endif
+#if BB_WITH_USER_KITS
+#define BB_SAMPLE_USER_ID 253u /* 2.0 kit builder: layer plays a resolved user kit */
+#include "bb_user_kit.h"
+/* A kit ID no registered catalogue entry, the 808 or a USER layer answers to. */
+#define BB_SAMPLE_KIT_UNKNOWN(a,k) ((k)!=BB_SAMPLE_808_ID&&(k)!=BB_SAMPLE_USER_ID&&(k)>=(a)->sample_catalogue_count)
+#endif
 #if defined(BB_SAMPLE_HYBRID_TRIAL) && defined(BB_GROUP_TARGET_CANDIDATE) && !defined(BB_SAMPLE_HYBRID_QUALIFY)
 #error "Hybrid target requires explicit qualification build; not a released profile"
 #endif
@@ -58,6 +84,7 @@ typedef struct {uint32_t seen,queued,applied,launches;uint64_t applied_frame;uin
 #if BB_WITH_PATTERN
 #include "bb_pattern.h"
 #include "bb_audio_phrase.h"
+#include "bb_audio_section.h"
 #endif
 #if BB_WITH_PARTS
 #ifndef BB_WITH_PREPARED_BANK
@@ -107,9 +134,17 @@ enum {BB_EV_RESULT_NONE,BB_EV_RESULT_OK,BB_EV_RESULT_WAIT,
  * two enabled by default. Four-slot host support is not target CPU acceptance.
  * Same code runs on the desktop and the FM-1. No target/graphics dependency.
  * Rendering preserves one-sample reference DSP semantics inside event spans. */
+#include "bb_live_capture.h"
+#if BB_WITH_LIVE_CAPTURE && (BB_OWNER_AUDIO_BRIDGE || BB_WITH_909_ROUTE || !BB_SAMPLE_HOST_INTEGRATION)
+#error "Qualify live capture voice mapping for this engine before enabling"
+#endif
+#if BB_WITH_LIVE_CAPTURE && !BB_WITH_RICH_DRUM_RENDER
+#error "Live capture requires the rich owner"
+#endif
 typedef struct bb_audio {
     bb_core core;
     bb_commands commands;
+    bb_midi_output midi_output; /* transient audio-time USB clock state */
 #if BB_WITH_PARTS
 #if BB_WITH_PREPARED_BANK
     prepared_bank parts; /* compact scenes plus bounded main-loop preparation */
@@ -124,7 +159,12 @@ typedef struct bb_audio {
 #if BB_WITH_DILLO || BB_WITH_TELEGRAM
     /* Last-note priority, all 128 pitches; unique entries, no heap/allocation.
      * Transient, not scene data. Audio consumer owns every write. */
-    struct {uint8_t order[128],velocity[128],owners[128];uint16_t count;} keys[BB_SYNTHS];
+    struct {
+        uint8_t order[128],velocity[128],owners[128],held[128],source_order[128];
+        uint8_t sustain[BB_KEY_SOURCES];
+        int16_t bend[BB_KEY_SOURCES]; /* signed wheel offset: -8192..8191 */
+        uint16_t count;float applied_bend;
+    } keys[BB_SYNTHS];
 #endif
 #if BB_WITH_EVOLVE
     bb_evolve evolve; /* lazy snapshot on first audio-owned evolution command */
@@ -199,6 +239,10 @@ typedef struct bb_audio {
 #endif
     /* Append audio-owned transient faders; no shifted existing DSP offsets. */
     gg_state *groups; /* startup-bound external audio-owned state */
+#if BB_WITH_SLOOP_KITS
+    sl_bank sloop_bank;
+    sl_layer sloop[2]; /* CPU0 audio owner only; no scene/wire adoption */
+#endif
 #if BB_SAMPLE_HOST_INTEGRATION
     bb_sample_audio_binding *sample;
     bb_aux_voices *aux; /* cold-bound shared SY/ZAP one-shots, never a kit */
@@ -217,9 +261,46 @@ typedef struct bb_audio {
 #endif
 #if BB_WITH_PATTERN && BB_WITH_RICH_DRUM_HANDOFF
     bb_audio_phrase_state rich;
+#if BB_WITH_RICH_DRUM_RENDER
+    bb_section_handoff section;
+#endif
+#endif
+#if BB_WITH_LIVE_CAPTURE
+    bb_live_capture capture; /* appended; audio writes under existing owner */
+#endif
+#if BB_WITH_USER_KITS
+    /* 2.0 kit builder: audio-owned route of a layer playing a USER kit, else
+     * NULL. Main loop owns the immutable resolved tables (double-buffered). */
+    const bb_uk_resolved *user[2];
+    /* What a queued kit+phrase request for BB_SAMPLE_USER_ID installs at its
+     * boundary; written by the main loop under the command lock, never while
+     * such a request is pending. */
+    const bb_uk_resolved *user_staged[2];
 #endif
 } bb_audio;
+#if BB_WITH_USER_KITS
+/* Cold/stopped install of a resolved user kit on a drum layer. A kit whose every
+ * voice is the 808's own voice installs as the native 808 with its pots (CPU1 B
+ * worker kept); any remapped or sampled voice installs as BB_SAMPLE_USER_ID. */
+int bb_audio_user_kit_install_owned(bb_audio *,unsigned layer,const bb_uk_resolved *);
+/* Owner (or main loop holding the command lock): the layer plays u as a USER
+ * kit from the next block. Sounding sample voices keep their copied zone data;
+ * 808 tails take the overlaid pots as a SOUND edit would. Always USER, never
+ * the native-808 shortcut, so drum A's identity stays visible. */
+int bb_audio_user_kit_swap_owned(bb_audio *,unsigned layer,const bb_uk_resolved *u);
+#endif
 #if BB_SAMPLE_HOST_INTEGRATION
+#if BB_WITH_SLOOP_KITS
+int bb_audio_sloop_bind_cold(bb_audio *,const void *,size_t);
+/* Pure reuse of the assigned pair caps; no voice-count expansion. */
+int bb_audio_sloop_pair_supported(unsigned,unsigned);
+int bb_audio_sloop_selected(const bb_audio *,unsigned);
+int bb_audio_sloop_busy(const bb_audio *,unsigned);
+int bb_audio_sloop_phrase_hit(bb_audio *,unsigned,unsigned,float);
+/* Review-only cold restore: existing nonSLOOP bindings must be staged first.
+ * Both layers validate before either identity/control set is committed. */
+int bb_audio_sloop_restore_owned(bb_audio *,const unsigned [2],const int8_t [2][16],const int8_t [2][16]);
+#endif
 int bb_audio_sample_bind(bb_audio *,bb_sample_audio_binding *);
 /* Cold-only after validated pack bind. No capability is published merely by
  * the presence of a fourth BBSK bank; audio must own this exact pool. */
@@ -271,6 +352,9 @@ typedef struct {
     uint16_t required_lanes,supported_lanes;
     uint8_t count,selected,requested,result,compatible,queue_idle,stop_pending;
     uint8_t echo,spring,level,native_compatible,machine;
+#if BB_WITH_SLOOP_KITS
+    uint8_t sloop_compatible;
+#endif
     float gain; /* Actual binding values, not optimistic UI settings. */
 } bb_sample_status;
 /* Single-core existing queue/IRQ guard; paired hooks required on hardware.
@@ -364,4 +448,8 @@ int bb_audio_groups_outside(const bb_audio *,const void *,size_t);
 int bb_audio_sample_phrase_hit(bb_audio *,unsigned,float);
 int bb_audio_sample_phrase_hit_layer(bb_audio *,unsigned,unsigned,float);
 uint32_t bb_audio_sample_source_voices(const bb_audio *,unsigned);
+#if BB_WITH_PATTERN
+int bb_audio_pattern_data_valid(const bb_pattern_data *);
+void bb_audio_pattern_apply_owned(bb_audio *,unsigned);
+#endif
 #endif

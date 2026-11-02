@@ -5,10 +5,10 @@ static int bb_home_sound_browse(bb_page page,unsigned layer,int delta) {
         bb_say("AUDIO FAULT / LOAD BLOCKED");return 0;
     }
     if(bb_sound_pick.pending) {
-        bb_say("SOUND REQUEST STILL PENDING");return 0;
+        bb_say(BB_TX(TX_SOUND_REQUEST_STILL_PENDING));return 0;
     }
     if(!bb_sound_pick_open(page,layer)) {
-        bb_say("SOUND LIST NOT READY");return 0;
+        bb_say(BB_TX(TX_SOUND_LIST_NOT_READY));return 0;
     }
     bb_aux_cancel(1);bb_aux_apply(1u<<8);
     bb_face.requested.page=page;

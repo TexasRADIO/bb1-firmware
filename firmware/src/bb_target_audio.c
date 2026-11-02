@@ -171,12 +171,14 @@ static void bb_target_trio_init(void) {
     if(!bb_audio_groups_bind(&bb_sound,bb_single_target_groups,BB_MACHINES))bb_audio_faults++;
 }
 #define BB_PLAY_FIRST_BOOT 1
+static int bb_target_midi_emit(void *ctx,unsigned status){(void)ctx;return midi_out_realtime(status);}
 static void bb_target_init(void) {
     unsigned k;
     /* main.c calls this before core1 qualification and physical audio. */
     drum808_prepare_curves();
     bb_visual_peak=0;bb_visual_sample_phase=0;
     bb_audio_init(&bb_sound,bb_target_enter,bb_target_leave,0);
+    bb_sound.midi_output.emit=bb_target_midi_emit;
     bb_audio_demo(&bb_sound.core);
     /* The unequal-length native demo is a timing regression fixture, not the
      * instrument's welcome groove. All hardware parts start with one bar. */

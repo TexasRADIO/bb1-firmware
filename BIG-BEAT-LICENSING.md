@@ -39,3 +39,8 @@ into a GPLv3 work (Creative Commons' declared one-way compatibility); these adap
 
 - The JieLi AC79 SDK files inside a `.fwsc` package: Apache-2.0, from the public SDK (see `LICENSING.md`).
 - The Jieli compiler toolchain: pinned by hash in `big-beat/integration/inputs.json`. Its redistribution terms are not yet confirmed.
+
+
+## 2.0 development addition
+
+The Euclid/Bjorklund generator in `firmware/src/bb/bb_gen.c` retains its GPL-3.0-only adaptation credit to tensor-programming/fm1-t1, torso_t1_algo.c at bea0fd38fbebe48758059828a7ba107c6248304c. The upstream snapshot, source record and licence are retained in `big-beat/composition-20/provenance/`. The remaining generator transforms retain their own BB1 source attribution. This development branch does not incorporate the separate AGPL rich101 engine or grant new rights over samples, charts or harvested phrases. Existing source-pattern attribution, uncertainty and asset permissions continue to apply; do not relabel adapted material as original composition.

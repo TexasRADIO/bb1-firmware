@@ -111,6 +111,12 @@ FRONT_D = [a for a in front if a.startswith('-D') and not a.startswith('-D__DATE
 flags = (T / 'host_flags.sh').read_text()
 HOST = {k: shlex.split(re.search(rf'^{k}="(.*)"$', flags, re.M).group(1)) for k in ('HOST_DEFS', 'HOST_INC', 'HOST_WARN')}
 SAN = ['-std=c11', '-O1', '-Wall', '-Wextra', '-fsanitize=address,undefined']
+# 2.0 kit builder: host tests and the oracle are compiled as the 2.0 recipe builds the firmware. Its feature -D
+# flags (BB_WITH_USER_KITS) and the bb_user_kit unit come from the recipe itself, one source of truth with the
+# native build (build/recipes/composition-20-lean/recipe.json).
+LEAN = json.loads((HERE / 'build/recipes/composition-20-lean/recipe.json').read_text())
+RECIPE_D = [f for f in LEAN.get('extra_flags', []) if f.startswith('-DBB_WITH_USER_KITS')]
+RECIPE_UNITS = [f'firmware/src/bb/{u}.c' for u in LEAN['link_order'] if u == 'bb_user_kit']
 B = OUT / 'bin'; B.mkdir()
 
 def compile_and_run(name, cc, runargs=(), expect=None, returncode=0):
@@ -124,10 +130,10 @@ def compile_and_run(name, cc, runargs=(), expect=None, returncode=0):
 
 def host_tests():
     res = {}
-    res['routes'] = compile_and_run('test_routes', [*SAN, '-Werror', '-I', 'firmware/src', '-I', 'firmware/src/bb_ui_v3',
+    res['routes'] = compile_and_run('test_routes', [*SAN, '-Werror', *RECIPE_D, '-I', 'firmware/src', '-I', 'firmware/src/bb_ui_v3',
                                     str(T / 'test_routes.c'), 'firmware/src/bb_nav.c'], [str(OUT / 'route-matrix.csv')],
                                     r'legacy normal pages 0; \d+ checks, 0 failures')
-    res['captures'] = compile_and_run('capture', [*SAN, '-Wno-unused-function', '-Wno-missing-field-initializers', '-Dsection(x)=used',
+    res['captures'] = compile_and_run('capture', [*SAN, *RECIPE_D, '-Wno-unused-function', '-Wno-missing-field-initializers', '-Dsection(x)=used',
                                       '-I', 'firmware/src', '-I', 'build/gen', str(T / 'capture.c'), 'firmware/src/bb_nav.c'],
                                       [str(OUT / 'captures.raw')], r'0 lint/route failures')
     res['kit_intent'] = compile_and_run('test_kit_intent', [*SAN, '-Werror', '-Wno-unused-function', *FRONT_D, *HOST['HOST_INC'], str(T / 'test_kit_intent.c')])
@@ -187,6 +193,38 @@ def host_tests():
         if (SRC / 'firmware/hal/bb_c1_metal_job.h').exists():
             res['fixA_job'] = compile_and_run('metal_job', [*cap[:-3], '-Wno-unused-function', str(T / 'fixA/metal_job.c'), 'firmware/src/bb/group_gain.c', '-lm'],
                                               expect=r'fix A job: \d+ calls, \d+ tamper rounds, \d+ B job, \d+ checks, 0 failures')
+    # 2.0 series: REC+EDIT is Undo on PLAY/STEPS (and REC+SEQ records, once that patch is in), on the real bb_nav.c
+    res['nav_record_undo'] = compile_and_run('nav_record_undo', [*SAN, '-Werror', *RECIPE_D, '-I', 'firmware/src', str(T / 'nav_record_undo.c'),
+                                             'firmware/src/bb_nav.c'], expect=r'checks, 0 failures')
+    # 2.0 kit builder: BUILD / SAVE AS on the real bb_nav_input, with the recipe's flags, and its route matrix
+    if (T / 'nav_build.c').exists():
+        res['nav_build'] = compile_and_run('nav_build', [*SAN, '-Werror', *RECIPE_D, '-I', 'firmware/src', str(T / 'nav_build.c'),
+                                           'firmware/src/bb_nav.c'], [str(OUT / 'build-route-matrix.csv')], expect=r'checks, 0 failures')
+    # 2.0 series: editable copy, Undo and scene round-trip on the real audio owner (oracle's compile + CPU1 stand-in)
+    if (SRC / 'firmware/src/bb/bb_pattern_edit.h').exists():
+        r = run(['python3', str(T / 'pattern_edit/build.py'), str(SRC), str(T / 'pattern_edit/pattern_edit_test.c'), str(B / 'pattern_edit')],
+                'pattern_edit-compile.log')
+        assert r.returncode == 0, 'pattern_edit compile failed (see pattern_edit-compile.log)'
+        r = run([str(B / 'pattern_edit')], 'pattern_edit.log', cwd=OUT)
+        assert r.returncode == 0 and re.search(r'checks, 0 failures', r.stdout), 'pattern_edit: ' + r.stdout[-300:]
+        res['pattern_edit'] = r.stdout.strip().splitlines()[-1]
+    # 2.0 help flash (bb/bb_text_block.h): the committed block matches its .def; the block gives back every literal it
+    # replaced; missing/corrupt/stale/wrong-version blocks fall back; with no block at all the routes are identical and
+    # every capture still passes the layout lint (HELP UNAVAILABLE in place of the texts)
+    if (SRC / 'firmware/src/bb/bb_text_block.def').exists():
+        r = run(['python3', '-I', str(SRC / 'big-beat/help-flash/help_flash.py'), 'gen', str(SRC), '--check'], 'help_flash-gen-check.log')
+        assert r.returncode == 0, 'help_flash gen --check: ' + (r.stderr or r.stdout)[-300:]
+        res['help_flash'] = compile_and_run('test_help_flash', [*SAN, '-Werror', '-I', 'firmware/src',
+                                            str(T / 'help_flash/test_help_flash.c')], expect=r'checks, 0 failures')
+        res['help_flash_absent_routes'] = compile_and_run('test_routes_absent', [*SAN, '-Werror', '-DBB_TX_HOST_ABSENT', '-I', 'firmware/src',
+            '-I', 'firmware/src/bb_ui_v3', str(T / 'test_routes.c'), 'firmware/src/bb_nav.c'], [str(OUT / 'route-matrix-absent.csv')],
+            r'legacy normal pages 0; \d+ checks, 0 failures')
+        assert (OUT / 'route-matrix-absent.csv').read_bytes() == (OUT / 'route-matrix.csv').read_bytes(), 'routes differ with no text block'
+        res['help_flash_absent_captures'] = compile_and_run('capture_absent', [*SAN, '-DBB_TX_HOST_ABSENT', '-Wno-unused-function',
+            '-Wno-missing-field-initializers', '-Dsection(x)=used', '-I', 'firmware/src', '-I', 'build/gen', str(T / 'capture.c'),
+            'firmware/src/bb_nav.c'], [str(OUT / 'captures-absent.raw')], r'0 lint/route failures')
+        res['help_flash_absent_nav_record_undo'] = compile_and_run('nav_record_undo_absent', [*SAN, '-Werror', '-DBB_TX_HOST_ABSENT',
+            '-I', 'firmware/src', str(T / 'nav_record_undo.c'), 'firmware/src/bb_nav.c'], expect=r'checks, 0 failures')
     if (OUT / 'route-matrix.csv').read_bytes() != (HERE / 'route-matrix.csv').read_bytes():
         res['route_matrix'] = 'DIFFERS from the checked-in route-matrix.csv'
     else:
@@ -201,7 +239,7 @@ def oracle():
     base = [a.replace('@SRC@', str(SRC)).replace('@ORACLE@', str(o / 'integration-480.c')) for a in json.loads((T / 'oracle/compile.json').read_text())]
     res = {}
     for name, drop, add in (('worker', (), ()), ('serial', (), ('-DFORCE_SERIAL=1',)), ('faults', ('-DAUDIO_ONLY=1',), ())):
-        c = [a.replace('@OUT@', str(o / name)) for a in base if a not in drop] + list(add)
+        c = [a.replace('@OUT@', str(o / name)) for a in base if a not in drop] + list(add) + RECIPE_D + [str(SRC / u) for u in RECIPE_UNITS]
         r = run(c, f'oracle/{name}-compile.log'); assert r.returncode == 0, f'oracle {name} compile'
         r = run([str(o / name)], f'oracle/{name}.log', cwd=o); assert r.returncode == 0, f'oracle {name} exit {r.returncode}'
         tail = r.stdout.strip().splitlines()[-2:]

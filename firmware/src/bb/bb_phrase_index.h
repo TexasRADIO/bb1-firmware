@@ -23,6 +23,23 @@ int bb_phrase_index_prepare(const bb_phrase *,uint32_t playable,bb_phrase_index 
 /* Validate a copied index without constructing another phrase-sized object.
  * Publication boundary only, not a required per-hit operation. */
 int bb_phrase_index_valid(const bb_phrase_index *,uint32_t playable);
+#define BB_PHRASE_MODIFIER_BATCH_LIMIT 16u
+#define BB_RATCHET_GROUP UINT32_C(0x80000000)
+#define BB_RATCHET_NATIVE UINT32_C(0x40000000)
+#define BB_RATCHET_STRIKE UINT32_C(0x02000000)
+/* Group payload: step[5:0], count-1[7:6], numerator[9:8], tag bit31.
+ * The owner freezes event counts for the current step before scheduling. */
+typedef struct {
+    uint8_t event_counts[(BB_FACTORY_DRUM_EVENTS+3u)/4u];
+    bb_drum_step native;
+    uint8_t step,active;
+} bb_ratchet_snapshot;
+void bb_phrase_ratchet_snapshot(const bb_phrase_index *,unsigned,bb_ratchet_snapshot *);
+/* Convert one tagged group into matching existing source ordinals. No new
+ * source event or voice substitution is invented. -1 invalid,0 not selected,
+ * 1 returns original encoded hit with the existing repeat attenuation tag. */
+int bb_phrase_ratchet_group_hit(const bb_phrase_index *,const bb_ratchet_snapshot *,
+                                uint32_t,unsigned ordinal,uint32_t *payload);
 /* Audio owner: consumes only a successfully prepared immutable index. Maintains
  * the retained explicit Studio-reference delay policy, not recording fidelity.
  * Writes the queue transactionally through bb_delayed_offer; no dropped hits.

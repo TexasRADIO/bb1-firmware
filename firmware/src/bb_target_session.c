@@ -1,3 +1,4 @@
+static int bb_count_busy(void); /* UI count journal owns pending authoring */
 /* SPDX-License-Identifier: GPL-3.0-only
  * Included after storage.c/project.c and before Big Beat UI. Main loop only.
  * Uses existing project slots ONLY for blank or recognized Big Beat records.
@@ -8,6 +9,7 @@
  */
 #if BB_WITH_SESSION
 #include "bb/bb_family_scene.h"
+#include "bb/bb_text_block.h"
 #include "bb/group_scene.h"
 #include "bb/bb_expression_scene.h"
 #include "bb/bb_save_claim.h"
@@ -42,7 +44,11 @@ _Static_assert(BB_TARGET_SCENE_BYTES<=ST_PAYLOAD_MAX,"family scene fits project 
 static struct {
 #if defined(BB_SAMPLE_DUAL_TRIAL)
     bb_pair_stage pair;
+#if BB_WITH_USER_KITS
+    uint8_t wire[BB_PAIR_WIRE_BYTES];   /* + one USER record of staging room (dual-sample-platform-r1.inc) */
+#else
     uint8_t wire[BB_TARGET_SCENE_BYTES];
+#endif
     bb_sample_audio_binding sample_entries[2][8];
 #else
     bb_family_scene_workspace work;
@@ -131,9 +137,9 @@ static int bb_session_worker_ready(int load) {
 }
 static __attribute__((noinline)) int bb_session_request_ex(unsigned slot,int load,int claim) {
     uintptr_t token;
-    if(bb_session_busy()){bb_session_message="BUSY / PLEASE WAIT";return 0;}
+    if(bb_count_busy()||bb_session_busy()){bb_session_message=BB_TX(TX_BUSY_PLEASE_WAIT);return 0;}
     if(bb_kit_hold_request||bb_asset_hold_request||bb_session_hold_request||
-       !bb_session_worker_ready(load)){bb_session_message="WORKER NOT READY";return 0;}
+       !bb_session_worker_ready(load)){bb_session_message=BB_TX(TX_WORKER_NOT_READY);return 0;}
     if(slot>=4 || !flash_ok){bb_session_message="STORAGE UNAVAILABLE";return 0;}
     if(bb_session_usb_recording()){bb_session_message="STOP USB RECORDING FIRST";return 0;}
     token=bb_target_enter(0);
@@ -142,7 +148,7 @@ static __attribute__((noinline)) int bb_session_request_ex(unsigned slot,int loa
        !pb_ownership_idle(&bb_sound.parts)||
 #endif
        !bb_session_patterns_idle()||!bb_session_families_match()) {
-        bb_target_leave(0,token);bb_session_message="STOP / WAIT THEN RETRY";return 0;
+        bb_target_leave(0,token);bb_session_message=BB_TX(TX_STOP_WAIT_THEN_RETRY);return 0;
     }
     bb_session_loaded=0;bb_session_slot=slot;bb_session_job=load?2u:1u;
     bb_session_claimed=(uint8_t)(!load&&claim);
@@ -150,9 +156,48 @@ static __attribute__((noinline)) int bb_session_request_ex(unsigned slot,int loa
     bb_kit_hold_ack=0;
     __asm__ volatile("" ::: "memory");bb_session_hold_request=bb_kit_hold_request=1;
     bb_target_leave(0,token);
-    bb_session_message="PREPARING / AUDIO PAUSED";return 1;
+    bb_session_message=BB_TX(TX_PREPARING_AUDIO_PAUSED);return 1;
 }
 static int bb_session_request(unsigned slot,int load){return bb_session_request_ex(slot,load,0);}
+#if BB_WITH_USER_KITS
+/* 2.0 kit builder: USER 1-4 live in their own 496-byte object "BBUB" (bb_user_kit.h) in the storage object of
+ * the second stock user-preset bank (A/B sectors 0xDE000/0xDF000), which Big Beat never reads otherwise. It is
+ * written only when blank or already BBUB, through the same pause, verified A/B write and readback as a scene;
+ * anything else there is left untouched and STORE says so. Placement awaits the storage owner (README). */
+#define BB_UK_OBJ (OBJ_UPRESET0+1u)
+/* Scratch for four decoded records while no scene job runs (boot, the store job, a USER load). */
+static bb_user_kit *bb_uk_bank4(void){return (bb_user_kit *)(void *)&bb_session_memory.pair;}
+_Static_assert(sizeof bb_session_memory.pair>=BB_UK_SLOTS*sizeof(bb_user_kit)&&
+               sizeof bb_session_memory.pair>=sizeof(bb_uk_resolved),"kit builder scratch");
+/* Read USER 1-4 into bb_uk_bank4(): their used mask; blank = 0; anything not BBUB there: foreign. Flash reads run
+ * beside the audio (storage_hw.c reads in 256-byte IRQ-off windows). */
+static unsigned bb_uk_bank_read(void){
+    int n=flash_ok?st_load(BB_UK_OBJ,bb_session_memory.wire,sizeof bb_session_memory.wire):-1;
+    bb_uk.foreign=(uint8_t)(n>=0&&(n!=(int)BB_UK_BANK_BYTES||memcmp(bb_session_memory.wire,"BBUB",4)));
+    return n<0||bb_uk.foreign?0u:bb_uk_bank_decode(bb_session_memory.wire,bb_uk_bank4());
+}
+static void bb_uk_bank_names(unsigned used){
+    bb_uk.used=(uint8_t)used;
+    for(unsigned i=0;i<BB_UK_SLOTS;i++)memcpy(bb_uk.name[i],bb_uk_bank4()[i].name,BB_UK_NAME);
+}
+static int bb_uk_store_request(void){
+    if(bb_uk.foreign){bb_session_message="USER SLOTS: OTHER DATA IN FLASH";return 0;}
+    if(!bb_session_request_ex(0,0,0))return 0;
+    bb_session_job=4;bb_session_message=BB_TX(TX_STORING_USER_KIT);return 1;
+}
+/* Paused (bb_session_poll job 4): the draft into USER save_slot; the other slots kept as stored. */
+static const char *bb_uk_store_commit(void){
+    unsigned s=bb_uk.save_slot&3u,used=bb_uk_bank_read();
+    if(bb_uk.foreign)return "USER SLOTS: OTHER DATA IN FLASH";
+    const bb_user_kit *slots[BB_UK_SLOTS];
+    bb_uk_bank4()[s]=bb_uk.draft;used|=1u<<s;
+    for(unsigned i=0;i<BB_UK_SLOTS;i++)slots[i]=(used>>i&1u)?&bb_uk_bank4()[i]:0;
+    if(!bb_uk_bank_encode(slots,bb_session_memory.wire)||st_save(BB_UK_OBJ,bb_session_memory.wire,BB_UK_BANK_BYTES))
+        return "STORE FAILED / KEPT AS DRAFT";
+    bb_uk_bank_names(used);bb_uk.origin=(uint8_t)s;bb_uk.edits=0;bb_uk.stored=1;
+    return BB_TX(TX_USER_KIT_STORED);
+}
+#endif
 /* Return 1 for an existing supported scene, 0 for blank, -1 for protected
  * foreign/corrupt content. Even a valid journal CRC needs scene validation. */
 static int bb_target_scene_decode(const void *data,size_t bytes){
@@ -161,6 +206,7 @@ static int bb_target_scene_decode(const void *data,size_t bytes){
 #else
     const void *nested;size_t nested_bytes;
 #if BB_WITH_RICH_DRUM_RENDER
+    const void *ratchet_wire=data;size_t ratchet_bytes=bytes;
     if(!bb_rich_scene_open(data,bytes,bb_session_memory.rich_phrases,&bb_session_memory.rich_mask,
                            &nested,&nested_bytes))return 0;
     data=nested;bytes=nested_bytes;
@@ -177,7 +223,7 @@ static int bb_target_scene_decode(const void *data,size_t bytes){
                                     &bb_session_memory.sample_identity))return 0;
         bb_session_memory.sampled=1;
 #if BB_WITH_RICH_DRUM_RENDER
-        return bb_session_rich_admit();
+        return bb_rich_scene_apply_ratchets(ratchet_wire,ratchet_bytes,&bb_session_memory.work.decoded.core)&&bb_session_rich_admit();
 #else
         return 1;
 #endif
@@ -185,7 +231,7 @@ static int bb_target_scene_decode(const void *data,size_t bytes){
 #endif
     if(!gg_scene_decode_staged(data,bytes,44100,&bb_session_memory.work,bb_session_memory.groups))return 0;
 #if BB_WITH_RICH_DRUM_RENDER
-    return bb_session_rich_admit();
+    return bb_rich_scene_apply_ratchets(ratchet_wire,ratchet_bytes,&bb_session_memory.work.decoded.core)&&bb_session_rich_admit();
 #else
     return 1;
 #endif
@@ -203,32 +249,35 @@ static __attribute__((noinline)) int bb_session_poll(void) {
     if(bb_session_job==3)return 0; /* latched reset failure: keep silent */
     if(!bb_session_hold_ack||!bb_kit_hold_ack) {
         if((uint32_t)(fm1_ms-bb_session_started)<1000u)return 0;
-        bb_session_message="AUDIO PAUSE TIMEOUT";bb_session_release();return 1;
+        bb_session_message=BB_TX(TX_AUDIO_PAUSE_TIMEOUT);bb_session_release();return 1;
     }
     __asm__ volatile("" ::: "memory");
     if(bb_session_usb_recording()) {
         bb_session_message="USB RECORDING / CANCELLED";bb_session_release();return 1;
     }
     if(!bb_session_families_match()||!bb_session_patterns_idle()) {
-        bb_session_message="KIT CHANGED / CANCELLED";bb_session_release();return 1;
+        bb_session_message=BB_TX(TX_KIT_CHANGED_CANCELLED);bb_session_release();return 1;
     }
     /* Recheck after the pause handshake, before any flash access. */
     if(!bb_session_worker_ready(bb_session_job==2)) {
-        bb_session_message="WORKER NOT READY / CANCELLED";bb_session_release();return 1;
+        bb_session_message=BB_TX(TX_WORKER_NOT_READY_CANCELLED);bb_session_release();return 1;
     }
+#if BB_WITH_USER_KITS
+    if(bb_session_job==4){bb_session_message=bb_uk_store_commit();bb_session_release();return 1;}
+#endif
     obj=OBJ_PROJECT0+bb_session_slot;
     state=bb_session_slot_state(obj);
     gate=bb_save_gate(state,bb_session_job==2,bb_session_claimed);
     if(gate==BB_GATE_ASK){
         /* Other data and no confirm: write nothing; the SAVE page asks for a held SAVE. */
         bb_claim_arm(&bb_session_claim,bb_session_slot,fm1_ms);
-        bb_session_message="OTHER DATA / HOLD SAVE";bb_session_release();return 1;
+        bb_session_message=BB_TX(TX_OTHER_DATA_HOLD_SAVE);bb_session_release();return 1;
     }
     if(gate==BB_GATE_PROTECT){bb_session_message="PROTECTED / NOT BIG BEAT";bb_session_release();return 1;}
     /* No restore has begun. A failed precondition must release the pause;
      * only a failure after live-state mutation may retain the reset hold. */
     if(!pab_target_session_ready(&bb_sound)) {
-        bb_session_message="OWNER NOT READY / CANCELLED";bb_session_release();return 1;
+        bb_session_message=BB_TX(TX_OWNER_NOT_READY_CANCELLED);bb_session_release();return 1;
     }
     if(gate==BB_GATE_STORE) {
         if(!pab_session_snapshot_groups(&bb_sound,1)) {
@@ -264,8 +313,8 @@ static __attribute__((noinline)) int bb_session_poll(void) {
         if(bytes)bytes=bb_expression_scene_finish(bb_session_memory.wire+BB_TARGET_RICH_SCENE_BYTES,
                          sizeof bb_session_memory.wire-BB_TARGET_RICH_SCENE_BYTES,bytes,bb_session_memory.expression);
 #if BB_WITH_RICH_DRUM_RENDER
-        if(bytes)bytes=bb_rich_scene_finish(bb_session_memory.wire,sizeof bb_session_memory.wire,
-                         bytes,bb_session_memory.rich_phrases,bb_session_memory.rich_mask);
+        if(bytes)bytes=bb_rich_scene_finish_v2(bb_session_memory.wire,sizeof bb_session_memory.wire,
+                         bytes,bb_session_memory.rich_phrases,bb_session_memory.rich_mask,&s->core);
 #endif
 #endif
         if(!bytes)
@@ -273,7 +322,7 @@ static __attribute__((noinline)) int bb_session_poll(void) {
         else if(st_save(obj,bb_session_memory.wire,(uint32_t)bytes))
             bb_session_message="SAVE FAILED / KEEP SCENE";
         else bb_session_message="SAVED / FLASH VERIFIED";
-    } else if(gate==BB_GATE_EMPTY)bb_session_message="EMPTY SCENE";
+    } else if(gate==BB_GATE_EMPTY)bb_session_message=BB_TX(TX_EMPTY_SCENE);
     else {
         int n=st_load(obj,bb_session_memory.wire,sizeof bb_session_memory.wire);
         int result=BB_C1_SCENE_REJECTED;
@@ -307,7 +356,7 @@ static __attribute__((noinline)) int bb_session_poll(void) {
             memcpy(bb_sound.patterns.expression,bb_session_memory.expression,
                    sizeof bb_sound.patterns.expression);
 #endif
-            bb_session_loaded=1;bb_session_message="LOADED / PRESS PLAY";
+            bb_session_loaded=1;bb_session_message=BB_TX(TX_LOADED_PRESS_PLAY);
             bb_ticks=0;bb_visual_peak=0;
             for(unsigned k=0;k<BB_MACHINES;k++)bb_playhead[k]=0;
             for(unsigned k=0;k<BB_SYNTHS;k++)bb_synth_playhead[k]=0;

@@ -103,7 +103,7 @@ static void hm_draw_screen(const hm_pattern_row rows[HM_INSTRUMENTS],
     unsigned focus = 0;
     for (unsigned i=0;i<HM_INSTRUMENTS;i++) if (rows[i].focused && hm_available(HM_ACTIVE_MASK,i)) focus=i;
     char sound[128];
-    const char *name = sounds[focus].name ? sounds[focus].name : "UNAVAILABLE";
+    const char *name = sounds[focus].name ? sounds[focus].name : BB_TX(TX_UNAVAILABLE);
     unsigned n=0;
     while (name[n] && n<117) {sound[n]=name[n];n++;}
     sound[n]=0;

@@ -19,6 +19,11 @@ int bb_catalogue_unsigned(const bb_catalogue *,bb_catalogue_id,uint32_t,uint32_t
 int bb_catalogue_scaled(const bb_catalogue *,bb_catalogue_id,unsigned,unsigned,uint32_t,uint32_t *);
 int bb_catalogue_text(const bb_catalogue *,bb_catalogue_id,const uint8_t **,size_t *);
 int bb_catalogue_copy_text(const bb_catalogue *,bb_catalogue_id,char *,size_t);
+/* Shared by the factory, recipe and browser readers: text equal to a C string; non-empty text; an unsigned
+ * number <= limit as unsigned. */
+int bb_catalogue_text_is(const bb_catalogue *,bb_catalogue_id,const char *);
+int bb_catalogue_has_text(const bb_catalogue *,bb_catalogue_id);
+int bb_catalogue_uint(const bb_catalogue *,bb_catalogue_id,unsigned,unsigned *);
 /* Mapped region outside the view, immutable storage and mutable cache. */
 int bb_catalogue_private(const bb_catalogue *,const void *,size_t);
 #endif

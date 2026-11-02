@@ -66,8 +66,8 @@ for off in (0, 47, 100, 2000, len(raw) - 1):
 negative.append(reject('wrong-product', packer.ufw(packer.flash_image(app, packer.KEY), loader, 'OTHER_900')))
 assert len(negative) == 8
 
-rollback = OB / 'FM1 Recovery Vault/1.5-c04aa9f-candidate-20261029/bb1-1.5.fwsc'
-assert sha(rollback) == '2ef5f0112657e25fcce3f25d3e9be6eb6ba1832d941386cbf3543a450686dcfc'      # preserved exact original public1.5 rollback
+rollback = OB / 'Codex Working Cache/tmp/bb1-identity-qualification-20261030/BB-1-1.5-identity-qualification-ONLY.fwsc'
+assert sha(rollback) == '0efa13388f688927fb46e40fa5acc508f3a3fc04a37cd3184910ef7d7d43571a'      # exact current corrected-ID1.5 rollback
 outdir.mkdir(parents=True, exist_ok=True)
 package = outdir / (name + '.fwsc')
 assert not package.exists(), package
@@ -77,9 +77,10 @@ out = {'packaged': True, 'product': PRODUCT, 'display_name': DISPLAY_NAME, 'inst
        'asset_write': False, 'user_data_write': False, 'app_sha256': link['sha256'], 'app_bytes': link['bytes'],
        'fit': {k: link[k] for k in ('code_free', 'ram_free', 'pool_free', 'ram_text_bytes')},
        'package': {'path': str(package), 'sha256': sha(package), 'bytes': len(raw)},
-       'loader_sha256': sha(loader_path), 'rollback': {'what': 'Original public1.5 retained for rollback; identity-only supplement does not replace its tag', 'path': str(rollback), 'sha256': sha(rollback),
-       'app_sha256': 'c3a703a388e8c274585b27097a888d30b3c4f2b92c57e1077cee9e4ebf0d3380'},
-       'sound_library_expected_sha256': '154ef6b92553af5803c3e003dc5d2c379aed4e0503f24f08ad8b024cff7d821e',
+       'loader_sha256': sha(loader_path), 'rollback': {'what': 'Current corrected-ID BB-1 1.5 normal return; historical v1.5 tag remains unchanged', 'path': str(rollback), 'sha256': sha(rollback),
+       'product': 'FM-1_92200105', 'app_sha256': 'ce17d90b317a7a476be6e0026084717fb81f613bb8244a529eb5c790e7e2f6bf'},
+       'sound_library_expected_sha256': '9911a933e25a4bd507c4fa8240f86d53785eeb5ca6654e4e51215077ed447ada',
+       'return_sound_library_sha256': '154ef6b92553af5803c3e003dc5d2c379aed4e0503f24f08ad8b024cff7d821e',
        'decoded': decoded, 'negative_cases': negative}
 (outdir / (name + '-package-report.json')).write_text(json.dumps(out, indent=2) + '\n')
 print(json.dumps({k: out[k] for k in ('package', 'app_sha256', 'fit', 'negative_cases')}, indent=2))

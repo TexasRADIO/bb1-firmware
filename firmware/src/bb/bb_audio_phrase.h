@@ -35,6 +35,9 @@
 #elif !defined(BB_GROUP_HOST_SERIAL_TEST) || defined(BB_GROUP_TARGET_CANDIDATE)
 #error "Rich phrase handoff is host integration only: rendering/edit/save/target gates remain"
 #endif
+#ifndef BB_WITH_DILLO_KIT_VIEW
+#define BB_WITH_DILLO_KIT_VIEW 0
+#endif
 enum {BB_RICH_DRUMS=2,BB_RICH_PINNED=3};
 enum {BB_RICH_NONE,BB_RICH_QUEUED,BB_RICH_STAGED,BB_RICH_CANCELLED,BB_RICH_REJECTED,BB_RICH_APPLIED};
 enum {BB_RICH_ERROR_NONE,BB_RICH_ERROR_TOKEN,BB_RICH_ERROR_DATA,BB_RICH_ERROR_ENGINE,
@@ -43,6 +46,7 @@ typedef struct {
     bb_phrase_index data;
     uint32_t ticket,epoch;
     uint8_t machine,phrase,kit;
+    uint8_t enable_on_apply; /* copied opt-in launch intent; audio-owned while pinned */
     volatile uint8_t state;
 } bb_rich_slot;
 typedef struct {
@@ -51,13 +55,17 @@ typedef struct {
     bb_phrase_index active[BB_RICH_DRUMS];
     bb_pattern_status status[BB_RICH_DRUMS];
     uint8_t valid[BB_RICH_DRUMS],error[BB_RICH_DRUMS];
+#if BB_WITH_DILLO_KIT_VIEW
+    uint32_t strikes[BB_RICH_DRUMS][BB_PHRASE_VOICES]; /* audio owner only */
+#endif
 #if BB_WITH_RICH_DRUM_RENDER
     struct {
         bb_delayed queue;
         uint32_t phase,generation,primary,delayed;
         uint8_t step,pending,odd,swing,sounded;
+        bb_ratchet_snapshot ratchets;
     } player[BB_RICH_DRUMS];
-    uint32_t render_errors,edit_refusals;
+    uint32_t render_errors,edit_refusals,edit_revision[BB_RICH_DRUMS];
 #endif
 } bb_audio_phrase_state;
 struct bb_audio;
@@ -71,13 +79,17 @@ typedef struct {bb_pattern_status state;uint8_t valid,error;} bb_audio_phrase_st
 typedef struct {
     bb_phrase phrase;
     bb_phrase_controls controls;
-    uint32_t applied,generation;
+    uint32_t applied,generation,edits,refusals;
     uint8_t valid;
 } bb_phrase_view;
-typedef struct {uint8_t hits,accents,soft,flams,repeats;} bb_phrase_cell;
+typedef struct {uint8_t hits,accents,soft,flams,repeats,ratchet,mixed;} bb_phrase_cell;
 /* 0 refused, 1 unchanged, 2 refreshed. One bounded command lock; no decoding
  * or catalogue access while held. Only a changed immutable phrase is copied. */
 int bb_audio_phrase_view_read(struct bb_audio *,unsigned,bb_phrase_view *);
+#if BB_WITH_DILLO_KIT_VIEW
+typedef struct {uint32_t strikes[BB_PHRASE_VOICES],generation;uint8_t active,running;} bb_dillo_strikes;
+int bb_audio_dillo_strikes_read(struct bb_audio *,unsigned,bb_dillo_strikes *);
+#endif
 /* Main-owned zero-initialized sound snapshot. 0 invalid,1 queue pending (no
  * sound copy),2 authoritative idle snapshot refreshed,3 unchanged. Copying
  * portable pots is bounded; no DSP/oscillator state crosses the boundary. */
@@ -89,11 +101,29 @@ typedef struct {
 int bb_audio_source_tone_view_read(struct bb_audio *,unsigned,bb_source_tone_view *);
 /* Exact selected source voice, zero-based step. Duplicate and delayed-strike
  * indicators retain their own counts; no collapse into an editable 808 grid. */
+/* Owner-only command handler after source-token and hypothetical queue admission. */
+void bb_audio_phrase_ratchet_command(struct bb_audio *,const bb_command *);
+int bb_audio_phrase_ratchet_preflight(const bb_phrase_index *,unsigned voice,unsigned step,unsigned count);
+/* Main: build a token from the actual copied source view, never a grid projection. */
+/* Main-loop UI API: native voice is physical lane0..10; rich voice is its
+ * actual BB_FDV_* source (including SH). Get returns1..4,1 for an empty cell,
+ * 0 for invalid/mixed. Request refuses empty cells. A true request means
+ * queued, not applied; the owner rechecks the expected source ticket. */
+unsigned bb_audio_ratchet_get(struct bb_audio *,unsigned machine,unsigned voice,unsigned step);
+int bb_audio_ratchet_request(struct bb_audio *,unsigned machine,unsigned voice,unsigned step,unsigned count);
+int bb_phrase_view_ratchet_command(const bb_phrase_view *,unsigned machine,unsigned voice,unsigned step,unsigned count,bb_command *);
 int bb_phrase_view_cell(const bb_phrase_view *,unsigned,unsigned,bb_phrase_cell *);
 /* Handoff-only profile acknowledges STAGED; optional rich renderer acknowledges
  * APPLIED musical state (stopped loads do not sound until PLAY). Host-only and
  * kept out of public browsers until rich editing/save/target gates are complete. */
 int bb_audio_phrase_submit(struct bb_audio *,unsigned,const bb_phrase_index *,unsigned,uint32_t *);
+/* Review proposal: kit255 preserves source; enable0 keeps existing producer semantics. */
+int bb_audio_phrase_submit_launch(struct bb_audio *,unsigned,unsigned,const bb_phrase_index *,unsigned,unsigned,uint32_t *);
+/* Same rich shape/kit only. Queue in existing copied inbox; apply at its own
+ * wrap with empty delayed queue, preserving phase/generation and tails. */
+int bb_audio_phrase_submit_seamless(struct bb_audio *,unsigned,const bb_phrase_index *,uint32_t *);
+int bb_audio_phrase_seamless_pending(const struct bb_audio *,unsigned);
+void bb_audio_phrase_apply_seamless(struct bb_audio *,unsigned,uint64_t);
 #if BB_SAMPLE_HOST_INTEGRATION
 /* Control-thread submission: one immutable kit + phrase ticket. The audio
  * owner validates again and swaps both at the same phrase boundary. */

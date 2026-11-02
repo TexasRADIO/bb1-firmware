@@ -16,9 +16,9 @@ static int bb_aux_browse_input(uint32_t pressed,uint32_t *notes,int rec) {
         if(bb_sound_pick_audio_failed()){
             bb_say("AUDIO FAULT / LOAD BLOCKED");return bb_browse_consume(notes);
         }
-        if(bb_sound_pick.pending){bb_say("SOUND REQUEST STILL PENDING");return bb_browse_consume(notes);}
+        if(bb_sound_pick.pending){bb_say(BB_TX(TX_SOUND_REQUEST_STILL_PENDING));return bb_browse_consume(notes);}
         if(!bb_sound_pick_open(bb_face.requested.page,bb_face.machine)) {
-            bb_say("SOUND LIST NOT READY");return bb_browse_consume(notes);
+            bb_say(BB_TX(TX_SOUND_LIST_NOT_READY));return bb_browse_consume(notes);
         }
         bb_aux_cancel(1);bb_sound_pick_return=0;bb_aux_apply(1u<<8);
         bb_sound_pick_page=1;bb_library_page=0;bb_tone_page=0;

@@ -10,12 +10,16 @@ int bb_factory_prepare_rich_drum(const bb_catalogue *c,const bb_factory_choice *
 }
 int bb_factory_request_rich_drum(bb_audio *a,const bb_catalogue *c,const bb_factory_choice *choice,
     unsigned machine,unsigned boundary,uint32_t *ticket){
+ return bb_factory_request_rich_drum_launch(a,c,choice,machine,boundary,0,ticket);
+}
+int bb_factory_request_rich_drum_launch(bb_audio *a,const bb_catalogue *c,const bb_factory_choice *choice,
+    unsigned machine,unsigned boundary,unsigned enable,uint32_t *ticket){
     if(!a||machine>=BB_RICH_DRUMS)return BB_FDRUM_INVALID;
     bb_phrase_index p;int result=bb_factory_prepare_rich_drum(c,choice,&p);if(result)return result;
     if(!bb_phrase_index_valid(&p,bb_audio_phrase_source_voices(a,machine)))return BB_FDRUM_VOICE;
     if(!bb_audio_phrase_preflight(&p))return BB_FDRUM_EXPRESSION;
     if(a->drum_patterns.family[machine])return BB_FDRUM_UNAVAILABLE;
-    if(!bb_audio_phrase_submit(a,machine,&p,boundary,ticket))return BB_FDRUM_BUSY;
+    if(!bb_audio_phrase_submit_launch(a,machine,255u,&p,boundary,enable,ticket))return BB_FDRUM_BUSY;
     return BB_FDRUM_OK;
 }
 #endif

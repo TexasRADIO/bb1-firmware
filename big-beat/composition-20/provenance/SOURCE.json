@@ -1,0 +1,8 @@
+{
+  "project": "tensor-programming/fm1-t1",
+  "commit": "bea0fd38fbebe48758059828a7ba107c6248304c",
+  "licence": "GPL-3.0-only",
+  "used": "Bjorklund distribution adapted in firmware/src/bb/bb_gen.c; existing source attribution retained",
+  "upstream_snapshot_sha256": "e1c5030d88cd5a8cfdea1de3a5dd8e34a1d64691059db83c6f6ee99677d8bb95",
+  "rich_101_AGPL_included": false
+}

@@ -7,7 +7,7 @@ static int separate(const void *a,size_t n,const void *b,size_t m) {
 }
 static int control(unsigned v){return v==BB_FDV_ACCENT || v==BB_FDV_ACC;}
 int bb_phrase_controls_prepare(const bb_phrase *p,bb_phrase_controls *out) {
-    if(!separate(p,sizeof *p,out,sizeof *out) || !p->length || p->length>BB_STEPS ||
+    if(!separate(p,sizeof *p,out,sizeof *out) || !bb_phrase_ratchets_valid(p) || !p->length || p->length>BB_STEPS ||
        p->count>BB_FACTORY_DRUM_EVENTS || p->lattice>BB_FDL_TRIPLETS || p->bars>4)return 0;
     unsigned per=p->lattice==BB_FDL_SIXTEENTHS?16:p->lattice==BB_FDL_EIGHTHS?8:24;
     if(p->bars && p->length!=p->bars*per)return 0;

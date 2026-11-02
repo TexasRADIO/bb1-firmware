@@ -1,5 +1,8 @@
 #ifndef BB_CONTROL_H
 #define BB_CONTROL_H
+#ifndef BB_WITH_PROJECT_FILES
+#define BB_WITH_PROJECT_FILES 0
+#endif
 #include "bb_core.h"
 #include "bb_pattern_limits.h"
 #ifndef BB_WITH_EVOLVE
@@ -51,7 +54,13 @@ typedef enum {
     ,BB_CMD_KIT_PHRASE /* Owned phrase slot and ticket; note.gate=registered kit ID. */
 #endif
     ,BB_CMD_TRANSPORT_RESTART /* append only; atomic MIDI Start proposal */
-    ,BB_CMD_SYNTH_SILENCE /* MIDI CC120: owner clears active voice, keeps patch/sequence */
+    ,BB_CMD_SYNTH_SILENCE /* existing CC120 value preserved */
+    ,BB_CMD_TRANSPORT_RESUME /* internal owner event; not a new wire protocol ID */
+    ,BB_CMD_MIDI_PERFORMANCE /* target=synth,step=source,voice=64/121/123/128(bend) */
+    ,BB_CMD_SECTION_PATTERN, BB_CMD_SECTION_CANCEL /* internal copied whole-section token */
+    ,BB_CMD_DRUM_RATCHET /* target=machine,step=0..63,voice=0..15,value=1..4; no hit toggle */
+    ,BB_CMD_DRUM_SOURCE_RATCHET /* source voice/step/count; note bytes=expected applied ticket */
+    ,BB_CMD_SECTION_RATCHET /* internal token for a bounded SONG-owner edit */
 } bb_command_type;
 /* RESTART: all payload fields zero. Audio owner resets sequence frame/phase,
  * ticks/cursors even while running, using existing START side effects. Held
@@ -124,6 +133,11 @@ typedef struct {
     bb_leave_fn leave;
     void *lock_context;
     unsigned read,write,count;
+#if BB_WITH_PROJECT_FILES
+    /* Audio-owned edit-event epoch, not serialized state or DSP input.
+     * Saturation is a permanent dirty latch until a new scene owner resets it. */
+    volatile uint32_t project_edits;
+#endif
     uint8_t stop_pending,stop_inflight; /* isolated STOP-lane proposal */
 #if BB_SAMPLE_HOST_INTEGRATION
     /* Cold-bound host prototype admission hook, audio consumer only, outside
@@ -132,6 +146,13 @@ typedef struct {
     void *admit_context;
 #endif
 } bb_commands;
+static inline void bb_commands_project_edit(bb_commands *q) {
+#if BB_WITH_PROJECT_FILES
+    if(q && q->project_edits!=UINT32_MAX)q->project_edits++;
+#else
+    (void)q;
+#endif
+}
 /* Caller holds queue guard or exclusive suspended ownership. Not an atomic
  * snapshot API; NULL cannot establish idle ownership. Capacity checks still
  * use count, while save/switch/resync guards use this complete predicate. */

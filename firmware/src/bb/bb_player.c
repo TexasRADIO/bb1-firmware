@@ -67,7 +67,7 @@ int bb_player_sync(bb_player *p,bb_audio *a) {return sync_with(p,a,NULL,
 );}
 static int launch(bb_player *p,bb_audio *a,const bb_browser *view,int kit) {
     bb_factory_choice choice;
-    if(!p || !p->ready || !a || !bb_browser_current(view,&choice))return BB_FACTORY_PATTERN_INVALID;
+    if(!p || !p->ready || p->launch_enable>1u || !a || !bb_browser_current(view,&choice))return BB_FACTORY_PATTERN_INVALID;
     (void)bb_player_sync(p,a);
     bb_player_selection incoming;memset(&incoming,0,sizeof incoming);incoming.choice=choice;
     if(kit>=0){incoming.kit=(uint8_t)kit;incoming.has_kit=1;}
@@ -83,17 +83,17 @@ static int launch(bb_player *p,bb_audio *a,const bb_browser *view,int kit) {
             if(drum==BB_FDRUM_OK) {
                 uint32_t voices=(unsigned)kit==BB_SAMPLE_808_ID?(BB_RICH_808_VOICES|bb_audio_aux_capabilities(a)):
                     bb_audio_sample_source_voices(a,(unsigned)kit);
-                if(((unsigned)kit!=BB_SAMPLE_808_ID && (unsigned)kit>=a->sample_catalogue_count) ||
+                if(((unsigned)kit!=BB_SAMPLE_808_ID && !bb_audio_sample_source_voices(a,(unsigned)kit)) ||
                    !bb_phrase_index_valid(&phrase,voices))drum=BB_FDRUM_VOICE;
                 else if(!bb_audio_phrase_preflight_playable(&phrase,voices))drum=BB_FDRUM_EXPRESSION;
-                else if(!bb_audio_kit_phrase_submit(a,p->target,(unsigned)kit,&phrase,16,&incoming.ticket))
+                else if(!bb_audio_phrase_submit_launch(a,p->target,(unsigned)kit,&phrase,16,p->launch_enable,&incoming.ticket))
                     drum=BB_FDRUM_BUSY;
             }
 #else
             drum=BB_FDRUM_UNAVAILABLE;
 #endif
         } else if(kit>=0)drum=BB_FDRUM_UNAVAILABLE;
-        else if(rich_request)drum=bb_factory_request_rich_drum(a,view->catalogue,&choice,p->target,16,&incoming.ticket);
+        else if(rich_request)drum=bb_factory_request_rich_drum_launch(a,view->catalogue,&choice,p->target,16,p->launch_enable,&incoming.ticket);
         else
 #endif
         drum=bb_factory_request_drum_pattern(a,view->catalogue,&choice,p->target,16,&incoming.ticket);
@@ -104,6 +104,7 @@ static int launch(bb_player *p,bb_audio *a,const bb_browser *view,int kit) {
                drum==BB_FDRUM_VOICE?BB_PLAYER_NEEDS_VOICE:
                drum==BB_FDRUM_EXPRESSION?BB_FACTORY_PATTERN_EXPRESSION:BB_FACTORY_PATTERN_INVALID;
     } else result=bb_factory_request_synth_pattern(a,view->catalogue,&choice,p->target,16,&incoming.ticket);
+    incoming.enable_on_apply=(uint8_t)(rich_request&&p->launch_enable);
     p->view=*view;p->error=(uint8_t)result;
     if(result==BB_FACTORY_PATTERN_OK && p->is_drum && choice.group==BB_BROWSER_SONGS &&
        !(p->request.choice.group==BB_BROWSER_SONGS && p->request.choice.bank_index==choice.bank_index)) {
@@ -188,7 +189,7 @@ int bb_player_preview_part_key(bb_player *p,unsigned key) {
 static uint32_t preview_kit_voices(const bb_audio *a,unsigned machine,unsigned kit) {
     if(!a || !bb_audio_sample_layer(a,machine))return 0;
     if(kit==BB_SAMPLE_808_ID)return BB_RICH_808_VOICES|bb_audio_aux_capabilities(a);
-    return kit<a->sample_catalogue_count?bb_audio_sample_source_voices(a,kit):0;
+    return bb_audio_sample_source_voices(a,kit);
 }
 static int preview_choice_playable(const bb_browser *view,const bb_audio *a,unsigned machine,unsigned kit) {
     bb_factory_choice choice;bb_phrase_index phrase;
@@ -205,7 +206,7 @@ int bb_player_preview_substitutions(const bb_player *p,const bb_audio *a,unsigne
                                     unsigned *count,unsigned *first,unsigned *replacement) {
     if(!count||!first||!replacement||!p||!p->ready||!p->is_drum||!a||
        p->target>=BB_RICH_DRUMS||!bb_audio_sample_layer(a,p->target)||
-       (kit!=BB_SAMPLE_808_ID&&kit>=a->sample_catalogue_count))return 0;
+       (kit!=BB_SAMPLE_808_ID&&!bb_audio_sample_source_voices(a,kit)))return 0;
     bb_factory_choice choice;bb_phrase_index phrase;
     if(!bb_browser_current(&p->view,&choice)||
        bb_factory_prepare_rich_drum(p->view.catalogue,&choice,&phrase)!=BB_FDRUM_OK)return 0;

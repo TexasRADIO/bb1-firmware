@@ -1,0 +1,67 @@
+{
+  "repository": "TexasRADIO/bb1-firmware",
+  "source": "b0b9c01acd1edeccf25fc35716f9f29d424a59c5",
+  "scope": "Exact released sample-pack/FSMP reader dependencies; f792168b is scene-reader precedent, not this library test",
+  "files": [
+    {
+      "file": "bb_sample_pack_r20.h",
+      "git_blob": "f80f93846b1127e2c5a72019a78f1c3b5733fc80",
+      "verified_equal": true
+    },
+    {
+      "file": "bb_sample_fsmp_r18.h",
+      "git_blob": "e6e9388e8ae1f48626afde9c715ca1b8094dafe5",
+      "verified_equal": true
+    },
+    {
+      "file": "bb_sample_directory.h",
+      "git_blob": "89ad3a6d62b5b6ee75151ab2fe15c675d19318a7",
+      "verified_equal": true
+    },
+    {
+      "file": "bb_sample_kit_r1.h",
+      "git_blob": "a028e06c9332db27b78aa0ca6fbf1b7bb683cda7",
+      "verified_equal": true
+    },
+    {
+      "file": "bb_sample_voice_r1.h",
+      "git_blob": "5f791a4ba4f5d1e81363724e349b69e1d1ff2c23",
+      "verified_equal": true
+    },
+    {
+      "file": "bb_sample_ima_tables_r1.h",
+      "git_blob": "384f123cd85cfe79a2321b9ac271e12f07cae823",
+      "verified_equal": true
+    },
+    {
+      "file": "bb_sample_ima_delta_r438.h",
+      "git_blob": "333a5aa256ce5b8a0d0e0c7648f61affe03619dd",
+      "verified_equal": true
+    },
+    {
+      "file": "bb_crc32.h",
+      "git_blob": "85d2e4c22c0d7a3a139b5ecaf55aa9801afc99c7",
+      "verified_equal": true
+    },
+    {
+      "file": "bb_crc32.c",
+      "git_blob": "b7426345b51ad19eb9148f909bcd5fb3f3d93733",
+      "verified_equal": true
+    },
+    {
+      "file": "bb_wire.h",
+      "git_blob": "6b398a2e997f5c5cf57362230286da76d8464d90",
+      "verified_equal": true
+    },
+    {
+      "file": "bb_wire.c",
+      "git_blob": "90a51528ecdf2a53fadba8626901adb26d78a597",
+      "verified_equal": true
+    },
+    {
+      "file": "bb_sample_floor_q15_r1.h",
+      "git_blob": "1b60109dedd1d729956c60c860063c9aa3b5bc27",
+      "verified_equal": true
+    }
+  ]
+}

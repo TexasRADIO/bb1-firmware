@@ -14,9 +14,7 @@ static int playable_word(bb_note_expression word){
     return bb_note_expression_read(word,&v) &&
            (!v.has_velocity||v.velocity) && (!v.has_gate||v.gate_percent);
 }
-static uint32_t checksum(const uint8_t *p,size_t bytes){
-    return ~bb_crc32_add(bb_crc32_add(UINT32_MAX,p,12),p+16,bytes-16);
-}
+#define checksum(a,b) bb_crc32_record(a,b)
 size_t bb_expression_scene_finish(void *output,size_t capacity,size_t nested,
                                   const bb_note_expression e[BB_SYNTHS][BB_STEPS]){
     const size_t overhead=BB_EXPRESSION_SCENE_OVERHEAD;

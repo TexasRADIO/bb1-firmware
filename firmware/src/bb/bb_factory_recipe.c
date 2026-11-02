@@ -5,10 +5,7 @@ static int distinct(const void *a,size_t n,const void *b,size_t m) {
     uintptr_t x=(uintptr_t)a,y=(uintptr_t)b;
     return a && b && x<=UINTPTR_MAX-n && y<=UINTPTR_MAX-m && (x+n<=y || y+m<=x);
 }
-static int key(const bb_catalogue *c,bb_catalogue_id id,const char *s) {
-    const uint8_t *p;size_t n,w=0;while(s[w])w++;
-    return bb_catalogue_text(c,id,&p,&n) && n==w && !memcmp(p,s,w);
-}
+#define key(a,b,c) bb_catalogue_text_is(a,b,c)
 static int number(const bb_catalogue *c,bb_catalogue_id object,const char *name,
                   unsigned scale,unsigned denominator,unsigned minimum,unsigned maximum,unsigned *out,int optional) {
     bb_catalogue_id id=bb_catalogue_find(c,object,name);uint32_t value;

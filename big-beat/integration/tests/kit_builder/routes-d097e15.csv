@@ -1,0 +1,181 @@
+kit,requested,played,substituted
+LinnDrum,Bass drum,Bass drum,False
+LinnDrum,Snare,Snare,False
+LinnDrum,Low tom,Low tom,False
+LinnDrum,Middle tom,Middle tom,False
+LinnDrum,High tom,High tom,False
+LinnDrum,Low conga,Low conga,False
+LinnDrum,Middle conga,Middle tom,True
+LinnDrum,High conga,High conga,False
+LinnDrum,Rimshot,Rimshot,False
+LinnDrum,Claves,Rimshot,True
+LinnDrum,Clap,Clap,False
+LinnDrum,Maracas,Maracas,False
+LinnDrum,Cowbell,Cowbell,False
+LinnDrum,Cymbal,Cymbal,False
+LinnDrum,Open hi-hat,Open hi-hat,False
+LinnDrum,Closed hi-hat,Closed hi-hat,False
+LinnDrum,Ride,Ride,False
+LinnDrum,Synth percussion,Synth percussion,False
+LinnDrum,Zap,Zap,False
+LinnDrum,Shaker,Maracas,True
+DrumTraks,Bass drum,Bass drum,False
+DrumTraks,Snare,Snare,False
+DrumTraks,Low tom,Middle tom,True
+DrumTraks,Middle tom,Middle tom,False
+DrumTraks,High tom,Middle tom,True
+DrumTraks,Low conga,Middle tom,True
+DrumTraks,Middle conga,Middle tom,True
+DrumTraks,High conga,Middle tom,True
+DrumTraks,Rimshot,Rimshot,False
+DrumTraks,Claves,Rimshot,True
+DrumTraks,Clap,Clap,False
+DrumTraks,Maracas,Maracas,False
+DrumTraks,Cowbell,Cowbell,False
+DrumTraks,Cymbal,Cymbal,False
+DrumTraks,Open hi-hat,Open hi-hat,False
+DrumTraks,Closed hi-hat,Closed hi-hat,False
+DrumTraks,Ride,Ride,False
+DrumTraks,Synth percussion,Synth percussion,False
+DrumTraks,Zap,Zap,False
+DrumTraks,Shaker,Maracas,True
+DMX,Bass drum,Bass drum,False
+DMX,Snare,Snare,False
+DMX,Low tom,Low tom,False
+DMX,Middle tom,Middle tom,False
+DMX,High tom,High tom,False
+DMX,Low conga,Low tom,True
+DMX,Middle conga,Middle tom,True
+DMX,High conga,High tom,True
+DMX,Rimshot,Rimshot,False
+DMX,Claves,Rimshot,True
+DMX,Clap,Clap,False
+DMX,Maracas,Maracas,False
+DMX,Cowbell,Rimshot,True
+DMX,Cymbal,Cymbal,False
+DMX,Open hi-hat,Open hi-hat,False
+DMX,Closed hi-hat,Closed hi-hat,False
+DMX,Ride,Ride,False
+DMX,Synth percussion,Synth percussion,False
+DMX,Zap,Zap,False
+DMX,Shaker,Maracas,True
+LM-1,Bass drum,Bass drum,False
+LM-1,Snare,Snare,False
+LM-1,Low tom,Low tom,False
+LM-1,Middle tom,Middle tom,False
+LM-1,High tom,High tom,False
+LM-1,Low conga,Low tom,True
+LM-1,Middle conga,Middle tom,True
+LM-1,High conga,High tom,True
+LM-1,Rimshot,Rimshot,False
+LM-1,Claves,Rimshot,True
+LM-1,Clap,Clap,False
+LM-1,Maracas,Maracas,False
+LM-1,Cowbell,Cowbell,False
+LM-1,Cymbal,Cymbal,False
+LM-1,Open hi-hat,Open hi-hat,False
+LM-1,Closed hi-hat,Closed hi-hat,False
+LM-1,Ride,Cymbal,True
+LM-1,Synth percussion,Synth percussion,False
+LM-1,Zap,Zap,False
+LM-1,Shaker,Maracas,True
+Simmons,Bass drum,Bass drum,False
+Simmons,Snare,Snare,False
+Simmons,Low tom,Low tom,False
+Simmons,Middle tom,Middle tom,False
+Simmons,High tom,High tom,False
+Simmons,Low conga,Low tom,True
+Simmons,Middle conga,Middle tom,True
+Simmons,High conga,High tom,True
+Simmons,Rimshot,Rimshot,False
+Simmons,Claves,Rimshot,True
+Simmons,Clap,Snare,True
+Simmons,Maracas,Closed hi-hat,True
+Simmons,Cowbell,Rimshot,True
+Simmons,Cymbal,Open hi-hat,True
+Simmons,Open hi-hat,Open hi-hat,False
+Simmons,Closed hi-hat,Closed hi-hat,False
+Simmons,Ride,Open hi-hat,True
+Simmons,Synth percussion,Synth percussion,False
+Simmons,Zap,Zap,False
+Simmons,Shaker,Closed hi-hat,True
+Rhythm King,Bass drum,Bass drum,False
+Rhythm King,Snare,Snare,False
+Rhythm King,Low tom,Low tom,False
+Rhythm King,Middle tom,Low tom,True
+Rhythm King,High tom,High tom,False
+Rhythm King,Low conga,Low tom,True
+Rhythm King,Middle conga,Low tom,True
+Rhythm King,High conga,High tom,True
+Rhythm King,Rimshot,Rimshot,False
+Rhythm King,Claves,Claves,False
+Rhythm King,Clap,Snare,True
+Rhythm King,Maracas,Maracas,False
+Rhythm King,Cowbell,Cowbell,False
+Rhythm King,Cymbal,Cymbal,False
+Rhythm King,Open hi-hat,Open hi-hat,False
+Rhythm King,Closed hi-hat,Closed hi-hat,False
+Rhythm King,Ride,Cymbal,True
+Rhythm King,Synth percussion,Synth percussion,False
+Rhythm King,Zap,Zap,False
+Rhythm King,Shaker,Maracas,True
+Drumulator,Bass drum,Bass drum,False
+Drumulator,Snare,Snare,False
+Drumulator,Low tom,Low tom,False
+Drumulator,Middle tom,Middle tom,False
+Drumulator,High tom,High tom,False
+Drumulator,Low conga,Low conga,False
+Drumulator,Middle conga,Middle tom,True
+Drumulator,High conga,High tom,True
+Drumulator,Rimshot,Rimshot,False
+Drumulator,Claves,Claves,False
+Drumulator,Clap,Clap,False
+Drumulator,Maracas,Closed hi-hat,True
+Drumulator,Cowbell,Cowbell,False
+Drumulator,Cymbal,Cymbal,False
+Drumulator,Open hi-hat,Open hi-hat,False
+Drumulator,Closed hi-hat,Closed hi-hat,False
+Drumulator,Ride,Ride,False
+Drumulator,Synth percussion,Synth percussion,False
+Drumulator,Zap,Zap,False
+Drumulator,Shaker,Closed hi-hat,True
+808 layer A,Bass drum,Bass drum,False
+808 layer A,Snare,Snare,False
+808 layer A,Low tom,Low tom,False
+808 layer A,Middle tom,Middle tom,False
+808 layer A,High tom,High tom,False
+808 layer A,Low conga,Low conga,False
+808 layer A,Middle conga,Middle conga,False
+808 layer A,High conga,High conga,False
+808 layer A,Rimshot,Rimshot,False
+808 layer A,Claves,Claves,False
+808 layer A,Clap,Clap,False
+808 layer A,Maracas,Maracas,False
+808 layer A,Cowbell,Cowbell,False
+808 layer A,Cymbal,Cymbal,False
+808 layer A,Open hi-hat,Open hi-hat,False
+808 layer A,Closed hi-hat,Closed hi-hat,False
+808 layer A,Ride,Cymbal,True
+808 layer A,Synth percussion,Synth percussion,False
+808 layer A,Zap,Zap,False
+808 layer A,Shaker,Shaker,False
+808 layer B,Bass drum,Bass drum,False
+808 layer B,Snare,Snare,False
+808 layer B,Low tom,Low tom,False
+808 layer B,Middle tom,Middle tom,False
+808 layer B,High tom,High tom,False
+808 layer B,Low conga,Low conga,False
+808 layer B,Middle conga,Middle conga,False
+808 layer B,High conga,High conga,False
+808 layer B,Rimshot,Rimshot,False
+808 layer B,Claves,Claves,False
+808 layer B,Clap,Clap,False
+808 layer B,Maracas,Maracas,False
+808 layer B,Cowbell,Cowbell,False
+808 layer B,Cymbal,Cymbal,False
+808 layer B,Open hi-hat,Open hi-hat,False
+808 layer B,Closed hi-hat,Closed hi-hat,False
+808 layer B,Ride,Cymbal,True
+808 layer B,Synth percussion,Cowbell,True
+808 layer B,Zap,High tom,True
+808 layer B,Shaker,Shaker,False

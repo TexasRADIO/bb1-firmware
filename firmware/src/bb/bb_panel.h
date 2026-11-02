@@ -10,7 +10,7 @@ typedef struct {
     uint32_t rejected;
 } bb_panel;
 void bb_panel_init(bb_panel *,const bb_core *stopped_boot_state);
-/* Same-core, IRQ-protected pattern/length refresh. Copy only when the command
+/* Same-core, IRQ-protected pattern/length and committed tempo/swing refresh. Copy only when the command
  * FIFO is empty, preserving optimistic pending edits and UI-only selection.
  * Returns 0 if busy/invalid, 1 unchanged, 2 refreshed with differences.
  * Target must supply the usual bounded IRQ hooks; NULL is host-only. */

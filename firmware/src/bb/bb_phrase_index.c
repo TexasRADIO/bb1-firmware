@@ -6,7 +6,7 @@ static int disjoint(const void *a,size_t n,const void *b,size_t m) {
     return a&&b&&x<=UINTPTR_MAX-n&&y<=UINTPTR_MAX-m&&(x+n<=y||y+m<=x);
 }
 int bb_phrase_index_valid(const bb_phrase_index *p,uint32_t playable) {
-    if(!p||!p->phrase.length||p->phrase.length>BB_STEPS||
+    if(!p||!bb_phrase_ratchets_valid(&p->phrase)||!p->phrase.length||p->phrase.length>BB_STEPS||
        p->phrase.count>BB_FACTORY_DRUM_EVENTS||p->phrase.lattice>BB_FDL_TRIPLETS||p->phrase.bars>4)return 0;
     unsigned per=p->phrase.lattice==BB_FDL_SIXTEENTHS?16:p->phrase.lattice==BB_FDL_EIGHTHS?8:24;
     if((p->phrase.bars&&p->phrase.length!=p->phrase.bars*per)||p->start[0])return 0;
@@ -74,14 +74,17 @@ int bb_phrase_index_delays(const bb_phrase_index *p,unsigned step,uint64_t frame
        p->phrase.count>BB_FACTORY_DRUM_EVENTS)return BB_DELAYED_INVALID;
     unsigned first=p->start[step-1],last=p->start[step];
     if(first>last||last>p->phrase.count)return BB_DELAYED_INVALID;
-    bb_delayed_event batch[BB_DELAYED_CAPACITY];unsigned count=0;
+    /* Keep stack growth independent of queue capacity: at most16 retained
+     * source modifiers plus six count/fraction groups for x2/x3/x4. */
+    enum {LEGACY_BATCH=BB_PHRASE_MODIFIER_BATCH_LIMIT,USER_GROUPS=6};
+    bb_delayed_event batch[LEGACY_BATCH+USER_GROUPS];unsigned count=0;
     for(unsigned at=first;at<last;at++) {
         unsigned i=p->ordinal[at];bb_phrase_event e;
         if(!bb_phrase_read(&p->phrase,i,&e)||e.step!=step)return BB_DELAYED_INVALID;
         if((e.modifiers&BB_FDM_RETRIGGER_LENGTH)&&!(e.modifiers&BB_FDM_RETRIGGER_RATE))return BB_DELAYED_INVALID;
         for(unsigned kind=1;kind<=3;kind++) {
             if(kind==1?!(e.modifiers&BB_FDM_FLAM):!(e.modifiers&BB_FDM_RETRIGGER_RATE))continue;
-            if(count==BB_DELAYED_CAPACITY)return BB_DELAYED_FULL;
+            if(count==LEGACY_BATCH)return BB_DELAYED_FULL;
             uint64_t offset=kind==1?((uint64_t)sample_rate+39)/40:
                 ((uint64_t)step_frames*(kind-1)+2)/3;
             if(offset>UINT64_MAX-frame)return BB_DELAYED_INVALID;
@@ -89,5 +92,38 @@ int bb_phrase_index_delays(const bb_phrase_index *p,unsigned step,uint64_t frame
                 (uint32_t)p->phrase.events[i]|(i<<16)|(kind<<23),q->generation};
         }
     }
+    unsigned classes=0;
+    for(unsigned at=first;at<last;at++){
+        unsigned i=p->ordinal[at];bb_phrase_event e;
+        if(!bb_phrase_read(&p->phrase,i,&e))return BB_DELAYED_INVALID;
+        if(e.voice==BB_FDV_ACCENT||e.voice==BB_FDV_ACC)continue;
+        unsigned n=bb_phrase_ratchet_count(&p->phrase,i);if(n>1u)classes|=1u<<n;
+    }
+    for(unsigned n=2;n<=4;n++)if(classes&(1u<<n))for(unsigned k=1;k<n;k++){
+        uint64_t offset=((uint64_t)step_frames*k+n-1u)/n;
+        if(offset>=step_frames||offset>UINT64_MAX-frame)return BB_DELAYED_INVALID;
+        batch[count++]=(bb_delayed_event){frame+offset,
+            BB_RATCHET_GROUP|(step-1u)|((n-1u)<<6)|(k<<8),q->generation};
+    }
     return count?bb_delayed_offer(q,frame,batch,count):BB_DELAYED_OK;
+}
+
+void bb_phrase_ratchet_snapshot(const bb_phrase_index *p,unsigned step,bb_ratchet_snapshot *out){
+    memset(out,0,sizeof *out);out->step=(uint8_t)step;
+    memcpy(out->event_counts,p->phrase.ratchets,sizeof out->event_counts);
+    if(step<p->phrase.length)for(unsigned at=p->start[step];at<p->start[step+1];at++)
+        if(bb_phrase_ratchet_count(&p->phrase,p->ordinal[at])>1u){out->active=1;break;}
+}
+int bb_phrase_ratchet_group_hit(const bb_phrase_index *p,const bb_ratchet_snapshot *snapshot,
+    uint32_t group,unsigned ordinal,uint32_t *payload){
+    if(!p||!snapshot||!payload||!(group&BB_RATCHET_GROUP)||(group&~(BB_RATCHET_GROUP|UINT32_C(0x3ff)))||
+       !snapshot->active||ordinal>=p->phrase.count)return -1;
+    unsigned step=group&63u,n=1u+((group>>6)&3u),k=(group>>8)&3u;
+    if(step!=snapshot->step||step>=p->phrase.length||n<2u||!k||k>=n)return -1;
+    bb_phrase_event e;if(!bb_phrase_read(&p->phrase,ordinal,&e))return -1;
+    if(e.step!=step+1u||e.voice==BB_FDV_ACCENT||e.voice==BB_FDV_ACC)return 0;
+    unsigned count=1u+((snapshot->event_counts[ordinal>>2]>>(2u*(ordinal&3u)))&3u);
+    if(count!=n)return 0;
+    *payload=(uint32_t)p->phrase.events[ordinal]|(ordinal<<16)|(2u<<23)|BB_RATCHET_STRIKE;
+    return 1;
 }

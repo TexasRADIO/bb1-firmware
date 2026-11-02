@@ -2,7 +2,7 @@
 #ifndef BB_DELAYED_EXPERIMENT_H
 #define BB_DELAYED_EXPERIMENT_H
 #include <stdint.h>
-#define BB_DELAYED_CAPACITY 16u
+#define BB_DELAYED_CAPACITY 32u
 typedef struct {uint64_t frame;uint32_t payload,generation;} bb_delayed_event;
 typedef struct {
     bb_delayed_event items[BB_DELAYED_CAPACITY];
@@ -18,9 +18,17 @@ enum {BB_DELAYED_OK,BB_DELAYED_WAIT,BB_DELAYED_INVALID,BB_DELAYED_FULL,
  * owner reset, not silent wrap. Begin cancels prior pending strikes. */
 int bb_delayed_begin(bb_delayed *,uint32_t generation,uint64_t frame);
 void bb_delayed_stop(bb_delayed *);
+/* Exclusive native step boundary only: discard all prior step events and
+ * open an empty step queue at frame, preserving source generation. Initial
+ * native generation0 is private to this owner; it is not a copied-source
+ * publication token. Never use this to bind/restart a rich source. */
+int bb_delayed_native_step(bb_delayed *,uint64_t frame);
 /* Whole batch accepted or unchanged; equal-frame entries preserve offer order. */
 int bb_delayed_offer(bb_delayed *,uint64_t now,const bb_delayed_event *,unsigned);
 /* Peek supplies the next render boundary. Pop never silently dispatches late. */
 int bb_delayed_peek(const bb_delayed *,bb_delayed_event *);
+/* Audio owner: cancel only events tagged by mask, preserving all other events,
+ * order, generation and floor. Used to keep user repeat groups inside a step. */
+int bb_delayed_remove_mask(bb_delayed *,uint32_t mask);
 int bb_delayed_pop(bb_delayed *,uint64_t frame,bb_delayed_event *);
 #endif

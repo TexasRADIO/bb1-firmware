@@ -38,6 +38,15 @@ static int bb_single_capture(bb_audio *a,bb_family_scene *s,uint8_t *mix,const b
     if(!gg_scene_capture(a->groups,mix))return BB_SINGLE_REJECTED;
     memset(s,0,sizeof *s);s->core=a->core;return BB_SINGLE_OK;
 }
+/* The auxiliary voice owner lives outside the actor reset. Restore clears
+ * sounding voices but must retain its validated immutable sample binding. */
+static int bb_single_aux_separate(const bb_audio *a,const void *input,size_t n) {
+#if BB_SAMPLE_HOST_INTEGRATION
+    return !a->aux||bb_wire_separated(a->aux,sizeof *a->aux,input,n);
+#else
+    (void)a;(void)input;(void)n;return 1;
+#endif
+}
 static int bb_single_restore_base(bb_audio *a,const bb_family_scene *s,const uint8_t *mix,const bb_single_pause *p) {
     if(!bb_single_paused(a,p)||!s||!mix||!bb_audio_groups_outside(a,s,sizeof *s)||
        !bb_audio_groups_outside(a,mix,GG_SCENE_MIX_BYTES)||
@@ -50,9 +59,30 @@ static int bb_single_restore_base(bb_audio *a,const bb_family_scene *s,const uin
      * allocation, never a private snapshot or pointer into the old actor. */
     gg_state *groups=a->groups;bb_enter_fn enter=a->commands.enter;bb_leave_fn leave=a->commands.leave;
     void *context=a->commands.lock_context;
+    /* Platform-owned output route/global OFF/ON is not scene data. Reset
+     * clock phase, running/counters with the actor, but retain its endpoint.
+     * No transport or packet is emitted while the real scene hold is owned. */
+    bb_midi_emit_fn midi_emit=a->midi_output.emit;
+    void *midi_context=a->midi_output.context;
+    uint8_t midi_enabled=a->midi_output.enabled;
+#if BB_SAMPLE_HOST_INTEGRATION
+    bb_aux_voices *aux=a->aux;
+    if(aux&&(aux->ready!=1||!bb_audio_groups_outside(a,aux,sizeof *aux)||
+       !bb_single_aux_separate(a,s,sizeof *s)||
+       !bb_single_aux_separate(a,mix,GG_SCENE_MIX_BYTES)||
+       !bb_single_aux_separate(a,p,sizeof *p)))return BB_SINGLE_REJECTED;
+#endif
     if(!bb_audio_init(a,enter,leave,context))return BB_SINGLE_HELD_FAILURE;
+    a->midi_output.emit=midi_emit;a->midi_output.context=midi_context;
+    a->midi_output.enabled=midi_enabled;
     a->groups=groups;
     if(!gg_scene_restore(a->groups,mix))return BB_SINGLE_HELD_FAILURE;
+#if BB_SAMPLE_HOST_INTEGRATION
+    if(aux){
+        bb_aux_voices_stop(aux);
+        if(!bb_audio_aux_bind(a,aux))return BB_SINGLE_HELD_FAILURE;
+    }
+#endif
     a->core=s->core;
     for(unsigned k=0;k<BB_MACHINES;k++){
         a->drum_revision[k]=0;
@@ -84,7 +114,8 @@ static int bb_single_restore_sample_impl(bb_audio *a,const bb_family_scene *s,co
     if(!bb_single_paused(a,p)||!s||!mix||!current||!entries)return BB_SINGLE_REJECTED;
 #if BB_WITH_RICH_DRUM_RENDER
     if(replacement){
-        if(!bb_audio_groups_outside(a,replacement,sizeof *replacement)||
+        if(!bb_single_aux_separate(a,replacement,sizeof *replacement)||
+           !bb_audio_groups_outside(a,replacement,sizeof *replacement)||
            !bb_sample_separate(replacement,sizeof *replacement,current,sizeof *current)||
            !bb_sample_separate(replacement,sizeof *replacement,current->slots,current->count*sizeof *current->slots)||
            !bb_audio_sample_restore_check_phrase(a,&s->core,current,entries,count,selected,replacement))return BB_SINGLE_REJECTED;
@@ -93,9 +124,12 @@ static int bb_single_restore_sample_impl(bb_audio *a,const bb_family_scene *s,co
     if(!bb_audio_sample_restore_check(a,&s->core,current,entries,count,selected))return BB_SINGLE_REJECTED;
     /* The scene and transaction descriptors must survive the reset and voice
      * clearing. Validate output overlap before touching any live state. */
+    if(!bb_single_aux_separate(a,current,sizeof *current)||
+       !bb_single_aux_separate(a,current->slots,current->count*sizeof *current->slots))return BB_SINGLE_REJECTED;
     const void *inputs[]={s,mix,p,entries};
     const size_t sizes[]={sizeof *s,GG_SCENE_MIX_BYTES,sizeof *p,count*sizeof *entries};
-    for(unsigned i=0;i<4;i++)if(!bb_audio_groups_outside(a,inputs[i],sizes[i])||
+    for(unsigned i=0;i<4;i++)if(!bb_single_aux_separate(a,inputs[i],sizes[i])||
+        !bb_audio_groups_outside(a,inputs[i],sizes[i])||
         !bb_sample_separate(inputs[i],sizes[i],current,sizeof *current)||
         !bb_sample_separate(inputs[i],sizes[i],current->slots,current->count*sizeof *current->slots))return BB_SINGLE_REJECTED;
     int result=bb_single_restore_base(a,s,mix,p);

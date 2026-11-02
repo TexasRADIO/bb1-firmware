@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include "bb_drum_sound.h"
 #include "bb_fx_settings.h"
+#include "bb_ratchet.h"
 
 /* Portable musical state: no OS, graphics, allocation or audio-driver dependency. */
 #define BB_MACHINES 4
@@ -25,7 +26,7 @@ typedef enum {
     BB_PARAM_SQUARE, BB_PARAM_SAW, BB_PARAM_SUB, BB_PARAM_MODULATION,
     BB_PARAM_GLIDE, BB_PARAM_LFO_RATE
 } bb_synth_parameter;
-typedef struct { uint16_t hits, accents; } bb_drum_step;
+typedef struct { uint16_t hits, accents; uint32_t ratchets; } bb_drum_step;
 typedef struct { uint8_t note, gate, accent, slide; } bb_note;
 typedef struct {
     bb_drum_step steps[BB_STEPS];
@@ -79,7 +80,8 @@ typedef struct bb_core {
 } bb_core;
 /* Optional audio-owner hook immediately before a sixteenth's events. May
  * publish validated musical state, including tempo and sequence lengths.
- * Never alter frame/phase/ticks/pending_tick/swing_odd/running/sample_rate,
+ * May perform an owner-qualified STOP; the core skips that tick and renders
+ * remaining tails. Never alter frame/phase/ticks/pending_tick/swing_odd/sample_rate,
  * re-enter the core, or perform storage work. A phrase launch may reset the
  * musical sequence cursors and update active_swing at an even tick.
  * Existing callers retain the no-hook path. */

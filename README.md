@@ -1,184 +1,59 @@
-<p align="center">
-  <img src="docs/media/bb1-social.png" alt="BB1 rhythm firmware for the M-VAVE FM-1: two beats, one little box. Two drum machines and Dillo, a bass synth, through tape echo and spring. The FM-1 is shown with the BB1 STUDIO screen." width="100%">
-</p>
+# FOLKS! HOW MANY DRUM MACHINES CAN YOU FIT IN ONE LITTLE BOX?
 
-<p align="center">
-  <b><a href="https://thebigbeat.app/fm1/install/">Install (one click)</a></b> ·
-  <b><a href="https://thebigbeat.app/fm1/emulator/">Play it in your browser</a></b> ·
-  <a href="https://thebigbeat.app/fm1/guide/">Player's guide</a> ·
-  <a href="https://thebigbeat.app/fm1/">thebigbeat.app/fm1</a>
-</p>
+**WITH BIG BEAT, YOU CAN PLAY TWO AT ONCE!**
 
-<p align="center">
-  <img alt="Version 1.5" src="https://img.shields.io/badge/BB1-1.5-ffae41">
-  <img alt="Licence GPL v3" src="https://img.shields.io/badge/licence-GPL--3.0-1b1c1b">
-  <img alt="For the M-VAVE FM-1" src="https://img.shields.io/badge/for-M--VAVE%20FM--1-45474a">
-  <img alt="Felucca family" src="https://img.shields.io/badge/family-Felucca-6b6e69">
-</p>
+Put an **808** on one side and a **LinnDrum** on the other! Bring in the **DMX! DrumTraks! Linn LM-1! Simmons! Rhythm King! Drumulator!**
 
-# BB1 — the FM-1 becomes a rhythm machine
+Choose your machines. Give each one its own pattern. Stack them up and LET ’EM GO!
 
-**Two drum machines at once. A bass synth with attitude. A tape echo and a spring on everything.** BB1 rewires the FM-1 into a pocket studio built for one job: grooves. Load a beat from five decades of drum machines, stack a second machine on top, let **Dillo** find the bassline, then grab the knobs and push it until something breaks.
+**NEED A RHYTHM? WE’VE GOT 539 SECTIONS READY TO PLAY!**
 
-```
-          1 . . . 2 . . . 3 . . . 4 . . .
-  KIT A   ■ · · · · · ■ · · · ■ · · · · ·   808, live
-  KIT B   · · · · ■ · · · · · · · ■ · · ·   DMX, sampled
-  DILLO   ■ · ■ ■ · · ■ · ■ · · ■ · · ■ ·   acid bass
-  ECHO    ═══════════════════════════════▶  REC + FX
-```
+That’s **67 songs**, **21 musical eras**, and **138 classic rhythms from four vintage Roland rhythm boxes** — all in the catalogue.
 
-## Screens
+**AND THERE’S A BASS SYNTH IN THERE TOO!**
 
-Screens captured directly from the released BB1 1.5 browser player at the FM-1's native **240 × 240** resolution.
+Dillo brings **205 ACID phrases across 27 banks**, with accents, slides and hands-on sound shaping. Open that filter! Give it some bite! Send the whole show through **tape echo and spring reverb!**
 
-| Studio | Drum grid | Tape echo |
-|---|---|---|
-| ![BB1 Studio overview with the Late-70s Machine Pop pattern selected](docs/media/bb1-studio-240.png) | ![BB1 drum grid showing the kick pattern and four drum level controls](docs/media/bb1-sequencer-240.png) | ![BB1 tape echo screen with time, feedback, head selection and echo level](docs/media/bb1-effects-240.png) |
+## BUT WAIT — THERE’S MORE!
 
-These are firmware screen captures from the browser player, not photographs of the physical FM-1. [Capture details and original PNGs](docs/media/SCREENSHOTS.md).
+BIG BEAT 2.0 now brings you:
 
-## What's in the box
+- **31 MORE DRUM KITS!**
+- **A SONG ARRANGER WITH NAMED SECTIONS!**
+- **BUILD SCREENS FOR MAKING YOUR OWN KITS!**
+- **RATCHETS! REVERSIBLE EVOLVE! SWUNG RECORDING! EDITING AND UNDO!**
 
-|  |  |
-|---|---|
-| **KIT A + KIT B** | Two independent drum machines running together, each with its own pattern, kit and level. A Linn groove under an 808? Go on. |
-| **Eight machines** | The **808**, synthesised in real time, plus seven sampled machines: **LinnDrum**, **DrumTraks**, **DMX**, **LM-1**, **Simmons**, **Rhythm King** and **Drumulator**. Swap the machine under a pattern and it lands on the next bar. |
-| **Dillo** | A monophonic bass synth with nine presets, including Square Acid, from rubbery acid to hollow dub. Every era brings its own line. |
-| **Echo & spring** | A three-head tape echo and a spring reverb, shared by everything. Hold **REC + FX** for a dub throw. |
-| **67 songs** | 233 playable drum sections, with catalogue tempos and swing. |
-| **205 ACID phrases** | 27 Dillo banks, with accents and slides, alongside songs and eras. |
-| **21 eras** | Big Beat originals, from Motorik to rave, each with its own Dillo bassline. |
-| **138 classic rhythms** | The preset rhythms of four vintage rhythm boxes: waltzes, bossa novas, rock and everything between. |
-| **Changes on the beat** | New kits and patterns wait for the bar line. The screen says **NEXT** until they land. |
+You get the rhythm machine — AND the new features!
 
-## Get it on your FM-1
+**ALL FOR $19.99? NO! IT’S FREE!**
 
-1. Plug the FM-1 into a computer with a USB **data** cable, and open **[thebigbeat.app/fm1/install](https://thebigbeat.app/fm1/install/)** in Chrome or Edge.
-2. Press **Install BB1** once. The installer handles the firmware and sounds together, checking the existing library before writing it. Allow about five minutes. The installer preserves the user-data regions. Keep a backup: preserved bytes do not guarantee compatibility with older firmware.
-3. With **MASTER** down, press **HOME**, then **PLAY**. Bring **MASTER** up gently.
+No instalments. No subscription. No shipping and handling.
 
-Want it gone? Go back to M-VAVE's official firmware any time with M-VAVE's own updater and their `FM-1.fwsc`. BB1 can't export its music to the computer yet, so copy out anything you want to keep before you switch.
+**BIG BEAT 2.0. TWO BEATS. ONE LITTLE BOX.**
 
-**Try before you flash:** the [browser player](https://thebigbeat.app/fm1/emulator/) runs the real BB1 firmware, the same screen and the same engine, right in your browser. Then read **[the guide](https://thebigbeat.app/fm1/guide/)**.
-
-## Controls in ten seconds
-
-```
-  HOME ········· back to STUDIO from anywhere (hold it for help)
-  SELECT ······· who you're playing: KIT A · KIT B · DILLO
-  PRESETS ······ turn to browse kits, EDIT to load
-  ALGORITHM ···· turn to browse songs, eras and patterns, EDIT to load
-  FX ··········· echo, tape, spring, motion, sends
-  REC + FX ····· dub throw: the echo opens wide, then snaps back
-  four knobs ··· always do what the bottom of the screen says
-```
-
-## Known limits
-
-- **Saving:** on an FM-1 that came with its own firmware, a scene can still hold that firmware's data. BB1 shows **SCENE n HAS OTHER DATA** and writes nothing until you hold **SAVE** for two seconds, which replaces it. BB1 never loads that old data. This has been tested on an FM-1: save, load, a power cycle, a second save, and a return to 1.1 and back.
-- **Headroom:** the released lead-off candidate passed its recorded two-drum tests within the audio deadline, above the preferred processing headroom. Experimental Duo/Fix A tests exceeded the deadline and are not included. Not every arrangement has been tested.
-- **First tempo edit:** in the browser, loading a song can update playback to its own tempo while the header/control mirror retains 120. The first GLOBAL tempo increment can therefore jump from 87 to 121 instead of 88. Set the intended tempo explicitly. This source/UI issue is open; physical FM-1 behavior has not been tested.
-- **Rollback:** returning to 1.2 resets global preferences, including MIDI settings. 1.2 scenes load in 1.5; 1.2 refuses scenes saved by experimental builds with the lead enabled. Keep a compatible backup.
-- **Substitute voices:** a missing voice plays a substitute, and the pattern itself is unchanged. On a native 808 drum B, synth percussion plays as cowbell and zap as high tom.
-- **The browser player** runs the released engine with the native 808 and the seven-machine sound library. It lets you try the layout, controls and sound; browser results do not prove FM-1 hardware timing or scene persistence.
-
-## Build it yourself
-
-Everything here is the complete source of the released firmware. One command rebuilds it and proves it matches, **given the pinned build inputs** (see below):
-
-```sh
-python3 -I big-beat/integration/verify_release.py . /tmp/bb1-1.5-check --recipe candidate \
-  --expect-tree 08457b66eae409bcbae3735033a49d3785efaa4884df6c2cc457996c1dad6ae6 \
-  --expect-app ce17d90b317a7a476be6e0026084717fb81f613bb8244a529eb5c790e7e2f6bf \
-  --expect-package 0efa13388f688927fb46e40fa5acc508f3a3fc04a37cd3184910ef7d7d43571a
-```
-
-Those are the identities of **BB-1 1.5**, with the identity-only correction (`bb1-1.5-id.fwsc`, 610,086 bytes), built from the lead's `c04aa9f` engine plus the shared BB1 identity contract with the `candidate` recipe: Dillo enabled, Telegram and Fix A disabled. Duo remains future work. The seven-machine sound library is unchanged from 1.2: `154ef6b92553af5803c3e003dc5d2c379aed4e0503f24f08ad8b024cff7d821e` (245,760 bytes). Earlier releases remain available for rollback.
-
-The corrected runtime and package both report `FM-1_92200105`; the friendly release name remains **BB-1 1.5**. This supplements version 1.5 and changes no musical features. The original `v1.5` tag and `bb1-1.5.fwsc` remain available as historical rollback; use the corrected source archive and current main for the ID-corrected build. The USB product stays **Big Beat**.
-
-The verifier runs host suites, the worker/serial oracle, level checks, the from-source target build and deterministic packaging, including negative cases. Exit 0 proves the expected bytes match. It does not prove hardware acceptance. The original 1.5 engine's exact install/readback and two 65-second two-drum runs passed on the FM-1 with zero fault or miss counters; their retained maximum was 5,475.3 µs against a 5,802.7 µs deadline. The second run retained the first run's boot-cumulative maximum. Physical ACID, three-focus and Square Acid walkthroughs remain unperformed on this candidate while Joe is remote. The identity-only build has separate runtime/app/data readback evidence in `BB1-1.5-ID-HARDWARE-RECEIPT.json`; its other 74 native objects are unchanged. See the historical `BB1-1.5-HARDWARE-RECEIPT.json` and [the current build instructions](BB1-1.5-ID-BUILD.md).
-
-**Build inputs:** external inputs are checked against `big-beat/integration/inputs.json` by SHA-256. The JieLi `pi32v2` toolchain, linker overlay, asset symbols/object and pinned Docker image are external dependencies. Some paths still refer to our build machine. A fresh checkout cannot reproduce the target bytes without those exact inputs and path mappings; they are not bundled or downloaded by the verification command. The included SDK package notices remain Apache-2.0. [BUILDING.md](BUILDING.md) puts the BB1 release route first and keeps upstream Felucca instructions as reference.
-
-## OleBigBeat
-
-Drum machines, acid bass and a love of rhythm. Makers of BB1 for the M-VAVE FM-1. Two beats. One little box.
-
-Find us on the FM-1 Discord as **OleBigBeat**, or at [thebigbeat.app/fm1](https://thebigbeat.app/fm1/).
-
-## Licence
-
-The Acid Tabs phrases credit **J. McConaghy / Acid-Tabs.com**, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); phrases were renamed, revoiced and retimed for Dillo. Further provenance and permissions are in `BIG-BEAT-LICENSING.md`.
-
-GNU GPL v3. See `LICENSE`, `LICENSING.md`, `LICENSES/` and `BIG-BEAT-LICENSING.md`. BB1 is a Felucca-family firmware; upstream notices are kept in `LICENSING.md`. M-VAVE, FM-1, Roland, TR-808, Linn, LinnDrum, LM-1, DrumTraks, Sequential, DMX, Oberheim, Simmons, E-mu, Drumulator and Rhythm King are trademarks of their respective owners. BB1 is independent and not affiliated with or endorsed by them. **No warranty:** you install it at your own risk.
-
-```
-  ────────────────────────────────────────────────────────────────
-   OLE BIG BEAT LTD  ·  thebigbeat.app
-  ────────────────────────────────────────────────────────────────
-```
+*For the M-VAVE FM-1. Hardware required.*
 
 ---
 
-```
-                                                    ..
-                                              .,,,:;: :@@@* ,;::,,.
-                                       ..,:;!++++*+;!.,@@@! :!!*++++!!;:,..
-                               .,:;;;;!+!!;;:;!+!::!: ,%@@! .!;,;++;::;!!+!;;;;:,.
-                               :@;,:;;:,.,:;++;,,++. ;@@@@@#  ;*:.:!+!:,,,:;;:,:#*
-                               .+! *:..:;!+!,.,!#;  +@@@@@@@@. ,**:,.;!!;:,..+,.#,
-                            .:!+!;;!;::;;;, ;!;#.  #@+@%*#@%*@,  +*;!..:!;;::+;;;!!;,
-                         .:!++!::. ,#: *!   *+ ;; %%:%@%!#%@!;@:.+.,%,  ,%. *! .,:;!++;,
-                      .:+*+!:.    .:!+:!*  .;+:!+@#.*%#@,#*@*;:@++;;+,  ;*:;*:,    .,;+**;,
-                   .;+*+;,.    ,;+++!::. .:++!;:@+ *;@!@ +*#++,,@+:+!+!,  ,:;+++!:.    .:!**!,
-                .;*#*;.     :!**!;,.   .;*+!: :@! +;+%+% ;%+@.# .@# ,;+*+,   ..:!+*+;.     :!##!,
-             .:+*+:.    .:+#*;,      .+#*;,  !@: :* @!%* ,@!@!:*  %@  .:+##;      .:+#*;.     ,!**;,
-            .!!,      .;!!:.       ,+%+,    *@, .#.!@;%;  %!*@ +;  *@,   .;%#;        ,;!;,      .;+,
-                       .          :+;      #@.  +: @!!@,  *#;@; #.  +@:     ,!!.
-                                         .@%   :! ;@++@   !%:#% ,*   ;@;
-                                        ,@+ :!+@*+%###@++!*@#+@; ;;   :@+
-                                     ,;!@@!#%*;,#@;.,+@#.:;*%%%*!!%:   .@#
-                                .:!+#*+!,;@%*!;;#*!;;*@@*;;+#@: ;!+%*!;. %%
-                             ,!*#+;#@#*!:+@%*+!;,*%;;#%,:!!!+**;!#%@+:*%%+@@.
-                         .:!*##**++!!*%**;.!@%;:;#%!:+@+;!#@* :+*%+.;+##!**@@;.
-                      ,!++*%@#!.+#%%;!@%+!+*##++;:%!:#;:*##*+++#@%!,***+,*@@#*!!!:
-                   :**#!,,::::!%%+,*@%;:@%#!:@#+!*%!:*%!!#@;,+#@::#%*.;@@!;;::,,!##*;
-                 .#%: .!!!:.....!@#*+;#*+##!!!#++,+!;#,:+%*+!*%++%;;**%+:,...,!!!,:#@@!
-               .**;,;!: .:;:;,,;!!!#+:**#,%@!;@#!!++!%+;*@+:#@;*%#:!%%*:,..;;;:. ,;!*:*@!
-              ,@+.,:::!+!  .!+;,,:.:@%+.**+#+!;@*!++!#:!#*!!##+%,;#%, ,!!!+!.  :!!!;:,;%@#.      .*#+
-             +#::!;;,,. !+:;!:  ,+++:+#!+#!+@;*@+;#+;#*;+#:#%,##;*@*!++   ,++::*,.%*++;+;:@+     %*+%
-            +@,!;,;*!,,!+:   !*+!   +,@%:,%+*#+%+:+!:%;:#%**##+,#@.::,,;+;*   ,!!+*;**!.:*%@+   +%..@:
-           ;@*#!*!. .*!. !;:*;  ,+::!;:**!%*+*:%*;#+:#*;%!;@:#*;@@!#.  ;,:;!!.;:,#*  .+%%%%*@%,#+   :@:
-          ,@%%##%;;::!:,+!. .+;::!;;. .:@%;%+*#*%+*#,#*!%**+*+;%! .,;+*!. .!,,!!:;#    :*%@@@@@!  ..,*@.
-          !@@%%@##@!,!!.:*:;;;:!:  ;+;+!.,###*###!**:#!+%+%;%#*#;;,,!..,;+*!,. +*;#,.  ,++:@@@@+;:;;!!@+
-          +@@@@@@@#:+#;;:;:!, .:**!,   :!.+!%!#+@+#!;#++%**###. ;!:;!;,.+. .:++%!!%+ !!#!. ;%**+*@#%%@@,
-          ,@@#*###%#;;;%:,,!!+,. +!..,;;+;+++%*+@*#!:+++#*#*#*,:+    .*#!::,;!;*+#@@!:!#@@*;%.:,,:::+@;
-          :%!;:.,;;!+*::%:,.,*,,::+;::!:   **#+*#*#+;++!#*!#!@+:!;!:,:#,   *!!++####@@*!;!+;+!.   ..,*!.
-          @@##++!:.;.#+++:,+;,..:!    .*,;%@*%#*##*+:+*!*+**@@!,.!:,,;;!!:!#*!#!%#*@@@@* ,:,,::.      +!
-        .%#:,,  :+;;*%@@*+,:!,,,,*!;:,:!;*@@*++***##!#*!#++##@##*+..   !!:+!!#++%@@@@+,  !%+*:   ...:!#*
-       :%+;::,,.,:#!@@@%@%#!!+.. .!   .;%%@@@#%%***!!***%*#!#%%+#*:,::!#++++##+*%@@@!   ,+*+!**..,....,%
-       *@**++,,;;;@@:+@@@%#%##!;!;+;+!+@@@@*;;,.      .,,:+#@@@+@*!. .!!:!+%%#%#@@@#    !!;*#+*!  ..,!%*
-      .%*;;:,,:;+@%. .#@@@%*#%+*%@*%@%##!,                 .!#@@@@@:*###*+##@@%%@%@! .,.,::!++;+: .....#.
-      ,@##*! ..,!@!    !*@@@%%;;;!!+##*!::                    ,:!+%*%@#%@@###+!!!;+@+##*+*+!!:. !, ,,;!%,
-       @%:,,::::+@,      .,;@%+,,.,;!,!+*@#                        ,,:;:::#@*  ,:;!@@@%%@!,+;;!,.!   .:#;
-      .@!;*%*!,:@@           .;++*;++@*@@%*                                ,%*!.,;!::*###:,#!!:+,,; ,;;*;
-       :@@+;,,::!@*              ,;##%*!..                                   :+@,:*!:!!!**;;+!!!+.,: .:**
-        .@#++*+::+#%:               .                                          *%@;@%+@%%! ,:!*+#+.,;..,#;
-         .+@*:;#!,.#@#:                                                         .%*+#*,!;     ,;+*+.,!, :+:
-           .*+%*+:!+,+@+!:,.                                                                    .:++!*;;;*#.
-             .,!*!%#+,*:!++*!!;,.                                                                 .:+***+:
-                 ,,;*#@#+:#!,!#+!++;,                                                                 .
-                       .;++**##*;!*+##;.
-                            ...:;!+**%@#,
-                                   .....
-```
+## Get Big Beat 2.0
 
-```
-  ____   ____   _       TWO BEATS.  ONE LITTLE BOX.
- | __ ) | __ ) / |
- |  _ \ |  _ \ | |      firmware for the M-VAVE FM-1
- | |_) || |_) || |      two drum machines · a bass that bites
- |____/ |____/ |_|      tape echo · spring · no computer needed
-```
+[Download the release](https://github.com/TexasRADIO/bb1-firmware/releases/tag/v2.0) · [Installer](https://thebigbeat.app/fm1/install/) · [Player’s guide](https://thebigbeat.app/fm1/guide/) · [Browser player](https://thebigbeat.app/fm1/emulator/)
+
+## Downloads and starting firmware
+
+Use `bb1-2.0.fwsc` together with the matching `bb1-sounds-1.4.bin`. The source archive and browser corresponding-source ZIP are included. SHA256SUMS pins all four downloads.
+
+The prepared BB1 installer admits corrected BB1 1.5 (`FM-1_92200105`) or this exact 2.0 identity (`FM-1_92200200`). Do not assume a different firmware family or an old `FM-1_900` package is interchangeable. Back up material before switching firmware; scene compatibility and byte preservation are separate questions. Earlier releases remain available for rollback.
+
+## Known issue and verification scope
+
+This release is published at the owner's direction with one known native audio deadline overrun deferred to a minor follow-up: a callback took 6,031.5 microseconds against a 5,802.667 microsecond deadline, recording one deadline exceed and one DMA miss. Later separate bounded runs were clean; they do not explain the original event or prove uninterrupted playback under every workload. A glitch remains possible.
+
+The native build and package are independently reproduced. The corrected SONG/audio/navigation checks and the website's 969-test suite pass at their documented scopes. App-only installation and return to corrected 1.5 passed with two byte-identical readbacks of app, user and both sound regions. The matched-library return is now proven: original1.2 sounds and corrected1.5 firmware were restored, followed by2.0 and library1.4; two full readbacks at each endpoint matched the fresh saved-data reference and unchanged regionB. Formal whole-stack acceptance and exhaustive physical/persistence qualification are not represented as completed passes. These limitations remain disclosed; publication does not convert them into test results.
+
+The measurement/profiling firmware is not part of this release. The playable 2.0 emulator already exists; browser results are separate from physical FM-1 timing. Licence and source notices remain included; no proprietary toolchain is redistributed.
+
+
+## Source and build
+
+This public snapshot exports the frozen 2.0 source without private review history. Firmware inputs match freeze `8425ff5db5da689da7a69b161c1e66a8b7974627`; README/build/release documentation is updated for publication. The unchanged source download is pinned in SHA256SUMS. See [BUILDING-2.0.md](BUILDING-2.0.md), [LICENSING.md](LICENSING.md), [BIG-BEAT-LICENSING.md](BIG-BEAT-LICENSING.md) and [LICENSES](LICENSES/). External proprietary compiler inputs are not redistributed. Earlier public 1.5 releases and source remain available.

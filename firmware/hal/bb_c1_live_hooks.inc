@@ -1,3 +1,4 @@
+#include "../src/bb/bb_optional_storage.h"
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Included by the target HAL. Only CPU0 calls these hooks, from its audio
  * owner. CPU1 sees the fixed private payload only, never a live pointer.
@@ -127,7 +128,7 @@ static struct {
     float bus[3][3][128];
     uint32_t mask,count,frames,worker,ticket,pending,retained,rendered;
     uint8_t slot[4];
-} bb_c1_other;
+} bb_c1_other BB_OPTIONAL_BSS("bb_c1_other");
 int bb_parallel_prepare_others(drum808_t *kit,gg_state *groups,unsigned count,unsigned frames,unsigned worker) {
     if(!kit || !groups || count>4u || worker>=count || !frames || frames>128u ||
        !bb_c1_live.ready || !bb_c1_live.busy || bb_c1_live.failed ||

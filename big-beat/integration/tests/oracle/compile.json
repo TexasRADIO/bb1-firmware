@@ -6,6 +6,7 @@
 "@SRC@/firmware/src/bb/bb_sound_picker.c",
 "-DBB_WITH_PATTERN=1",
 "@SRC@/firmware/src/bb/bb_audio_pattern.c",
+"@SRC@/firmware/src/bb/bb_audio_section.c",
 "-std=c11",
 "-O1",
 "-ffp-contract=off",

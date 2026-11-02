@@ -32,15 +32,15 @@ static int bb_sample_sends_input(void){
     for(unsigned k=0;k<4;k++){
         int delta=bb_read_encoder(EN_K1+k);if(!delta)continue;
         bb_dirty=1;
-        if(route<0){bb_say("SAMPLE STATE WAIT");continue;}
-        if(!view.queue_idle||view.stop_pending){bb_say("MIX BUSY - RETRY");continue;}
+        if(route<0){bb_say(BB_TX(TX_SAMPLE_STATE_WAIT));continue;}
+        if(!view.queue_idle||view.stop_pending){bb_say(BB_TX(TX_MIX_BUSY_RETRY));continue;}
         unsigned value=(unsigned)bb_limit((int)bb_sample_sends_value(&view,k)+bb_limit(delta,-127,127),k==3?1:0,k==3?100:127);
         if(k==2){bb_send_machine(view.machine,BB_CMD_DRUM_LEVEL,value);continue;}
         bb_command command;
         unsigned parameter=k==3?BB_SAMPLE_MIX_GAIN:k;
         if(!bb_audio_sample_mix_command(&view,parameter,value,&command)||
-           !bb_command_push(&bb_sound.commands,&command)){bb_say("MIX BUSY - RETRY");continue;}
-        bb_say("SAMPLE MIX REQUESTED");
+           !bb_command_push(&bb_sound.commands,&command)){bb_say(BB_TX(TX_MIX_BUSY_RETRY));continue;}
+        bb_say(BB_TX(TX_SAMPLE_MIX_REQUESTED));
     }
     return 1;
 }

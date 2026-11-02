@@ -17,7 +17,8 @@ enum { BB_PLAYER_CANCELLED=BB_PLAYER_NEEDS_VOICE+1 /* = 10, CANCELLED BY STOP */
 typedef struct {
     bb_factory_choice choice;
     uint32_t ticket;
-    uint8_t kit,has_kit; /* Only a committed pair carries a kit identity. */
+    uint8_t kit,has_kit;
+    uint8_t enable_on_apply; /* immutable accepted request intent */ /* Only a committed pair carries a kit identity. */
 } bb_player_selection;
 /* Main-loop owned. A cursor is not a playing label. The immutable catalogue
  * and audio object must outlive this controller; reset after audio restore. */
@@ -26,6 +27,7 @@ typedef struct {
     bb_player_selection request,playing;
     bb_pattern_status status;
     uint8_t target,is_drum,ready,error,request_seen;
+    uint8_t launch_enable; /* main-producer scoped opt-in, copied before publication */
 #if BB_WITH_RICH_DRUM_BROWSER
     uint8_t request_rich;
 #endif

@@ -5,13 +5,17 @@
  * claude-code/integration/tests/test_kit_label.c. (Integration lead, #4 6471457725.) */
 #ifndef BB_UI_KIT_LABEL_H
 #define BB_UI_KIT_LABEL_H
+/* Display alias only: pack names, IDs, checksums and scene identities stay intact. */
+static inline const char *bb_ui_kit_display_name(const char *name) {
+    return name && name[0]=='L' && name[1]=='M' && name[2]=='-' && name[3]=='1' && !name[4] ? "Linn LM-1" : name;
+}
 static inline const char *bb_ui_kit_label(int family_909, const char *native_name,
                                           const char *const *sample_names, unsigned sample_count,
                                           int status_ok, unsigned selected, unsigned id_808)
 {
     if (family_909) return "Oh Nine Oh";
     if (sample_names && sample_count && status_ok && selected != id_808 && selected < sample_count && sample_names[selected])
-        return sample_names[selected];
+        return bb_ui_kit_display_name(sample_names[selected]);
     return native_name;
 }
 #endif

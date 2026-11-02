@@ -293,6 +293,10 @@ void bb_process_render_hook(bb_core *c,uint32_t frames,bb_hit_fn hit,bb_note_fn 
             if(!c->swing_odd)c->active_swing=c->swing;
             c->pending_tick=0;
             if(before)before(ctx,c);
+            /* A bounded owner hook may end an arrangement at this exact
+             * boundary. Render residual tails without emitting another tick
+             * or advancing stopped sequence time. No hook is re-entered. */
+            if(!c->running){c->pending_tick=1;if(render)render(ctx,frames);return;}
             tick(c,hit,note,ctx);
         }
         /* A part-launch hook can change tempo at this exact tick. Reading it

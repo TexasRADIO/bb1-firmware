@@ -1,8 +1,9 @@
+#include "bb_optional_storage.h"
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "bb_home_service.h"
 #include <string.h>
 static bb_performer home_controller;
-static bb_factory_trio_workspace home_workspace;
+static bb_factory_trio_workspace home_workspace BB_OPTIONAL_BSS("home_workspace");
 static bb_factory_trio_report home_report;
 int bb_home_reset(const bb_browser *view,unsigned primary) {
     memset(&home_controller,0,sizeof home_controller);

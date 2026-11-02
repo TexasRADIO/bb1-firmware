@@ -229,6 +229,14 @@ static void midi_out_event(uint32_t pkt)            /* from the audio ISR */
     }
 }
 
+/* Audio-ISR-only MIDI clock producer. Unlike legacy void note output this
+ * reports queue backpressure/disconnection to the caller's drop counters. */
+static int midi_out_realtime(unsigned status) {
+    if((status!=0xf8&&status!=0xfa&&status!=0xfb&&status!=0xfc)||
+       !usb.config||usb.suspended||mo_w-mo_r>=MQ)return 0;
+    midi_out_q[mo_w%MQ]=15u|(status<<8);RING_PUBLISH();mo_w++;return 1;
+}
+
 /* ------------------------------------------------------- descriptors --- */
 /* Two functions: audio + MIDI (0 audio control, 1 MIDI streaming, 2 audio streaming with FELUCCA_UAC)
  * and, with FELUCCA_CDC, the CDC-ACM console (communication + data). The endpoints never move:

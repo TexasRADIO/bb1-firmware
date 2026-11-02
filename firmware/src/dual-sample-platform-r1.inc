@@ -6,10 +6,14 @@
 #include "bb_note_expression.h"
 #include "bb_rich_scene.h"
 #include "bb_expression_scene.h"
+#define BB_PAIR_SLOOP (BB_WITH_USER_KITS && BB_WITH_SLOOP_KITS)
 typedef struct {
     bb_family_scene scene;
     uint8_t mix[GG_SCENE_MIX_BYTES];
     bb_sample_scene_identity identities[2];
+#if BB_PAIR_SLOOP
+    bb_sample_sloop_scene sloop[2];
+#endif
     bb_phrase phrases[2];
     uint8_t rich_mask;
     bb_note_expression expression[BB_SYNTHS][BB_STEPS];
@@ -18,29 +22,80 @@ typedef struct {
  * Re-open the small immutable envelopes after base decode, instead of keeping
  * a second family/core allocation. Failed staging is disposable. */
 typedef union {bb_pair_snapshot snapshot;bb_family_scene_workspace decode;} bb_pair_stage;
+#include "bb_user_kit_state.inc"
+#if BB_WITH_USER_KITS
+/* 2.0 kit builder: a scene whose drum A plays a USER kit carries its 120-byte record (BBKS v4). The staging buffer
+ * holds the worst case; the stored scene must still fit the 3,840-byte journal, which only a scene with a USER
+ * kit AND more than 98 ratcheted drum steps can exceed. The encoder refuses that one (bb_pair_wire_fits). */
+#if BB_PAIR_SLOOP
+#define BB_PAIR_OPTIONAL_BYTES (BB_UK_RECORD_BYTES+2u*BB_SAMPLE_SLOOP_RECORD_BYTES)
+#else
+#define BB_PAIR_OPTIONAL_BYTES BB_UK_RECORD_BYTES
+#endif
+#define BB_PAIR_WIRE_BYTES (BB_SAMPLE_PAIR_SCENE_BYTES+BB_PAIR_OPTIONAL_BYTES+BB_RICH_SCENE_OVERHEAD+BB_EXPRESSION_SCENE_OVERHEAD)
+_Static_assert(BB_PAIR_WIRE_BYTES-BB_PAIR_OPTIONAL_BYTES<=3840,"paired journal payload limit");
+#else
 #define BB_PAIR_WIRE_BYTES (BB_SAMPLE_PAIR_SCENE_BYTES+BB_RICH_SCENE_OVERHEAD+BB_EXPRESSION_SCENE_OVERHEAD)
 _Static_assert(BB_PAIR_WIRE_BYTES<=3840,"paired journal payload limit");
+#endif
 static size_t bb_pair_encode_mode(const bb_pair_snapshot *s,void *wire,size_t capacity,int native){
     if(!s||!wire||capacity<BB_PAIR_WIRE_BYTES||!bb_wire_separated(s,sizeof *s,wire,capacity))return 0;
     uint8_t *p=wire;
     if(native&&(s->identities[0].kind!=1||s->identities[1].kind!=1))return 0;
     void *base=p+BB_RICH_SCENE_OVERHEAD+BB_EXPRESSION_SCENE_OVERHEAD;
+#if BB_WITH_USER_KITS
+    const bb_user_kit *user[2]={s->identities[0].kind==2?&bb_uk.draft:0,0};
+#if BB_PAIR_SLOOP
+    const bb_sample_sloop_scene *sl[2]={s->identities[0].kind==3?s->sloop:0,s->identities[1].kind==3?s->sloop+1:0};
+    size_t n=native?gg_scene_encode(&s->scene,s->mix,base,BB_SAMPLE_PAIR_SCENE_BYTES):
+        bb_sample_shared_scene_encode(&s->scene,s->mix,s->identities,user,sl,base,BB_SAMPLE_PAIR_SCENE_BYTES+BB_PAIR_OPTIONAL_BYTES);
+#else
+    size_t n=native?gg_scene_encode(&s->scene,s->mix,base,BB_SAMPLE_PAIR_SCENE_BYTES):
+        bb_sample_user_scene_encode(&s->scene,s->mix,s->identities,user,base,BB_SAMPLE_PAIR_SCENE_BYTES+BB_UK_RECORD_BYTES);
+#endif
+#else
     size_t n=native?gg_scene_encode(&s->scene,s->mix,base,BB_SAMPLE_PAIR_SCENE_BYTES):
         bb_sample_pair_scene_encode(&s->scene,s->mix,s->identities,base,BB_SAMPLE_PAIR_SCENE_BYTES);
+#endif
     if(n)n=bb_expression_scene_finish(p+BB_RICH_SCENE_OVERHEAD,capacity-BB_RICH_SCENE_OVERHEAD,n,s->expression);
-    if(n)n=bb_rich_scene_finish(p,capacity,n,s->phrases,s->rich_mask);
+    if(n)n=bb_rich_scene_finish_v2(p,capacity,n,s->phrases,s->rich_mask,&s->scene.core);
+#if BB_WITH_USER_KITS
+    if(n>3840u)n=0;                                   /* journal and project scene bound (see BB_PAIR_WIRE_BYTES) */
+#endif
     return n;
 }
 static size_t bb_pair_encode(const bb_pair_snapshot *s,void *wire,size_t capacity){return bb_pair_encode_mode(s,wire,capacity,0);}
-static int bb_pair_decode(const void *wire,size_t bytes,bb_pair_stage *stage,
-                          uint32_t header,uint32_t payload,unsigned count){
+static int bb_pair_decode_bank(const void *wire,size_t bytes,bb_pair_stage *stage,
+                          uint32_t header,uint32_t payload,unsigned count
+#if BB_PAIR_SLOOP
+                          ,const bb_sample_sloop_bank_identity *bank
+#endif
+                          ){
     if(!wire||!stage||!bb_wire_separated(wire,bytes,stage,sizeof *stage))return 0;
     const void *inner,*base;size_t inner_bytes,base_bytes;
     bb_sample_scene_identity ids[2];uint8_t mix[GG_SCENE_MIX_BYTES];
+#if BB_PAIR_SLOOP
+    bb_sample_sloop_scene sl[2]={{0}};unsigned sl_mask=0;
+#endif
     if(!bb_rich_scene_open(wire,bytes,stage->snapshot.phrases,&stage->snapshot.rich_mask,&inner,&inner_bytes)||
        !bb_expression_scene_open(inner,inner_bytes,stage->snapshot.expression,&base,&base_bytes))return 0;
+#if BB_WITH_USER_KITS
+    bb_uk.scene_mask=0;
+#endif
     if(base_bytes>=4&&!memcmp(base,"BBKS",4)){
+#if BB_WITH_USER_KITS
+        unsigned user_mask=0;
+#if BB_PAIR_SLOOP
+        if(!bb_sample_shared_scene_decode(base,base_bytes,44100,header,payload,count,&stage->decode,mix,ids,
+                                         bb_uk.kit,&user_mask,bank,sl,&sl_mask))return 0;
+#else
+        if(!bb_sample_user_scene_decode(base,base_bytes,44100,header,payload,count,&stage->decode,mix,ids,
+                                        bb_uk.kit,&user_mask))return 0;
+#endif
+        bb_uk.scene_mask=(uint8_t)user_mask;
+#else
         if(!bb_sample_pair_scene_decode(base,base_bytes,44100,header,payload,count,&stage->decode,mix,ids))return 0;
+#endif
     }else{
         /* Legacy native scenes have no sampled identity. Never infer the
          * current sampled selection from a matching pattern or bank title. */
@@ -56,8 +111,20 @@ static int bb_pair_decode(const void *wire,size_t bytes,bb_pair_stage *stage,
      * Everything after that shared scene may have been used as core scratch. */
     if(!bb_rich_scene_open(wire,bytes,stage->snapshot.phrases,&stage->snapshot.rich_mask,&inner,&inner_bytes)||
        !bb_expression_scene_open(inner,inner_bytes,stage->snapshot.expression,&base,&base_bytes))return 0;
+    if(!bb_rich_scene_apply_ratchets(wire,bytes,&stage->snapshot.scene.core))return 0;
     memcpy(stage->snapshot.mix,mix,sizeof mix);memcpy(stage->snapshot.identities,ids,sizeof ids);
+#if BB_PAIR_SLOOP
+    memcpy(stage->snapshot.sloop,sl,sizeof sl);
+#endif
     return 1;
+}
+static int bb_pair_decode(const void *wire,size_t bytes,bb_pair_stage *stage,
+                          uint32_t header,uint32_t payload,unsigned count){
+    return bb_pair_decode_bank(wire,bytes,stage,header,payload,count
+#if BB_PAIR_SLOOP
+                               ,NULL
+#endif
+                               );
 }
 static int bb_pair_capture(bb_audio *a,bb_pair_snapshot *out,const bb_single_pause *p,
                            uint32_t header_crc,uint32_t payload_crc) {
@@ -71,11 +138,26 @@ static int bb_pair_capture(bb_audio *a,bb_pair_snapshot *out,const bb_single_pau
         unsigned id=bb_audio_sample_layer_id(a,m);
         if(b&&(!b->slots||!b->zones||!b->count||!b->nz||
            !(b->gain>0&&b->gain<=1)||b->echo>127||b->spring>127||
+#if BB_WITH_USER_KITS
+#if BB_PAIR_SLOOP
+           (BB_SAMPLE_KIT_UNKNOWN(a,id)&&!bb_audio_sloop_selected(a,m))||(m&&id==BB_SAMPLE_USER_ID)||
+#else
+           BB_SAMPLE_KIT_UNKNOWN(a,id)||(m&&id==BB_SAMPLE_USER_ID)||
+#endif
+#else
            (id!=BB_SAMPLE_808_ID&&id>=a->sample_catalogue_count)||
+#endif
            !bb_sample_separate(out,sizeof *out,b,sizeof *b)||
            !bb_sample_separate(out,sizeof *out,b->slots,b->count*sizeof *b->slots)||
            !bb_sample_separate(out,sizeof *out,b->zones,b->nz*sizeof *b->zones)))return BB_SINGLE_REJECTED;
         if(b)for(unsigned z=0;z<b->nz;z++)if(!bb_sample_separate(out,sizeof *out,b->zones[z].data,b->zones[z].bytes))return BB_SINGLE_REJECTED;
+#if BB_PAIR_SLOOP
+        if(bb_audio_sloop_selected(a,m)){
+            if(!a->sloop_bank.bytes)return BB_SINGLE_REJECTED;
+            for(unsigned j=0;j<16;j++)if(a->sloop[m].tune[j]<-8||a->sloop[m].tune[j]>7||
+                a->sloop[m].dec[j]<-4||a->sloop[m].dec[j]>3)return BB_SINGLE_REJECTED;
+        }
+#endif
         if(a->rich.valid[m]>1)return BB_SINGLE_REJECTED;
         if(a->rich.valid[m]){
             uint32_t available=!b||id==BB_SAMPLE_808_ID?(BB_RICH_808_VOICES|bb_audio_aux_capabilities(a)):bb_audio_sample_source_voices(a,id);
@@ -96,6 +178,9 @@ static int bb_pair_capture(bb_audio *a,bb_pair_snapshot *out,const bb_single_pau
     if(!gg_scene_capture(a->groups,out->mix))return BB_SINGLE_REJECTED;
     memset(&out->scene,0,sizeof out->scene);out->scene.core=a->core;
     memset(out->identities,0,sizeof out->identities);
+#if BB_PAIR_SLOOP
+    memset(out->sloop,0,sizeof out->sloop);
+#endif
     memset(out->phrases,0,sizeof out->phrases);out->rich_mask=0;
     memcpy(out->expression,a->patterns.expression,sizeof out->expression);
     for(unsigned m=0;m<2;m++){
@@ -104,7 +189,21 @@ static int bb_pair_capture(bb_audio *a,bb_pair_snapshot *out,const bb_single_pau
         bb_sample_scene_identity *v=&out->identities[m];
         v->pack_header_crc=header_crc;v->pack_payload_crc=payload_crc;
         v->gain=b?b->gain:.25f;v->echo=b?b->echo:64;v->spring=b?b->spring:48;
+#if BB_WITH_USER_KITS
+        /* kind 2 = USER (scene v4); the kit byte is set by the caller (the origin slot, or 7 for a draft) */
+        v->kind=(uint8_t)(!b||id==BB_SAMPLE_808_ID?1u:id==BB_SAMPLE_USER_ID?2u:0u);v->kit=v->kind?(v->kind==2?BB_UK_ORIGIN_DRAFT:0):id;
+#if BB_PAIR_SLOOP
+        if(bb_audio_sloop_selected(a,m)){
+            v->kind=3;v->kit=(uint8_t)(id-BB_SLOOP_ID_FIRST);
+            out->sloop[m].bank.recipe_crc=bb_wire_get32(a->sloop_bank.bytes+24);
+            out->sloop[m].bank.image_crc=bb_wire_get32(a->sloop_bank.bytes+20);
+            /* Validated ranges above; this operation cannot fail now. */
+            (void)bb_sample_sloop_controls_pack(out->sloop[m].controls,a->sloop[m].tune,a->sloop[m].dec);
+        }
+#endif
+#else
         v->kind=!b||id==BB_SAMPLE_808_ID;v->kit=v->kind?0:id;
+#endif
         if(a->rich.valid[m]){out->phrases[m]=a->rich.active[m].phrase;out->rich_mask|=1u<<m;}
     }
     return BB_SINGLE_OK;
@@ -125,6 +224,7 @@ static int bb_pair_restore_native(bb_audio *a,const bb_pair_snapshot *s,const bb
     for(unsigned m=0;m<BB_SYNTHS;m++)for(unsigned n=0;n<BB_STEPS;n++){
         bb_note_expression_view v;if(!bb_note_expression_read(s->expression[m][n],&v))return BB_SINGLE_REJECTED;
     }
+    if(!bb_single_aux_separate(a,s,sizeof *s))return BB_SINGLE_REJECTED;
     int result=bb_single_restore_base(a,&s->scene,s->mix,p);if(result!=BB_SINGLE_OK)return result;
     if(!bb_audio_phrase_scene_install_reset(a,s->phrases,s->rich_mask))return BB_SINGLE_HELD_FAILURE;
     memcpy(a->patterns.expression,s->expression,sizeof s->expression);return BB_SINGLE_OK;
@@ -146,22 +246,57 @@ static int bb_pair_restore(bb_audio *a,const bb_pair_snapshot *s,const bb_single
     size_t extents[4]={sizeof *owners[0],owners[0]->count*sizeof *owners[0]->slots,
                        sizeof *owners[1],owners[1]->count*sizeof *owners[1]->slots};
     for(unsigned i=0;i<4;i++){
-        if(!bb_audio_groups_outside(a,inputs[i],sizes[i]))return BB_SINGLE_REJECTED;
+        if(!bb_single_aux_separate(a,inputs[i],sizes[i])||
+           !bb_single_aux_separate(a,mutable[i],extents[i])||
+           !bb_audio_groups_outside(a,inputs[i],sizes[i]))return BB_SINGLE_REJECTED;
         for(unsigned j=0;j<4;j++)if(!bb_sample_separate(inputs[i],sizes[i],mutable[j],extents[j]))return BB_SINGLE_REJECTED;
         for(unsigned j=i+1;j<4;j++)if(!bb_sample_separate(inputs[i],sizes[i],inputs[j],sizes[j])||
            !bb_sample_separate(mutable[i],extents[i],mutable[j],extents[j]))return BB_SINGLE_REJECTED;
     }
     unsigned selected[2];
+#if BB_PAIR_SLOOP
+    unsigned startup[2],sl_mask=0;int8_t tune[2][16]={{0}},decay[2][16]={{0}};
+    sl_bank resident=a->sloop_bank;
+#endif
     for(unsigned m=0;m<2;m++){
         const bb_sample_scene_identity *id=&s->identities[m];
+#if BB_WITH_USER_KITS
+        /* kind 2: drum A's USER kit, already resolved by bb_uk_scene_prepare; it restores on the 808 binding
+         * with the USER id and its table is installed after this returns. */
+        int user=id->kind==2&&!m&&(bb_uk.scene_mask&1u);
+#if BB_PAIR_SLOOP
+        int sl=id->kind==3;
+        if(sl){
+            if(id->kit>=31||!resident.bytes||s->sloop[m].bank.recipe_crc!=bb_wire_get32(resident.bytes+24)||
+               s->sloop[m].bank.image_crc!=bb_wire_get32(resident.bytes+20)||
+               !bb_sample_sloop_controls_unpack(s->sloop[m].controls,tune[m],decay[m]))return BB_SINGLE_REJECTED;
+            sl_mask|=1u<<m;
+        }
+#else
+        int sl=0;
+#endif
+        if(id->pack_header_crc!=header_crc||id->pack_payload_crc!=payload_crc||(id->kind>1&&!user&&!sl)||
+           (sl?id->kit>=31:user?(id->kit>=BB_UK_SLOTS&&id->kit!=BB_UK_ORIGIN_DRAFT):id->kind?id->kit!=0:id->kit>=count)||
+           !(id->gain>0&&id->gain<=1)||id->echo>127||id->spring>127)return BB_SINGLE_REJECTED;
+        selected[m]=user?BB_SAMPLE_USER_ID:id->kind?BB_SAMPLE_808_ID:id->kit;
+#if BB_PAIR_SLOOP
+        if(sl)selected[m]=BB_SLOOP_ID_FIRST+id->kit;
+#endif
+#else
         if(id->pack_header_crc!=header_crc||id->pack_payload_crc!=payload_crc||id->kind>1||
            (id->kind?id->kit!=0:id->kit>=count)||!(id->gain>0&&id->gain<=1)||
            id->echo>127||id->spring>127)return BB_SINGLE_REJECTED;
         selected[m]=id->kind?BB_SAMPLE_808_ID:id->kit;
+#endif
         const bb_phrase *phrase=(s->rich_mask&(1u<<m))?&s->phrases[m]:NULL;
         if(!phrase){const uint8_t *q=(const uint8_t*)&s->phrases[m];
             for(unsigned i=0;i<sizeof s->phrases[m];i++)if(q[i])return BB_SINGLE_REJECTED;}
+#if BB_PAIR_SLOOP
+        startup[m]=(sl_mask>>m&1u)?BB_SAMPLE_808_ID:selected[m];
         if(!bb_audio_sample_restore_check_layer(a,&s->scene.core,owners[m],banks[m],count,selected[m],m,phrase))return BB_SINGLE_REJECTED;
+#else
+        if(!bb_audio_sample_restore_check_layer(a,&s->scene.core,owners[m],banks[m],count,selected[m],m,phrase))return BB_SINGLE_REJECTED;
+#endif
         for(unsigned k=0;k<count;k++){
             const bb_sample_audio_binding *b=&banks[m][k];
             /* Both owner catalogues must describe the same immutable library. */
@@ -175,17 +310,44 @@ static int bb_pair_restore(bb_audio *a,const bb_pair_snapshot *s,const bb_single
     for(unsigned m=0;m<BB_SYNTHS;m++)for(unsigned n=0;n<BB_STEPS;n++){
         bb_note_expression_view v;if(!bb_note_expression_read(s->expression[m][n],&v))return BB_SINGLE_REJECTED;
     }
+#if BB_PAIR_SLOOP
+    if(!bb_audio_sloop_pair_supported(selected[0],selected[1]))return BB_SINGLE_REJECTED;
+    if(resident.bytes){
+        for(unsigned j=0;j<4;j++)if(!bb_sample_separate(resident.bytes,SL_BANK_BYTES,mutable[j],extents[j]))return BB_SINGLE_REJECTED;
+        sl_bank checked;if(!sl_bank_bind(&checked,resident.bytes,SL_BANK_BYTES))return BB_SINGLE_REJECTED;
+    }
+#endif
+#if BB_WITH_USER_KITS
+    /* All fallible scene/pair checks have completed before touching the live
+     * resolved USER table. The caller still holds the real pause. */
+    if(bb_uk_scene_prepare()<0)return BB_SINGLE_REJECTED;
+#endif
     /* First mutation. The caller must retain its pause on HELD_FAILURE. */
     int result=bb_single_restore_base(a,&s->scene,s->mix,p);
     if(result!=BB_SINGLE_OK)return result;
     for(unsigned m=0;m<2;m++){
         memset(owners[m]->slots,0,owners[m]->count*sizeof *owners[m]->slots);
+#if BB_WITH_USER_KITS
+        *owners[m]=banks[m][selected[m]>=count?0:selected[m]];
+#else
         *owners[m]=banks[m][selected[m]==BB_SAMPLE_808_ID?0:selected[m]];
+#endif
     }
+#if BB_PAIR_SLOOP
+    if((s->rich_mask&1)&&!(sl_mask&1)){if(!bb_audio_sample_startup_phrase(a,owners[0],ea,count,startup[0],&s->phrases[0]))return BB_SINGLE_HELD_FAILURE;}
+    else if(!bb_audio_sample_startup(a,owners[0],ea,count,startup[0]))return BB_SINGLE_HELD_FAILURE;
+    if((s->rich_mask&2)&&!(sl_mask&2)){if(!bb_audio_sample_bind_b_phrase(a,owners[1],startup[1],&s->phrases[1]))return BB_SINGLE_HELD_FAILURE;}
+    else if(!bb_audio_sample_bind_b(a,owners[1],startup[1]))return BB_SINGLE_HELD_FAILURE;
+    /* Actor reset cleared the descriptor. Revalidate the same immutable bank,
+     * even for a non-SLOOP scene, so availability survives scene loads. */
+    if(resident.bytes&&!bb_audio_sloop_bind_cold(a,resident.bytes,SL_BANK_BYTES))return BB_SINGLE_HELD_FAILURE;
+    if(sl_mask&&!bb_audio_sloop_restore_owned(a,selected,tune,decay))return BB_SINGLE_HELD_FAILURE;
+#else
     if(s->rich_mask&1){if(!bb_audio_sample_startup_phrase(a,owners[0],ea,count,selected[0],&s->phrases[0]))return BB_SINGLE_HELD_FAILURE;}
     else if(!bb_audio_sample_startup(a,owners[0],ea,count,selected[0]))return BB_SINGLE_HELD_FAILURE;
     if(s->rich_mask&2){if(!bb_audio_sample_bind_b_phrase(a,owners[1],selected[1],&s->phrases[1]))return BB_SINGLE_HELD_FAILURE;}
     else if(!bb_audio_sample_bind_b(a,owners[1],selected[1]))return BB_SINGLE_HELD_FAILURE;
+#endif
     if(!bb_audio_phrase_scene_install_reset(a,s->phrases,s->rich_mask))return BB_SINGLE_HELD_FAILURE;
     for(unsigned m=0;m<2;m++){
         owners[m]->gain=s->identities[m].gain;owners[m]->echo=s->identities[m].echo;owners[m]->spring=s->identities[m].spring;

@@ -4,9 +4,7 @@
 #include "bb_crc32.h"
 #include <string.h>
 #define overlap bb_wire_overlap
-static uint32_t crc(const unsigned char *p,size_t n){
-    return ~bb_crc32_add(bb_crc32_add(UINT32_MAX,p,12),p+16,n-16);
-}
+#define crc(a,b) bb_crc32_record(a,b)
 #define get32 bb_wire_get32
 #define put32 bb_wire_put32
 static int zero(const void *p,size_t n){const unsigned char *b=p;while(n--)if(*b++)return 0;return 1;}

@@ -13,7 +13,13 @@ static const uint8_t bb_rich_sounds[17]={0,1,2,3,4,5,6,7,8,9,11,10,12,15,14,13,1
 static const char *const bb_rich_names[17]={
     "KICK","SNARE","LOW TOM","MID TOM","HIGH TOM","LOW CONGA","MID CONGA","HIGH CONGA",
     "RIM","CLAVES","CLAP","MARACAS","COWBELL","CYMBAL","OPEN HAT","CLOSED HAT","SHAKER"};
-static void bb_rich_reset(void){memset(bb_rich_views,0,sizeof bb_rich_views);memset(bb_rich_tones,0,sizeof bb_rich_tones);memset(bb_rich_voices,0,sizeof bb_rich_voices);}
+/* 2.0 editable copy: a step edit shows at once, while the audio owner still plays the previous phrase
+ * until the loop wrap (QUEUED). bb_rich_view() is what every grid draws; the draft goes when APPLIED. */
+static bb_phrase_view bb_rich_drafts[BB_RICH_DRUMS] __attribute__((section(".pool")));   /* not .bss: data RAM is at its floor */
+static uint8_t bb_rich_draft_on[BB_RICH_DRUMS];
+static const bb_phrase_view *bb_rich_view(unsigned m){return bb_rich_draft_on[m]?&bb_rich_drafts[m]:&bb_rich_views[m];}
+static void bb_rich_reset(void){memset(bb_rich_views,0,sizeof bb_rich_views);memset(bb_rich_tones,0,sizeof bb_rich_tones);memset(bb_rich_voices,0,sizeof bb_rich_voices);
+    memset(bb_rich_draft_on,0,sizeof bb_rich_draft_on);}
 static int bb_rich_active(void){return bb_face.machine<BB_RICH_DRUMS&&bb_rich_views[bb_face.machine].valid;}
 static unsigned bb_drum_visible_length(const bb_machine *m){return bb_rich_active()?bb_rich_views[bb_face.machine].phrase.length:m->length;}
 static void bb_rich_refresh(void){
@@ -41,7 +47,7 @@ static void bb_rich_move(int delta){
 }
 static int bb_rich_cell(unsigned step,bb_phrase_cell *cell){
     if(!bb_rich_active())return 0;
-    return bb_phrase_view_cell(&bb_rich_views[bb_face.machine],bb_rich_sources[bb_rich_voices[bb_face.machine]],step,cell);
+    return bb_phrase_view_cell(bb_rich_view(bb_face.machine),bb_rich_sources[bb_rich_voices[bb_face.machine]],step,cell);
 }
 #else
 static void bb_rich_reset(void){}

@@ -1,7 +1,7 @@
 {
-  "display_name": "BB-1 1.5",
-  "product": "FM-1_92200105",
-  "version": "1.5",
+  "display_name": "BB-1 2.0",
+  "product": "FM-1_92200200",
+  "version": "2.0",
   "usb_product": "Big Beat",
-  "reservation_status": "project-assigned for BB1; no current catalogue collision observed; Hub registration pending, no global reservation claimed"
+  "reservation_status": "BB1 2.0 release identity; Hub collision and directory acceptance checks tracked separately"
 }

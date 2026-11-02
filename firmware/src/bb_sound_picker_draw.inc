@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 static void bb_sound_pick_name(int x,int y,const char *name,uint16_t ink) {
-    if(!name)name="UNAVAILABLE";
+    if(!name)name=BB_TX(TX_UNAVAILABLE);
     const aafont_t *font=text_w(&AF_M,name)<=231-x?&AF_M:&AF_S;
     cv_text(x,y,font,name,ink);
 }
@@ -12,7 +12,7 @@ static void bb_sound_pick_draw(void) {
     char title[]="DRUM A / KITS";title[5]=(char)('A'+bb_sound_pick.machine);
     bb_backdrop(0,120,0);
     cv_text(9,6,&AF_M,page==BB_DRUMS?title:page==BB_DILLO?(BB_WITH_TELEGRAM?"DILLO BASS / SOUNDS":"DILLO / SOUNDS"):"DILLO LEAD / SOUNDS",BB_TEXT);
-    cv_text(9,30,&AF_S,!valid?"STATE UNAVAILABLE":!view.enabled?"LAYER OFF":view.muted?"MUTED":
+    cv_text(9,30,&AF_S,!valid?BB_TX(TX_STATE_UNAVAILABLE):!view.enabled?"LAYER OFF":view.muted?"MUTED":
         page==BB_DRUMS&&bb_sound_pick.sample_count?"KIT > PATTERN":
         !bb_sound_picker_available(&bb_sound_pick,&view,bb_sound_pick.cursor)?"PATTERN MISMATCH":page==BB_DRUMS?"CHOOSE KIT":"CHOOSE SOUND",BB_DIM);
     cv_text(151,30,&AF_S,"K1 LEVEL",BB_DIM);
@@ -21,7 +21,7 @@ static void bb_sound_pick_draw(void) {
     bb_level_number(204,30,level,&AF_S,BB_TEXT);
     bb_sound_pick_name(9,49,bb_sound_picker_item_name(&bb_sound_pick,bb_sound_pick.cursor),BB_ORANGE);
     cv_text(9,81,&AF_S,valid&&view.edited?"LOADED / EDITED:":"LOADED:",BB_DIM);
-    cv_text(9,98,&AF_S,!valid?"STATE UNAVAILABLE":view.active_index<0?"CUSTOM SOUND":
+    cv_text(9,98,&AF_S,!valid?BB_TX(TX_STATE_UNAVAILABLE):view.active_index<0?"CUSTOM SOUND":
         bb_sound_picker_item_name(&bb_sound_pick,(unsigned)view.active_index),BB_TEXT);
     cv_blit(0,0);bb_backdrop(120,120,0);
     unsigned first=(bb_sound_pick.cursor/4u)*4u,count=bb_sound_picker_items(&bb_sound_pick);
@@ -37,7 +37,7 @@ static void bb_sound_pick_draw(void) {
         bb_sound_pick_refusal_message():
         bb_sound_pick.status==BB_SP_SUPERSEDED?"SOUND CHANGED ELSEWHERE":
         bb_sound_pick.status==BB_SP_APPLIED?"APPLIED / ALGO: PATTERNS":
-        bb_sound_pick.status==BB_SP_SAME?"SOUND ALREADY LOADED":
+        bb_sound_pick.status==BB_SP_SAME?BB_TX(TX_SOUND_ALREADY_LOADED):
         page==BB_DRUMS&&bb_sound_pick.sample_count?"KIT CHOICE / NOT LOADED":"ALGO: PATTERNS / HOME: STUDIO";
     if(failed)cv_text(9,87,&AF_S,"AUDIO FAULT / LOAD BLOCKED",BB_TEXT);
     else if(bb_sound_pick.pending) {

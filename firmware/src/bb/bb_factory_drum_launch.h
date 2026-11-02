@@ -7,6 +7,7 @@
  * from public browsers until rich edit/save/target integration is qualified. */
 int bb_factory_prepare_rich_drum(const bb_catalogue *,const bb_factory_choice *,bb_phrase_index *);
 int bb_factory_request_rich_drum(bb_audio *,const bb_catalogue *,const bb_factory_choice *,unsigned,unsigned,uint32_t *);
+int bb_factory_request_rich_drum_launch(bb_audio *,const bb_catalogue *,const bb_factory_choice *,unsigned,unsigned,unsigned,uint32_t *);
 #endif
 #include "bb_factory_drum.h"
 /* Main-loop source decoder and copied producer. OK means accepted request;

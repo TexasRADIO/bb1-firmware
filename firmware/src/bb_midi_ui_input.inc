@@ -24,35 +24,37 @@ static void bb_midi_ui_knob(unsigned k,int delta){
   if(k==0)c.clock_source=(uint8_t)bb_limit((int)c.clock_source+bb_limit(delta,-1,1),BB_MIDI_CLOCK_USB,BB_MIDI_CLOCK_TRS);
   if(k==1)c.tempo_follow=(uint8_t)bb_limit((int)c.tempo_follow+bb_limit(delta,-1,1),0,1);
   if(k==2)c.transport=(uint8_t)bb_limit((int)c.transport+bb_limit(delta,-1,1),0,1);
-  if(k==3){bb_say("CLOCK OUT: STAGE 2 / OFF");return;}
+  if(k==3)c.clock_out=(uint8_t)bb_limit((int)c.clock_out+bb_limit(delta,-1,1),0,1);
  }
  if(!memcmp(&c,&bb_midi_compat_config,sizeof c))return;
- if(bb_midi_configure(&c)){bb_dirty=1;bb_say("MIDI CHANGED / EDIT: SAVE GLOBALS");}
+ if(bb_midi_configure(&c)){bb_dirty=1;bb_say(BB_TX(TX_MIDI_CHANGED_EDIT_SAVE_GLOBALS));}
+ else bb_say(BB_TX(TX_STOP_WAIT_TO_CHANGE_CLOCK_OUT));
 }
 static void bb_midi_ui_save(void){
 #if FELUCCA_FLASH
  if(!flash_ok){bb_say("STORAGE UNAVAILABLE");return;}
  if(bb_face.requested.running||bb_session_busy()||bb_asset_hold_request||bb_session_usb_recording()){
-  bb_say("STOP / WAIT TO SAVE GLOBALS");return;
+  bb_say(BB_TX(TX_STOP_WAIT_TO_SAVE_GLOBALS));return;
  }
- bb_midi_save_wait=1;settings_save();bb_say("GLOBAL SETTINGS SAVE QUEUED");
+ bb_midi_save_wait=1;settings_save();bb_say(BB_TX(TX_GLOBAL_SETTINGS_SAVE_QUEUED));
 #endif
 }
 static int bb_midi_ui_input(uint32_t pressed,uint32_t notes){
 #if FELUCCA_FLASH
  if(bb_midi_save_wait&&!persist_pending){bb_midi_save_wait=0;bb_say("GLOBAL SETTINGS SAVED");}
- else if(bb_midi_save_wait&&persist_pending==2)bb_say("GLOBAL SAVE RETRY / WAIT");
+ else if(bb_midi_save_wait&&persist_pending==2)bb_say(BB_TX(TX_GLOBAL_SAVE_RETRY_WAIT));
 #endif
  if(bb_nav.page!=BB_NAV_GLOBAL){bb_midi_page=0;return 0;}
  uint32_t keys=bb_nav_keys_logical(notes);
  if(!bb_midi_page){if(!(keys&1u))return 0;bb_midi_page=1;bb_dirty=1;}
- if((pressed&(1u<<panel.btn[B_HOME]))||(pressed&(1u<<panel.btn[B_GLO]))){bb_midi_page=0;bb_dirty=1;return 0;}
+ if(pressed&(1u<<panel.btn[B_HOME])){bb_midi_page=0;bb_dirty=1;return 1;}   /* HOME: one step back, to GLOBAL */
+ if(pressed&(1u<<panel.btn[B_GLO])){bb_midi_page=0;bb_dirty=1;return 0;}
  if(keys&1u){bb_midi_page=1;bb_dirty=1;}
  if(keys&2u){bb_midi_page=2;bb_dirty=1;}
  if(keys&(1u<<16)){bb_midi_page=0;bb_dirty=1;return 1;}
  for(unsigned k=0;k<4;k++){int d=bb_read_encoder(EN_K1+k);if(d)bb_midi_ui_knob(k,d);}
  if(pressed&((1u<<panel.btn[B_EDIT])|(1u<<panel.btn[B_SAVE])))bb_midi_ui_save();
- if(pressed&(1u<<panel.btn[B_PLAY]))bb_send(BB_CMD_TRANSPORT,!bb_face.requested.running);
+ if((pressed&(1u<<panel.btn[B_PLAY]))&&!bb_arr_transport())bb_send(BB_CMD_TRANSPORT,!bb_face.requested.running);
  /* Big encoders have no MIDI-page job; avoid a hidden instrument/kit edit. */
  (void)bb_read_encoder(EN_SELECT);(void)bb_read_encoder(EN_ALGO);(void)bb_read_encoder(EN_PRESET);
  return 1;

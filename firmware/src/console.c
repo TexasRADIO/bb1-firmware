@@ -235,6 +235,10 @@ static void con_status(void)
     con_kv("usb_max_gap_polls", (int32_t)usb.max_gap);
     con_kv("midi_rx_pkts", (int32_t)usb.rx_pkts);
     con_kv("midi_tx_pkts", (int32_t)usb.tx_pkts);
+    con_kv("bb_midi_clock_sent",(int32_t)bb_sound.midi_output.clocks_sent);
+    con_kv("bb_midi_clock_drop",(int32_t)bb_sound.midi_output.clock_drops);
+    con_kv("bb_midi_transport_sent",(int32_t)bb_sound.midi_output.transport_sent);
+    con_kv("bb_midi_transport_drop",(int32_t)bb_sound.midi_output.transport_drops);
 #if FELUCCA_UAC
     con_uac();
 #endif
@@ -246,6 +250,9 @@ static void con_status(void)
 #endif
 #if FELUCCA_FLASH
     con_kv("flash", flash_ok);
+#endif
+#if FELUCCA_OTA
+    con_kv("ota_cleanup", ota_boot_cleanup_rc);   /* boot: 0 none, 1 cleared, -1 unreadable, -15 not cleared */
 #endif
 }
 

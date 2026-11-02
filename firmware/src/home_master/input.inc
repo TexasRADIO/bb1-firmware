@@ -40,13 +40,13 @@ static int hm_native_input(uint32_t pressed,uint32_t *notes) {
     delta=bb_read_encoder(EN_PRESET);
     if(delta) {
         if(bb_sound_pick_audio_failed())bb_say("AUDIO FAULT / LOAD BLOCKED");
-        else if(bb_sound_pick.pending)bb_say("SOUND REQUEST STILL PENDING");
+        else if(bb_sound_pick.pending)bb_say(BB_TX(TX_SOUND_REQUEST_STILL_PENDING));
         else {
 #if defined(BB_TWO_DRUM_HOST_EXPERIMENT)
             st_route route;
             if(st_resolve(hm_focus.selected,&route))
                 (void)bb_home_sound_browse(route.page,route.target,delta);
-            else bb_say("SOUND LIST NOT READY");
+            else bb_say(BB_TX(TX_SOUND_LIST_NOT_READY));
 #else
             (void)bb_home_sound_browse((bb_page)hm_focus.selected,bb_face.machine,delta);
 #endif

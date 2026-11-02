@@ -10,10 +10,25 @@
 #undef BB_MIDI_COMPAT_LIBC_PROVIDED
 #include "bb_midi_globals.inc"
 static bb_midi_compat_state bb_midi_compat;
+/* Optional main-loop program Start; NULL keeps ordinary1.5 MIDI semantics. */
+static int (*bb_midi_program_start)(void);
 static struct {
     uint32_t epoch,drop_usb_until;
     uint8_t initialized,ready,pending,discard_all,blocked,drop_usb;
 } bb_midi;
+
+#if BB_WITH_PROJECT_FILES
+/* Main owner already excludes IRQ producers. Publish the exact held-input
+ * boundary without touching the paused/rebuilt sound actor or its queue.
+ * Clearing blocked/discard_all preserves packets arriving AFTER release. */
+static void bb_midi_project_release_owned(void){
+    mi_r=mi_w;midi_in_overflow=0;
+    bb_midi_compat_reset(&bb_midi_compat);
+    bb_midi.pending|=15u;
+    bb_midi.blocked=bb_midi.discard_all=0;
+    RING_PUBLISH();
+}
+#endif
 
 /* The parser stamps each USB packet with this same connection generation.
  * Unsigned sum is intentional; wrap remains comparable within a 64-slot ring. */
@@ -28,6 +43,10 @@ static void bb_midi_reset(void) {
     bb_midi.ready=(uint8_t)(usb.config && !usb.suspended);
     bb_midi.initialized=1;
     mi_r=mi_w;midi_in_overflow=0;
+    /* Boot/reset is stopped before physical audio; restore persisted OFF/ON
+     * without creating a transport event. No automatic note/clock THRU. */
+    if(!bb_sound.core.running&&bb_commands_idle(&bb_sound.commands))
+        bb_sound.midi_output.enabled=bb_midi_compat_config.clock_out;
     RING_PUBLISH();bb_target_leave(0,token);
 }
 static int bb_midi_configure(const bb_midi_compat_settings *c){
@@ -35,21 +54,22 @@ static int bb_midi_configure(const bb_midi_compat_settings *c){
     if(!memcmp(c,&bb_midi_compat_config,sizeof *c))return 1;
     int channels=memcmp(c->drum_channel,bb_midi_compat_config.drum_channel,2)||
                  memcmp(c->synth_channel,bb_midi_compat_config.synth_channel,2);
-    bb_midi_compat_state previous=bb_midi_compat;
+    uintptr_t token=bb_target_enter(0);
+    if(c->clock_out!=bb_midi_compat_config.clock_out){
+        /* Quiescent ownership transfer: CPU0 audio excluded, stopped, no
+         * pending owner commands. Do not flip output behind a running owner. */
+        if(bb_sound.core.running||!bb_commands_idle(&bb_sound.commands)){
+            bb_target_leave(0,token);return 0;
+        }
+        bb_sound.midi_output.enabled=c->clock_out;
+        bb_sound.midi_output.phase=0;bb_sound.midi_output.running=0;
+    }
     if(channels){
-        uintptr_t token=bb_target_enter(0);
-        mi_r=mi_w;midi_in_overflow=0;RING_PUBLISH();
-        bb_target_leave(0,token);bb_midi.pending|=15u;
-    }
-    bb_midi_compat_config=*c;bb_midi_compat_reset(&bb_midi_compat);
-    /* A clock-only edit does not drop musical packets or release held keys.
-     * Keep a parked musical command exact while clearing clock estimation. */
-    if(!channels&&previous.pending&&previous.command.type!=BB_CMD_TEMPO&&
-       previous.command.type!=BB_CMD_TRANSPORT_RESTART&&previous.command.type!=BB_CMD_TRANSPORT){
-        bb_midi_compat.pending=1;bb_midi_compat.pending_source=previous.pending_source;
-        bb_midi_compat.command=previous.command;
-    }
-    return 1;
+        mi_r=mi_w;midi_in_overflow=0;RING_PUBLISH();bb_midi.pending|=15u;
+        bb_midi_compat_reset(&bb_midi_compat);
+    }else bb_midi_compat_clock_reset(&bb_midi_compat);
+    bb_midi_compat_config=*c;
+    bb_target_leave(0,token);return 1;
 }
 /* Configured explicit synth channels, from either musical input source.
  * Unimplemented messages do not masquerade as controls: no sustain/bend/PC.
@@ -63,7 +83,7 @@ static int bb_midi_decode(uint32_t packet,unsigned source,bb_command *command) {
     unsigned target;
     for(target=0;target<2;target++)if(bb_midi_compat_config.synth_channel[target]==channel+1u&&bb_midi_compat_synth(target))break;
     if(target==2)return 0;
-    if(cin!=8 && cin!=9 && !(cin==11 && note==123))return 0;
+    if(cin!=8 && cin!=9)return 0;
     memset(command,0,sizeof *command);
     command->target=(uint8_t)target;command->step=(uint8_t)source;
     if(cin==11)command->type=BB_CMD_SYNTH_SOURCE_RELEASE;
@@ -108,8 +128,9 @@ static void bb_midi_input(int paused,int suppressed) {
     if(!bb_midi_compat.pending&&bb_midi_compat.last_bpm&&bb_midi_compat.last_bpm!=live_bpm)bb_midi_compat.last_bpm=0;
     if(epoch!=bb_midi.epoch || (bb_midi.ready && !ready)) {
         bb_midi.pending|=3u; /* USB only; physical and TRS survive. */
-        if(bb_midi_compat_config.clock_source==BB_KEY_USB)bb_midi_compat_reset(&bb_midi_compat);
-        else if(bb_midi_compat.pending&&bb_midi_compat.pending_source==BB_KEY_USB)bb_midi_compat.pending=0;
+        memset(bb_midi_compat.bank_msb[BB_KEY_USB],0,2);memset(bb_midi_compat.bank_lsb[BB_KEY_USB],0,2);
+        if(bb_midi_compat_config.clock_source==BB_KEY_USB)bb_midi_compat_clock_reset(&bb_midi_compat);
+        if(bb_midi_compat.pending&&bb_midi_compat.pending_source==BB_KEY_USB)bb_midi_compat.pending=0;
         if(bb_midi.ready && !ready) {
             bb_midi.drop_usb_until=end;bb_midi.drop_usb=1;
         }
@@ -156,8 +177,20 @@ static void bb_midi_input(int paused,int suppressed) {
                 if(count>=BB_COMMAND_CAPACITY-4u)return;
             }
             if(!bb_command_push(&bb_sound.commands,&command))return;
-        } else if(!stale && !bb_midi_compat_dispatch(&bb_midi_compat,&bb_midi_compat_config,
+        } else if(!stale){
+            int program=0;
+            if(bb_midi_program_start&&!bb_midi_compat.pending){
+                bb_midi_compat_state planned=bb_midi_compat;bb_command intended;
+                if(bb_midi_compat_plan(&planned,&bb_midi_compat_config,packet,source,
+                        (uint32_t)(packet_ms*1000u),&intended)&&intended.type==BB_CMD_TRANSPORT_RESTART){
+                    program=bb_midi_program_start();
+                    if(program<0)return; /* retain packet until the owner queue can accept it */
+                    if(program){planned.pending=0;bb_midi_compat=planned;}
+                }
+            }
+            if(!program&&!bb_midi_compat_dispatch(&bb_midi_compat,&bb_midi_compat_config,
                    packet,source,(uint32_t)(packet_ms*1000u),&bb_sound.commands))return;
+        }
         token=bb_target_enter(0);mi_r=position+1u;RING_PUBLISH();bb_target_leave(0,token);
     }
 }

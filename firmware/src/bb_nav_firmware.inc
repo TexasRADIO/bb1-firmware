@@ -26,6 +26,8 @@ static bb_nav_state bb_nav;
 static bb_nav_out bb_nav_o;          /* 288 B: static, not on the stack */
 static bb_nav_out bb_nav_aux_o;      /* forced page / kit confirmed (never nested) */
 static bb_nav_facts bb_nav_f;        /* facts of the last scan (LEDs, drawing) */
+static void bb_arr_open(void);   /* bb_arranger_firmware.inc */
+static void bb_nav_ratchet_turn(unsigned key_step,int delta);   /* 2.0 ratchets, below */
 static uint8_t bb_nav_row;           /* focus: 0 DRUM A, 1 DRUM B, 2 DILLO BASS, 3 DILLO LEAD (Duo) */
 static uint8_t bb_nav_shown_page=0xFF,bb_nav_shown_row=0xFF; /* last projection */
 static uint8_t bb_nav_meters;        /* GLOBAL white 3: meters on the GLOBAL page */
@@ -33,10 +35,18 @@ static uint8_t bb_nav_swing_x2=112;  /* swing restored by SCL (x2 units, 112 = 5
 static uint8_t bb_nav_gsolo[BB_MACHINES],bb_nav_gsolo_muted[BB_MACHINES];
 static uint8_t bb_nav_isolo,bb_nav_isolo_muted;
 static uint8_t bb_nav_throw,bb_nav_throw_saved;
+static void bb_nav_arm_pattern(const bb_player *p);
+static int bb_nav_confirm_pattern(bb_player *p);
 static uint32_t bb_nav_note_on[4],bb_nav_note_owed[4]; /* MIDI note bitmaps, Dillo */
 static uint8_t bb_nav_note_phys[128];                  /* physical key of a sounding note */
 static uint8_t bb_nav_phys[BB_NAV_KEYS];               /* logical key -> physical note bit */
 static uint32_t bb_global_dirty_at;
+#if BB_WITH_USER_KITS
+/* 2.0 kit builder (bb_user_kit_firmware.inc, included right after this file) */
+static void bb_uk_nav_mode(void),bb_uk_lane_key(unsigned),bb_uk_slot_key(unsigned),bb_uk_store(void),
+            bb_uk_knob(unsigned,int),bb_uk_facts(bb_nav_facts *);
+static int bb_uk_kit_turn(int),bb_uk_in_build(void),bb_uk_list_commit(void);
+#endif
 
 /* ------------------------------------------------------------ mapping */
 static uint32_t bb_nav_buttons(uint32_t matrix) {
@@ -108,7 +118,7 @@ static void bb_nav_note_lit(unsigned note,int on) {
 static void bb_nav_note_off(unsigned note) {
     if(note>127||!bb_nav_note_bit(bb_nav_note_on,note))return;
     if(bb_nav_note_push(note,0)){bb_nav_note_set(bb_nav_note_on,note,0);bb_nav_note_set(bb_nav_note_owed,note,0);bb_nav_note_lit(note,0);}
-    else {bb_nav_note_set(bb_nav_note_owed,note,1);bb_say("KEY RELEASE WAIT");}
+    else {bb_nav_note_set(bb_nav_note_owed,note,1);bb_say(BB_TX(TX_KEY_RELEASE_WAIT));}
 }
 static void bb_nav_note_on_key(unsigned note,unsigned velocity,unsigned phys) {
     if(note>127)return;
@@ -118,7 +128,7 @@ static void bb_nav_note_on_key(unsigned note,unsigned velocity,unsigned phys) {
 #endif
     if(bb_nav_note_bit(bb_nav_note_on,note))bb_nav_note_off(note);  /* same pitch twice: re-trigger */
     if(bb_nav_note_bit(bb_nav_note_on,note))return;
-    if(!bb_nav_note_push(note,velocity)){bb_say("KEYS BUSY / RETRY");return;}
+    if(!bb_nav_note_push(note,velocity)){bb_say(BB_TX(TX_KEYS_BUSY_RETRY));return;}
     bb_nav_note_synth[note]=(uint8_t)bb_nav_synth();
     bb_nav_note_set(bb_nav_note_on,note,1);bb_nav_note_phys[note]=(uint8_t)phys;bb_nav_note_lit(note,1);
 }
@@ -162,12 +172,17 @@ static void bb_nav_section_launch(unsigned index) {
         if(delta)(void)bb_browser_move_bank(&p->view,delta);
     }
     unsigned count=bb_nav_section_count(p);
-    if(index>=count){bb_say("NO SUCH SECTION");return;}
+    if(index>=count){bb_say(BB_TX(TX_NO_SUCH_SECTION));return;}
     if(!bb_nav_part_page_to(p,index/BB_BROWSER_PART_KEYS)){bb_library_result(BB_FACTORY_PATTERN_INVALID);return;}
     unsigned key=index%BB_BROWSER_PART_KEYS;int result;
     if(bb_nav.page==BB_NAV_PATTERN)
-        result=bb_library_preview_part_key(p,key)?bb_library_confirm(p):BB_FACTORY_PATTERN_INVALID;
-    else result=bb_player_part_key(p,&bb_sound,key);
+        result=bb_library_preview_part_key(p,key)?bb_nav_confirm_pattern(p):BB_FACTORY_PATTERN_INVALID;
+    else {
+        unsigned prior=p->launch_enable;
+        p->launch_enable=(uint8_t)(p->is_drum&&p->target<BB_MACHINES&&!bb_face.requested.drums[p->target].enabled);
+        result=bb_player_part_key(p,&bb_sound,key);p->launch_enable=(uint8_t)prior;
+        if(result==BB_FACTORY_PATTERN_OK)bb_nav_arm_pattern(p);
+    }
     if(result!=BB_FACTORY_PATTERN_OK){bb_library_result(result);return;}
     /* "SECTION 12 QUEUED" / "SECTION 12 REQUESTED" */
     unsigned n=0,v=index+1u;const char *head="SECTION ";
@@ -186,7 +201,7 @@ static void bb_nav_section_step(int delta) {
     int next=(int)now+bb_limit(delta,-32,32);
     if(next<0)next=0;
     if(next>=(int)count)next=(int)count-1;
-    if((unsigned)next==now&&bb_nav_section_playing(p)==now){bb_say(delta<0?"FIRST SECTION":"LAST SECTION");return;}
+    if((unsigned)next==now&&bb_nav_section_playing(p)==now){bb_say(delta<0?BB_TX(TX_FIRST_SECTION):BB_TX(TX_LAST_SECTION));return;}
     bb_nav_section_launch((unsigned)next);
 }
 
@@ -286,6 +301,9 @@ static void bb_nav_fill_facts(bb_nav_facts *f) {
         if(!bb_sound_pick_audio_failed()&&bb_sound_picker_observe(&bb_sound_pick,&bb_sound,&view)&&
            view.active_index>=0&&view.active_index<16)f->list_playing=(uint8_t)view.active_index;
         if(bb_sound_pick.pending&&bb_sound_pick.requested<16u)f->list_queued=bb_sound_pick.requested;
+#if BB_WITH_USER_KITS
+        bb_uk_facts(f);
+#endif
     } else if(bb_nav.page==BB_NAV_PATTERN && p->ready) {
         unsigned first=p->view.bank_page*BB_BROWSER_BANK_KEYS,n=0;
         for(unsigned k=0;k<BB_BROWSER_BANK_KEYS;k++)if(bb_browser_bank_cell(&p->view,k)!=BB_CATALOGUE_NONE)n=k+1u;
@@ -379,7 +397,7 @@ static void bb_nav_project(void) {
         if(bb_nav_shown_page!=BB_NAV_KIT||bb_nav_shown_row!=bb_nav_row||!bb_sound_pick.ready||
            bb_sound_pick.page!=bb_face.requested.page||(bb_nav_is_drum()&&bb_sound_pick.machine!=bb_face.machine)) {
             if(!bb_sound_pick.pending&&!bb_sound_pick_audio_failed()&&
-               !bb_sound_pick_open(bb_face.requested.page,bb_face.machine))bb_say("SOUND LIST NOT READY");
+               !bb_sound_pick_open(bb_face.requested.page,bb_face.machine))bb_say(BB_TX(TX_SOUND_LIST_NOT_READY));
         }
         bb_sound_pick_page=1;
     } else bb_sound_pick_page=0;
@@ -388,7 +406,7 @@ static void bb_nav_project(void) {
     bb_keys_base[bb_nav_synth()]=(uint8_t)(41+12*bb_nav.key_octave);
     if(page!=bb_nav_shown_page||bb_nav_row!=bb_nav_shown_row)bb_dirty=1;
     bb_nav_shown_page=page;bb_nav_shown_row=bb_nav_row;
-    bb_help_visible=bb_nav.help;
+    bb_help_visible=bb_nav.help||bb_nav.rec_help;   /* 2.0 N5: REC held alone shows the page's chords */
 }
 /* Firmware-forced page change; owed releases are performed at once. */
 static void bb_nav_do_keys(const bb_nav_out *o);
@@ -467,15 +485,15 @@ static int bb_nav_sample_send(unsigned k,int delta) {
     bb_sample_status view;int route=bb_sample_sends_view(&view);
     if(!route)return 0;
     bb_dirty=1;
-    if(route<0){bb_say("SAMPLE STATE WAIT");return 1;}
-    if(!view.queue_idle||view.stop_pending){bb_say("MIX BUSY - RETRY");return 1;}
+    if(route<0){bb_say(BB_TX(TX_SAMPLE_STATE_WAIT));return 1;}
+    if(!view.queue_idle||view.stop_pending){bb_say(BB_TX(TX_MIX_BUSY_RETRY));return 1;}
     unsigned value=(unsigned)bb_limit((int)bb_sample_sends_value(&view,k)+bb_limit(delta,-127,127),k==3?1:0,k==3?100:127);
     if(k==2){bb_send_machine(view.machine,BB_CMD_DRUM_LEVEL,value);return 1;}
     bb_command command;
     unsigned parameter=k==3?BB_SAMPLE_MIX_GAIN:k;
     if(!bb_audio_sample_mix_command(&view,parameter,value,&command)||
-       !bb_command_push(&bb_sound.commands,&command)){bb_say("MIX BUSY - RETRY");return 1;}
-    bb_say("SAMPLE MIX REQUESTED");return 1;
+       !bb_command_push(&bb_sound.commands,&command)){bb_say(BB_TX(TX_MIX_BUSY_RETRY));return 1;}
+    bb_say(BB_TX(TX_SAMPLE_MIX_REQUESTED));return 1;
 }
 #endif
 #endif
@@ -485,13 +503,16 @@ static void bb_nav_level(unsigned type,unsigned target,unsigned current,int delt
 static void bb_nav_knob(unsigned role,unsigned index,int delta) {
     bb_machine *m=&bb_face.requested.drums[bb_face.machine];
     int p;
+#if BB_WITH_USER_KITS
+    if(role>=BB_NAV_R_UK_LEVEL&&role<=BB_NAV_R_UK_VOICE){bb_uk_knob(role,delta);return;}
+#endif
     switch(role) {
     case BB_NAV_R_GROUP_KICK: case BB_NAV_R_GROUP_SNCL: case BB_NAV_R_GROUP_HATS: case BB_NAV_R_GROUP_PERC: {
         bb_group_view view;   /* bb_group_knobs_input body */
         int result=bb_group_input(&bb_sound.commands,bb_sound.groups,bb_face.machine,BB_GROUP_TURN,
                                   role-BB_NAV_R_GROUP_KICK,delta,&view);
         bb_dirty=1;
-        if(result==BB_GROUP_REFUSED){bb_face.rejected++;bb_say("GROUP BUSY - RETRY");}
+        if(result==BB_GROUP_REFUSED){bb_face.rejected++;bb_say(BB_TX(TX_GROUP_BUSY_RETRY));}
         else bb_face.rejected=0;
         return;
     }
@@ -515,10 +536,10 @@ static void bb_nav_knob(unsigned role,unsigned index,int delta) {
         /* Dillo pattern transpose, the command OCT used to send. */
         const unsigned sy=bb_nav_synth();
         int wanted=bb_limit((int)bb_pattern_shift[sy]+bb_limit(delta,-24,24),-BB_TRANSPOSE_LIMIT,BB_TRANSPOSE_LIMIT);
-        if(wanted==bb_pattern_shift[sy]){bb_say("TRANSPOSE LIMIT");return;}
+        if(wanted==bb_pattern_shift[sy]){bb_say(BB_TX(TX_TRANSPOSE_LIMIT));return;}
         bb_command c={0};c.type=BB_CMD_SYNTH_TRANSPOSE;c.target=(uint8_t)sy;c.value=(uint16_t)(wanted+BB_TRANSPOSE_LIMIT);
         if(bb_command_push(&bb_sound.commands,&c)){bb_pattern_shift[sy]=(int8_t)wanted;bb_dirty=1;}
-        else bb_say("BUSY - RETRY");
+        else bb_say(BB_TX(TX_BUSY_RETRY));
         return;
     }
 #if BB_WITH_EFFECTS
@@ -534,10 +555,10 @@ static void bb_nav_knob(unsigned role,unsigned index,int delta) {
 #endif
         return;
 #if BB_WITH_EVOLVE
-    case BB_NAV_R_EVO_AMOUNT: bb_evo_send(BB_EV_AMOUNT,(unsigned)bb_limit((int)bb_evo_view.settings.amount+bb_limit(delta,-100,100),0,100),0,0);return;
-    case BB_NAV_R_EVO_EVERY: bb_evo_send(BB_EV_INTERVAL,(unsigned)bb_limit((int)bb_evo_view.settings.every_phrases+bb_limit(delta,-64,64),1,64),0,0);return;
-    case BB_NAV_R_EVO_ROOT: bb_evo_send(BB_EV_ROOT,(unsigned)bb_limit((int)bb_evo_view.settings.root+bb_limit(delta,-12,12),0,11),0,0);return;
-    case BB_NAV_R_EVO_SCALE: bb_evo_send(BB_EV_SCALE,delta>0?0x5ad:0xab5,0,0);return;
+    case BB_NAV_R_EVO_AMOUNT: if(bb_gen_state.mode){bb_gen_knob(0,delta);return;} bb_evo_send(BB_EV_AMOUNT,(unsigned)bb_limit((int)bb_evo_view.settings.amount+bb_limit(delta,-100,100),0,100),0,0);return;
+    case BB_NAV_R_EVO_EVERY: if(bb_gen_state.mode){bb_gen_knob(1,delta);return;} bb_evo_send(BB_EV_INTERVAL,(unsigned)bb_limit((int)bb_evo_view.settings.every_phrases+bb_limit(delta,-64,64),1,64),0,0);return;
+    case BB_NAV_R_EVO_ROOT: if(bb_gen_state.mode){bb_gen_knob(2,delta);return;} bb_evo_send(BB_EV_ROOT,(unsigned)bb_limit((int)bb_evo_view.settings.root+bb_limit(delta,-12,12),0,11),0,0);return;
+    case BB_NAV_R_EVO_SCALE: if(bb_gen_state.mode){bb_gen_knob(3,delta);return;} bb_evo_send(BB_EV_SCALE,delta>0?0x5ad:0xab5,0,0);return;
 #endif
     default: break;
     }
@@ -565,7 +586,7 @@ static void bb_nav_knob(unsigned role,unsigned index,int delta) {
         if(bb_nav.page==BB_NAV_SOUND) {
             /* Voice editor: the existing clamp to the voice's own range. */
             int max=bb_drum_parameter_max(&m->sound,bb_face.voice,(unsigned)p);
-            if(max<0){bb_say("NO CONTROL ON THIS VOICE");return;}
+            if(max<0){bb_say(BB_TX(TX_NO_CONTROL_ON_THIS_VOICE));return;}
             bb_send_drum_parameter((unsigned)p,(unsigned)bb_limit((int)bb_drum_parameter_get(&m->sound,bb_face.voice,(unsigned)p)+bb_limit(delta,-127,127),0,max));
         } else bb_send_drum_parameter((unsigned)p,(unsigned)bb_limit((int)bb_visible_drum_value(&m->sound,(unsigned)p)+bb_limit(delta,-127,127),0,127));
         return;
@@ -576,7 +597,7 @@ static void bb_nav_knob(unsigned role,unsigned index,int delta) {
         if(p==BB_PARAM_WAVE && !sy) {
             unsigned wave=delta>0;   /* right = SAW, left = SQUARE (was SCL) */
             if(wave==bb_face.requested.dillo.wave)return;
-            if(bb_send_synth(0,BB_CMD_SYNTH_PARAMETER,wave,BB_PARAM_WAVE)){bb_patch_edited[0]=1;bb_say(wave?"DILLO: SAW":"DILLO: SQUARE");}
+            if(bb_send_synth(0,BB_CMD_SYNTH_PARAMETER,wave,BB_PARAM_WAVE)){bb_patch_edited[0]=1;bb_say(wave?"DILLO: SAW":BB_TX(TX_DILLO_SQUARE));}
             return;
         }
         unsigned lo,hi;   /* bb_synth_knobs_input body */
@@ -593,7 +614,7 @@ static void bb_nav_group_toggle(unsigned group) {
     bb_group_view view;   /* bb_group_mutes_input body */
     int result=bb_group_input(&bb_sound.commands,bb_sound.groups,bb_face.machine,BB_GROUP_TOGGLE,group,0,&view);
     bb_dirty=1;
-    if(result==BB_GROUP_REFUSED){bb_face.rejected++;bb_say("GROUP BUSY - RETRY");}
+    if(result==BB_GROUP_REFUSED){bb_face.rejected++;bb_say(BB_TX(TX_GROUP_BUSY_RETRY));}
     else bb_face.rejected=0;
 }
 static unsigned bb_nav_group_muted(void) {
@@ -615,7 +636,7 @@ static void bb_nav_group_solo(unsigned group) {
     bb_nav_gsolo_muted[machine]=0;
     if(muted&bit){bb_nav_group_toggle(group);}
     for(unsigned g=0;g<GG_COUNT;g++)if(g!=group&&!((muted>>g)&1u)){bb_nav_group_toggle(g);bb_nav_gsolo_muted[machine]|=(uint8_t)(1u<<g);}
-    bb_nav_gsolo[machine]=(uint8_t)bit;bb_say("GROUP SOLO / REC+KEY: OFF");
+    bb_nav_gsolo[machine]=(uint8_t)bit;bb_say(BB_TX(TX_GROUP_SOLO_REC_KEY_OFF));
 }
 /* Instrument mute: hm_native_input's row loop (enable an off layer, else
  * toggle mute). Instrument 3 = both drums (KILL ALL DRUMS). */
@@ -649,20 +670,21 @@ static void bb_nav_instr_solo(unsigned row) {
     bb_nav_isolo_muted=0;
     if(muted&bit)bb_nav_instr_toggle(row);
     for(unsigned r=0;r<3;r++)if(r!=row&&!((muted>>r)&1u)){bb_nav_instr_toggle(r);bb_nav_isolo_muted|=(uint8_t)(1u<<r);}
-    bb_nav_isolo=(uint8_t)bit;bb_say("SOLO / REC+KEY: OFF");
+    bb_nav_isolo=(uint8_t)bit;bb_say(BB_TX(TX_SOLO_REC_KEY_OFF));
 }
 
 /* ------------------------------------------------------------ kit / pattern */
 /* Returns 1 when the choice was taken (requested, already loaded, or the
  * kit intent of a sample layer): bb_nav then continues to PATTERN. */
 static int bb_nav_kit_commit(void) {
-    if(!bb_sound_pick_visible()){bb_say("SOUND LIST NOT READY");return 0;}
+    if(!bb_sound_pick_visible()){bb_say(BB_TX(TX_SOUND_LIST_NOT_READY));return 0;}
     return bb_sound_pick_commit_result();
 }
 static void bb_nav_kit_chosen(void) {
     bb_nav_kit_confirmed(&bb_nav,&bb_nav_aux_o);
     bb_nav_do_keys(&bb_nav_aux_o);   /* releases only: never re-enters here */
-    if(bb_nav_aux_o.message)bb_say(bb_nav_message_text(bb_nav_aux_o.message));
+    /* D4: a sound request in flight keeps its QUEUED notice (APPLIED follows from the picker poll) */
+    if(bb_nav_aux_o.message&&!bb_sound_pick.pending)bb_say(bb_nav_message_text(bb_nav_aux_o.message));
     bb_nav_project();
 }
 static int bb_nav_pattern_is_playing(const bb_player *p) {
@@ -673,6 +695,7 @@ static int bb_nav_pattern_is_playing(const bb_player *p) {
  * starts (confirm, then START), with the queue room check of the old first
  * PLAY. Elsewhere: start/stop exactly as before. */
 static void bb_nav_transport(int pattern_play) {
+    if(bb_arr_transport())return;
     int start=!bb_face.requested.running;
     bb_player *p=bb_nav_player();
     if(start&&pattern_play&&p->ready) {
@@ -682,8 +705,8 @@ static void bb_nav_transport(int pattern_play) {
             int space=bb_sound.commands.count+2u<=BB_COMMAND_CAPACITY &&
                       !bb_sound.commands.stop_pending && !bb_sound.commands.stop_inflight;
             bb_target_leave(0,token);
-            if(!space){bb_say("BUSY / SELECT AGAIN");return;}
-            int result=bb_library_confirm(p);
+            if(!space){bb_say(BB_TX(TX_BUSY_SELECT_AGAIN));return;}
+            int result=bb_nav_confirm_pattern(p);
             if(result!=BB_FACTORY_PATTERN_OK){bb_library_result(result);return;}
         }
     }
@@ -698,13 +721,23 @@ static bb_nav_arm_state bb_nav_arm[BB_MACHINES];
 static unsigned bb_nav_arm_enables,bb_nav_arm_dropped;   /* diagnostics: switched on / disarmed */
 static void bb_nav_arm_enable(unsigned m) {
     if(bb_face.requested.drums[m].enabled)return;
-    if(!bb_send_machine(m,BB_CMD_DRUM_ENABLE,1)){bb_say("LOADED; LAYER STILL OFF: REC+ARP");return;}
+    if(!bb_send_machine(m,BB_CMD_DRUM_ENABLE,1)){bb_say(BB_TX(TX_LOADED_LAYER_STILL_OFF_REC_ARP));return;}
     bb_nav_arm_enables++;
-    if(bb_face.requested.drums[m].muted)bb_say("LAYER ON, STILL MUTED");
+    if(bb_face.requested.drums[m].muted)bb_say(BB_TX(TX_LAYER_ON_STILL_MUTED));
 }
 static void bb_nav_arm_pattern(const bb_player *p) {
     unsigned m=bb_face.machine;
-    if(bb_nav_is_drum()&&m<BB_MACHINES)bb_nav_arm_on_pattern(&bb_nav_arm[m],bb_face.requested.drums[m].enabled,p->request.ticket);
+    if(bb_nav_is_drum()&&m<BB_MACHINES&&p&&p->is_drum&&p->target==m){
+        bb_nav_arm_on_pattern(&bb_nav_arm[m],bb_face.requested.drums[m].enabled,p->request.ticket);
+        bb_library_panel_pending|=(uint8_t)(1u<<m);
+    }
+}
+/* All physical UI confirmation routes share the same accepted-ticket policy.
+ * Do not enable on a cursor move, a refused request or before owner APPLIED. */
+static int bb_nav_confirm_pattern(bb_player *p) {
+    int result=bb_library_confirm(p);
+    if(result==BB_FACTORY_PATTERN_OK)bb_nav_arm_pattern(p);
+    return result;
 }
 /* Called only after bb_nav_kit_commit() accepted the choice. */
 static void bb_nav_arm_kit(void) {
@@ -720,17 +753,28 @@ static void bb_nav_arm_poll(void) {
     for(unsigned m=0;m<BB_MACHINES;m++) {
         if(bb_nav_arm[m].kind==BB_NAV_ARM_NONE)continue;
         const bb_player *p=&bb_drum_library[m];
-        bb_nav_arm_view v={p->request.ticket,p->status.seen,(uint8_t)(p->status.result==BB_PATTERN_APPLIED),
+        /* QUEUED is an acknowledgement, not a failed terminal result. Keep
+         * the owed enable armed until APPLIED, rejection or cancellation. */
+        unsigned terminal=p->status.result==BB_PATTERN_APPLIED||p->status.result==BB_PATTERN_REJECTED||
+                          p->status.result==BB_PATTERN_CANCELLED;
+        bb_nav_arm_view v={p->request.ticket,terminal?p->status.seen:0,(uint8_t)(p->status.result==BB_PATTERN_APPLIED),
             bb_sound_pick.pending,(uint8_t)(bb_sound_pick.machine==m),
             (uint8_t)(bb_sound_pick.status==BB_SP_APPLIED||bb_sound_pick.status==BB_SP_SAME)};
         int verdict=bb_nav_arm_step(&bb_nav_arm[m],&v);
-        if(verdict==BB_NAV_ARM_ENABLE)bb_nav_arm_enable(m);
+        if(verdict==BB_NAV_ARM_ENABLE){
+            if(p->request.enable_on_apply){
+                /* Owner already committed it; never enqueue a late second enable. */
+                if(bb_face.requested.drums[m].enabled)bb_nav_arm_enables++;
+            }else bb_nav_arm_enable(m);
+        }
         else if(verdict==BB_NAV_ARM_DROP)bb_nav_arm_dropped++;
     }
 }
+static void bb_record_pattern_begin(void);   /* bb_record_firmware.inc, after this file */
 /* ------------------------------------------------------------ actions */
 static void bb_nav_do_actions(const bb_nav_out *o) {
     uint32_t a=o->actions;
+    if(a&BB_NAV_A_HOME_AGAIN)bb_arr_open();   /* 2.0 N4: HOME again on STUDIO opens SONG */
     bb_machine *m=&bb_face.requested.drums[bb_face.machine];
     if(a&BB_NAV_A_TRANSPORT)bb_nav_transport(o->pattern_play);
     if(a&BB_NAV_A_PANIC) {
@@ -738,18 +782,29 @@ static void bb_nav_do_actions(const bb_nav_out *o) {
          * voices are one-shots; no choke command exists (follow-up). */
         bb_nav_notes_all_off();
         bb_command c={0};c.type=BB_CMD_SYNTH_RELEASE;c.target=0;
-        if(!bb_command_push(&bb_sound.commands,&c))bb_say("BUSY - RETRY");
+        if(!bb_command_push(&bb_sound.commands,&c))bb_say(BB_TX(TX_BUSY_RETRY));
         bb_dirty=1;
     }
     /* Choosing a kit or a pattern for a drum layer that is off switches it on (Joe, #4 6469173268), but
      * only once the audio owner has APPLIED that choice (bb_nav_arm_poll). A refused, not-ready, busy,
      * cancelled or rejected confirmation never enables the layer (Duke, #4 6469741984). */
+#if BB_WITH_USER_KITS
+    if(a&BB_NAV_A_BUILD)bb_uk_nav_mode();
+    if(a&BB_NAV_A_UK_STORE)bb_uk_store();
+    if(a&BB_NAV_A_KIT_CONFIRM){
+        int user=bb_uk_list_commit();   /* -1: a machine row, as before */
+        if(user>0||(user<0&&bb_nav_kit_commit())){bb_nav_arm_kit();bb_nav_kit_chosen();}
+    }
+#else
     if(a&BB_NAV_A_KIT_CONFIRM){if(bb_nav_kit_commit()){bb_nav_arm_kit();bb_nav_kit_chosen();}}
+#endif
     if(a&BB_NAV_A_PATTERN_CONFIRM) {
         bb_player *p=bb_nav_player();
         if(!p->ready)bb_say("LIBRARY NOT READY");
-        else {int result=bb_library_confirm(p);bb_library_result(result);if(result==BB_FACTORY_PATTERN_OK)bb_nav_arm_pattern(p);}
+        else{int r=bb_nav_confirm_pattern(p);if(r!=BB_FACTORY_PATTERN_OK||!p->request.has_kit)bb_library_result(r);}   /* D4: KIT QUEUED stays */
     }
+    if(a&BB_NAV_A_UNDO)bb_pe_undo_last();   /* REC+EDIT on PLAY/STEPS */
+    if(a&BB_NAV_A_RECORD)bb_record_pattern_begin();   /* REC+SEQ on PLAY/STEPS, drums (bb_record_firmware.inc) */
     if(a&BB_NAV_A_MUTE) {
         if(bb_nav_is_drum())bb_send(BB_CMD_DRUM_MUTE,!m->muted);
         else bb_send_synth(bb_nav_synth(),BB_CMD_SYNTH_MUTE,!bb_face.requested.synths[bb_nav_synth()].muted,0);
@@ -772,19 +827,19 @@ static void bb_nav_do_actions(const bb_nav_out *o) {
     if(a&BB_NAV_A_REVERT) {
         if(!bb_nav_is_drum()) {
             const unsigned sy=bb_nav_synth();
-            if(bb_send_synth(sy,sy?BB_CMD_TELEGRAM_PATCH:BB_CMD_DILLO_PATCH,bb_patch_index[sy],0)){bb_patch_edited[sy]=0;bb_patch_from_scene[sy]=0;bb_say("SOUND BACK TO ITS PRESET");}
-        } else bb_say("NOT IN THIS BUILD");   /* drum voice revert needs a new command */
+            if(bb_send_synth(sy,sy?BB_CMD_TELEGRAM_PATCH:BB_CMD_DILLO_PATCH,bb_patch_index[sy],0)){bb_patch_edited[sy]=0;bb_patch_from_scene[sy]=0;bb_say(BB_TX(TX_SOUND_BACK_TO_ITS_PRESET));}
+        } else bb_say(BB_TX(TX_NOT_IN_THIS_BUILD));   /* drum voice revert needs a new command */
     }
 #if BB_WITH_EVOLVE
     if(a&BB_NAV_A_EVO_OPEN) {
-        if(bb_evo_source_blocked()){bb_nav_force(BB_NAV_PLAY);bb_say("SOURCE PATTERN: EVOLVE OFF");}
+        if(bb_evo_source_blocked()){bb_nav_force(BB_NAV_PLAY);bb_say(BB_TX(TX_SOURCE_PATTERN_EVOLVE_OFF));}
         else if(!bb_evo_view.ready)bb_evo_send(BB_EV_CAPTURE,0,0,0);
     }
     if(a&BB_NAV_A_EVO_TOGGLE) {
         if(bb_evo_view.enabled&&!bb_evo_view.frozen)bb_evo_send(BB_EV_ENABLE,0,0,0);
         else bb_evo_send(BB_EV_RUN,0,0,0);
     }
-    if(a&BB_NAV_A_EVO_CAPTURE)bb_evo_send(BB_EV_CAPTURE,0,0,0);
+    if(a&BB_NAV_A_EVO_CAPTURE){if(bb_gen_state.mode)bb_gen_apply();else bb_evo_send(BB_EV_CAPTURE,0,0,0);}
 #endif
     if(a&BB_NAV_A_TEMPO_SET)
         bb_send(BB_CMD_TEMPO,(unsigned)bb_limit(((int)o->tempo_x10+5)/10,30,300));
@@ -835,12 +890,15 @@ static void bb_nav_do_encoders(const bb_nav_out *o) {
         case BB_NAV_TO_INSTRUMENT: bb_nav_focus_move(d);break;
         case BB_NAV_TO_TEMPO:
             bb_send(BB_CMD_TEMPO,(unsigned)bb_limit((int)bb_face.requested.bpm+bb_limit(d,-270,270),30,300));
-            if(!bb_face.rejected)bb_say("TEMPO / REC + SELECT");
+            if(!bb_face.rejected)bb_say(BB_TX(TX_TEMPO_REC_SELECT));
             break;
         case BB_NAV_TO_SECTION: bb_nav_section_step(d);break;
         case BB_NAV_TO_KIT:
+#if BB_WITH_USER_KITS
+            if(bb_uk_kit_turn(d))break;        /* BUILD: the lane's machine */
+#endif
             if(bb_sound_pick_audio_failed()){bb_say("AUDIO FAULT / LOAD BLOCKED");break;}
-            if(bb_sound_pick.pending){bb_say("SOUND REQUEST STILL PENDING");break;}
+            if(bb_sound_pick.pending){bb_say(BB_TX(TX_SOUND_REQUEST_STILL_PENDING));break;}
             bb_nav_project();   /* opens the chooser on this scan's entry */
             if(bb_sound_pick_visible()){(void)bb_sound_picker_move(&bb_sound_pick,d);bb_dirty=1;bb_sound_pick_poll();}
             break;
@@ -851,6 +909,9 @@ static void bb_nav_do_encoders(const bb_nav_out *o) {
             break;
         }
         case BB_NAV_TO_VOICE:
+#if BB_WITH_USER_KITS
+            if(bb_uk_in_build())break;         /* BUILD: the lanes are on the keys */
+#endif
 #if BB_WITH_RICH_DRUM_BROWSER
             if(bb_rich_active()&&bb_nav.page==BB_NAV_PLAY){bb_rich_move(bb_limit(d,-17,17));break;}
 #endif
@@ -859,9 +920,63 @@ static void bb_nav_do_encoders(const bb_nav_out *o) {
             break;
         case BB_NAV_TO_STEP_PITCH: bb_pitch_edit(0,d);break;
         case BB_NAV_TO_KNOB: bb_nav_knob(r->role,r->index,d);break;
+        case BB_NAV_TO_RATCHET: bb_nav_ratchet_turn(r->index,d);break;   /* 2.0: hold a drum step + K4 */
         default: break;
         }
     }
+}
+
+/* ------------------------------------------------------------ ratchets (2.0)
+ * The panel side of ratchets: hold a drum step key, turn K4, and that step's count for the selected voice
+ * moves between x1 and x4. The count lives with the pattern (Codex's ratchet owner); these two hooks are
+ * the only meeting point. Until that owner is linked, the turn is refused out loud, never faked. */
+#ifndef BB_WITH_RATCHETS
+#define BB_WITH_RATCHETS 1
+#endif
+/* The owner's voice for the selected row: the physical lane (0..10) on native grids, the BB_FDV_* source on a
+ * rich phrase (bb_rich_sources[], so SH and the other folded sources stay distinct). */
+static unsigned bb_ratchet_voice(void){
+    return bb_rich_active()?bb_rich_sources[bb_rich_voices[bb_face.machine]%17u]:(bb_face.voice<11u?bb_face.voice:0u);
+}
+#if BB_WITH_RATCHETS
+/* The owner's identity for the source a ratchet edit applies to (rich phrase or native pattern ticket). */
+static uint32_t bb_ratchet_source(unsigned m){
+    if(m>=BB_MACHINES)return 0;
+    return m<BB_RICH_DRUMS&&bb_sound.rich.valid[m]?bb_sound.rich.status[m].applied:bb_sound.drum_patterns.status[m].state.applied;
+}
+/* bb_audio_ratchet_get: 1..4, 0 = invalid or mixed. bb_audio_ratchet_request: 1 = queued (not yet applied). */
+static int bb_ratchet_get(unsigned machine,unsigned voice,unsigned step){return (int)bb_audio_ratchet_get(&bb_sound,machine,voice,step);}
+static int bb_ratchet_request(unsigned machine,unsigned voice,unsigned step,unsigned count){return bb_pe_count_request(machine,voice,step,count);}
+#else
+static int bb_ratchet_get(unsigned machine,unsigned voice,unsigned step){(void)machine;(void)voice;(void)step;return 1;}
+#endif
+#if BB_WITH_RATCHETS
+static struct{uint32_t cell,source,refusals,ms;uint8_t want,live;}bb_nav_ratchet_pend;
+static void bb_nav_ratchet_cancel(void){bb_nav_ratchet_pend.live=0;}
+#else
+static void bb_nav_ratchet_cancel(void){}
+#endif
+static void bb_nav_ratchet_turn(unsigned key_step,int delta){
+    unsigned m=bb_face.machine,step=bb_face.bank*16u+key_step;
+    if(m>=BB_MACHINES||!delta)return;
+#if BB_WITH_RATCHETS
+    /* A request is only queued, so the owner still reports the old count for a scan or two. Fast turns on the
+     * same cell build on the count last asked for, but only while that ask can still be pending: same cell,
+     * same applied source (a new pattern or phrase gets a new ticket), no refusal since, within 400 ms. */
+    unsigned v=bb_ratchet_voice(),cell=m<<16|v<<8|step;
+    uint32_t source=bb_ratchet_source(m),refusals=bb_sound.rich.edit_refusals;
+    int now=bb_ratchet_get(m,v,step),want;
+    if(bb_nav_ratchet_pend.live&&bb_nav_ratchet_pend.cell==cell&&bb_nav_ratchet_pend.source==source&&bb_nav_ratchet_pend.refusals==refusals&&fm1_ms-bb_nav_ratchet_pend.ms<400u)now=bb_nav_ratchet_pend.want;
+    if(now<1)want=delta>0?2:1;                           /* mixed counts: up sets every copy x2, down x1 */
+    else{want=bb_limit(now+(delta>0?1:-1),1,4);if(want==now)return;}
+    bb_nav_ratchet_pend.live=0;
+    if(bb_ratchet_request(m,v,step,(unsigned)want)){
+        static char msg[]="RATCHET x1 QUEUED";msg[9]=(char)('0'+want);bb_say(msg);bb_dirty=1;   /* series 0005: the owner applies it; ticks show APPLIED */
+        bb_nav_ratchet_pend.cell=cell;bb_nav_ratchet_pend.source=source;bb_nav_ratchet_pend.refusals=refusals;bb_nav_ratchet_pend.ms=fm1_ms;bb_nav_ratchet_pend.want=(uint8_t)want;bb_nav_ratchet_pend.live=1;
+    } else bb_say(BB_TX(TX_RATCHET_NOT_SET_TRY_AGAIN));
+#else
+    (void)step;bb_say("RATCHETS: NOT IN THIS BUILD YET");
+#endif
 }
 
 /* ------------------------------------------------------------ keys */
@@ -874,14 +989,14 @@ static void bb_nav_do_keys(const bb_nav_out *o) {
         case BB_NAV_K_PAD:
             if(bb_panel_drum_hit(&bb_face,&bb_sound.commands,arg,accent?127u:88u)) {
                 bb_face.voice=(uint8_t)arg;bb_nav_set_voice(&bb_nav,(uint8_t)arg);bb_dirty=1;
-            } else bb_say("BUSY - RETRY");
+            } else bb_say(BB_TX(TX_BUSY_RETRY));
             break;
         case BB_NAV_K_NOTE:
             if(release)bb_nav_note_off(arg);else bb_nav_note_on_key(arg,accent?127u:88u,phys);
             break;
         case BB_NAV_K_STEP:
             if(bb_nav_is_drum()) {
-                if(bb_rich_active()){bb_say("SOURCE PATTERN VIEW");break;}
+                if(bb_rich_active()){bb_pe_step(arg,accent);break;}   /* 2.0: first edit makes an editable copy */
                 uint8_t was=bb_face.accent;bb_face.accent=(uint8_t)accent;
                 (void)bb_panel_step(&bb_face,&bb_sound.commands,arg);
                 bb_face.accent=was;bb_dirty=1;
@@ -894,7 +1009,7 @@ static void bb_nav_do_keys(const bb_nav_out *o) {
                 bb_edit edit=accent?BB_ACCENT:bb_face.requested.edit;
                 unsigned pitch=seq->notes[step].gate?seq->notes[step].note:bb_entry_pitch[sy];
                 bb_selected_note[sy]=(uint8_t)step;
-                if(!bb_panel_synth_step(&bb_face,&bb_sound.commands,sy,arg,edit,pitch))bb_say("NOTE EDIT REJECTED");
+                if(!bb_panel_synth_step(&bb_face,&bb_sound.commands,sy,arg,edit,pitch))bb_say(BB_TX(TX_NOTE_EDIT_REJECTED));
                 else bb_entry_pitch[sy]=(uint8_t)pitch;
                 bb_dirty=1;
             }
@@ -919,14 +1034,19 @@ static void bb_nav_do_keys(const bb_nav_out *o) {
         case BB_NAV_K_SECTION_NEXT: bb_nav_section_step(1);break;
         case BB_NAV_K_PICK:
             if(bb_nav.page==BB_NAV_KIT) {
-                if(!bb_sound_pick_visible()||arg>=bb_sound_picker_items(&bb_sound_pick)){bb_say("NO SOUND ON THIS KEY");break;}
+                if(!bb_sound_pick_visible()||arg>=bb_sound_picker_items(&bb_sound_pick)){bb_say(BB_TX(TX_NO_SOUND_ON_THIS_KEY));break;}
                 (void)bb_sound_picker_key(&bb_sound_pick,arg);
-                if(bb_nav_kit_commit())bb_nav_kit_chosen();
+#if BB_WITH_USER_KITS
+                {int user=bb_uk_list_commit();   /* drum A's USER 1-4 rows; -1: a machine row, as before */
+                 if(user>0||(user<0&&bb_nav_kit_commit())){bb_nav_arm_kit();bb_nav_kit_chosen();}}
+#else
+                if(bb_nav_kit_commit()){bb_nav_arm_kit();bb_nav_kit_chosen();}
+#endif
             } else {
                 bb_player *p=bb_nav_player();
                 if(!p->ready){bb_say("LIBRARY NOT READY");break;}
                 int valid=bb_library_preview_bank_key(p,arg);
-                bb_library_result(valid?bb_library_confirm(p):BB_FACTORY_PATTERN_INVALID);
+                bb_library_result(valid?bb_nav_confirm_pattern(p):BB_FACTORY_PATTERN_INVALID);
             }
             break;
 #if BB_WITH_SESSION
@@ -936,6 +1056,7 @@ static void bb_nav_do_keys(const bb_nav_out *o) {
         /* ANIMATION / SCOPE / METERS: no longer offered (bb_nav.c GLOBAL keys are inert on v3) */
 #if BB_WITH_EVOLVE
         case BB_NAV_K_EVO_KEY:
+            if(bb_gen_state.mode){if(arg<16){bb_gen_state.voice=(uint8_t)arg;bb_dirty=1;}break;}
             if(!bb_evo_view.ready)break;
             if(arg<6)bb_evo_send(BB_EV_PARTS,bb_evo_view.settings.parts^(1u<<arg),0,0);
             else if(arg<10)bb_evo_send(BB_EV_ATTRIBUTES,bb_evo_view.settings.attributes^(1u<<(arg-6)),0,0);
@@ -949,12 +1070,17 @@ static void bb_nav_do_keys(const bb_nav_out *o) {
         }
         case BB_NAV_K_EVO_FREEZE: if(bb_evo_view.ready)bb_evo_send(BB_EV_FREEZE,bb_evo_view.pending?1u:!bb_evo_view.frozen,0,0);break;
         case BB_NAV_K_EVO_HOME: if(bb_evo_view.ready)bb_evo_send(BB_EV_HOME,0,0,0);break;
+        case BB_NAV_K_GEN_MODE: bb_gen_mode_next();break;
+#endif
+#if BB_WITH_USER_KITS
+        case BB_NAV_K_LANE: bb_uk_lane_key(arg);break;
+        case BB_NAV_K_UK_SLOT: bb_uk_slot_key(arg);break;
 #endif
         case BB_NAV_K_STEP_PITCH: {
             const unsigned sy=bb_nav_synth();
             const bb_sequence *seq=&bb_face.requested.synths[sy];
             unsigned step=bb_selected_note[sy];
-            if(step>=seq->length||!seq->notes[step].gate){bb_say("CHOOSE A STEP FIRST");break;}
+            if(step>=seq->length||!seq->notes[step].gate){bb_say(BB_TX(TX_CHOOSE_A_STEP_FIRST));break;}
             int delta=(int)arg-(int)seq->notes[step].note;
             if(delta)bb_pitch_edit(sy,delta);
             break;
@@ -979,7 +1105,7 @@ static void bb_nav_boot(void) {
 }
 
 /* ------------------------------------------------------------ the scan */
-static void bb_nav_scan(uint32_t pressed,uint32_t notes) {
+static void bb_nav_scan_mode(uint32_t pressed,uint32_t notes,int count_busy) {
     bb_nav_in in;
     memset(&in,0,sizeof in);
     in.pressed=bb_nav_buttons(pressed);
@@ -990,12 +1116,13 @@ static void bb_nav_scan(uint32_t pressed,uint32_t notes) {
     in.now_ms=fm1_ms;
     bb_nav_fill_facts(&in.facts);
     bb_nav_f=in.facts;
-    bb_nav_input(&bb_nav,&in,&bb_nav_o);
+    if(count_busy)bb_nav_input_count_busy(&bb_nav,&in,&bb_nav_o);
+    else bb_nav_input(&bb_nav,&in,&bb_nav_o);
 #if BB_WITH_SESSION
     /* SAVE into other data (bb/bb_save_claim.h): after the refused STORE armed
      * the claim, a fresh SAVE press held 2 s on this page and slot, alone,
      * replaces the slot. bb_nav does nothing with SAVE on the SAVE page. */
-    if(bb_claim_scan(&bb_session_claim,fm1_ms,bb_nav.page==BB_NAV_SAVE,bb_scene_slot,
+    if(!count_busy&&bb_claim_scan(&bb_session_claim,fm1_ms,bb_nav.page==BB_NAV_SAVE,bb_scene_slot,
          !!(in.pressed&BB_NAV_BIT(BB_NAV_B_SAVE)),!!(in.held&BB_NAV_BIT(BB_NAV_B_SAVE)),
          (in.held&~BB_NAV_BIT(BB_NAV_B_SAVE))||in.keys_held||in.keys)) {
         (void)bb_session_request_ex(bb_scene_slot,0,1);bb_say(bb_session_message);
@@ -1017,6 +1144,12 @@ static void bb_nav_scan(uint32_t pressed,uint32_t notes) {
     bb_nav_do_encoders(&bb_nav_o);
     if(bb_nav.page!=BB_NAV_SOUND&&bb_face.voice>10)bb_face.voice=10;
     bb_nav_project();
+}
+
+static void bb_nav_scan(uint32_t pressed,uint32_t notes){bb_nav_scan_mode(pressed,notes,0);}
+static void bb_nav_scan_count_busy(uint32_t pressed,uint32_t notes){
+    if(pressed&(1u<<panel.btn[B_PLAY])){bb_nav_notes_all_off();bb_send(BB_CMD_TRANSPORT,0);}
+    bb_nav_scan_mode(pressed,notes,1);
 }
 
 /* ------------------------------------------------------------ LEDs */

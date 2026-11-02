@@ -2,6 +2,7 @@
  * Big Beat navigation core v2. See bb_nav.h. Pure decisions, no side effects
  * outside the caller's bb_nav_state / bb_nav_out / bb_nav_led_out. */
 #include "bb_nav.h"
+#include "bb/bb_text_block.h"
 #ifndef BB_NAV_FIRMWARE_INCLUDE
 #include <string.h>
 #endif
@@ -29,62 +30,69 @@ static const char *const nav_role_labels[BB_NAV_ROLES] = {
     "TIME MS", "FDBK %", "HEADS", "ECHO WET", "TONE %", "DRIVE %", "WEAR %", "SIZE %",
     "DAMP %", "SPR WET", "MOTION %", "ECHO", "SPRING",       /* the two wets named apart (SPRING bank shows both) */
     "SLOT", "AMOUNT", "EVERY", "ROOT", "SCALE"
+#if BB_WITH_USER_KITS
+    , "LEVEL", "TUNE", "DECAY", "VOICE"
+#endif
 };
 
-static const char *const nav_messages[BB_NAV_MESSAGES] = {
-    "",
-    "WAIT",
-    "STUDIO / EDIT: OPEN",
-    "PADS / SEQ: STEPS",
-    "STEPS / ARP: LIVE",
-    "KEYS / SEQ: STEPS",
-    "KIT / EDIT: CHOOSE",
-    "PATCH / EDIT: LOAD",
-    "PATTERN / EDIT: CHOOSE",
-    "SOUND / EDIT: MORE",
-    "FX / EDIT: NEXT BANK",
-    "SAVE / KEYS 1-4, EDIT: STORE",
-    "EVOLVE / EDIT: CAPTURE",
-    "GLOBAL / K1-K4",
-    "CHOOSE PATTERN / PLAY: START",
-    "ALL NOTES OFF",
-    "RESTART FROM BAR 1",
-    "SWING ON",
-    "SWING OFF",
-    "SCALE OFF",
-    "SCALE MINOR",
-    "SCALE MAJOR",
-    "SCALE DORIAN",
-    "SCALE PENTA",
-    "ROOT: PRESS A KEY",
-    "ROOT SET",
-    "TAP TEMPO",
-    "DUB THROW",
-    "STOP FIRST",
-    "OCTAVE LIMIT",
-    "KIT WAITING / EDIT: RETRY",
-    "PATTERN WAITING / EDIT: RETRY",
-    "NOT IN THIS BUILD",
-    "AUDIO FAULT / LOAD BLOCKED",
-    "KIT NOT READY",
-    "PATTERNS NOT READY",
-    "SOUNDS NOT READY",
-    "NO PATTERNS FOR THIS KIT",
-    "KIT / PATTERN MISMATCH",
-    "TIMING NOT SUPPORTED",
-    "VOICE NOT SUPPORTED",
-    "EXPRESSION NOT SUPPORTED",
-    "PATTERN UNAVAILABLE",
-    "SOUND REQUEST REFUSED",
-    "SOUND ALREADY LOADED",
-    "NO ALTERNATE VOICE",
-    "LAYER OFF",
-    "SOURCE LENGTH: READ ONLY",
-    "SOURCE PATTERN: EVOLVE OFF",
-    "SECTIONS 1-11",
-    "SECTIONS 12-22",
-    "SECTIONS 23-33",
-    "SOUND / K1-K4"
+/* 2.0 help flash: message IDs; the texts live in the BBTX flash block (bb/bb_text_block.h). TX_NONE = no text. */
+static const uint16_t nav_messages[BB_NAV_MESSAGES] = {
+    TX_NONE,
+    TX_WAIT,
+    TX_STUDIO_EDIT_SONG,
+    TX_PADS_SEQ_STEPS,
+    TX_STEPS_ARP_LIVE,
+    TX_KEYS_SEQ_STEPS,
+    TX_KIT_EDIT_CHOOSE,
+    TX_PATCH_EDIT_LOAD,
+    TX_PATTERN_EDIT_CHOOSE,
+    TX_SOUND_OCT_MORE,
+    TX_FX_EDIT_OR_OCT_BANK,
+    TX_SAVE_KEYS_1_4_EDIT_STORE,
+    TX_EVOLVE_EDIT_CAPTURE,
+    TX_GLOBAL_K1_K4,
+    TX_CHOOSE_PATTERN_PLAY_START,
+    TX_ALL_NOTES_OFF,
+    TX_RESTART_FROM_BAR_1,
+    TX_SWING_ON,
+    TX_SWING_OFF,
+    TX_SCALE_OFF,
+    TX_SCALE_MINOR,
+    TX_SCALE_MAJOR,
+    TX_SCALE_DORIAN,
+    TX_SCALE_PENTA,
+    TX_ROOT_PRESS_A_KEY,
+    TX_ROOT_SET,
+    TX_TAP_TEMPO,
+    TX_DUB_THROW,
+    TX_STOP_FIRST,
+    TX_OCTAVE_LIMIT,
+    TX_KIT_WAITING_EDIT_RETRY,
+    TX_PATTERN_WAITING_EDIT_RETRY,
+    TX_NOT_IN_THIS_BUILD,
+    TX_NONE,                 /* AUDIO FAULT / LOAD BLOCKED: a safety text, kept in the app (bb_nav_message_text) */
+    TX_KIT_NOT_READY,
+    TX_PATTERNS_NOT_READY,
+    TX_SOUNDS_NOT_READY,
+    TX_NO_PATTERNS_FOR_THIS_KIT,
+    TX_KIT_PATTERN_MISMATCH,
+    TX_TIMING_NOT_SUPPORTED,
+    TX_VOICE_NOT_SUPPORTED,
+    TX_EXPRESSION_NOT_SUPPORTED,
+    TX_PATTERN_UNAVAILABLE,
+    TX_SOUND_REQUEST_REFUSED,
+    TX_SOUND_ALREADY_LOADED,
+    TX_NO_ALTERNATE_VOICE,
+    TX_LAYER_OFF,
+    TX_SOURCE_LENGTH_READ_ONLY,
+    TX_SOURCE_PATTERN_EVOLVE_OFF,
+    TX_SECTIONS_1_11,
+    TX_SECTIONS_12_22,
+    TX_SECTIONS_23_33,
+    TX_SOUND_K1_K4
+#if BB_WITH_USER_KITS
+    , TX_BUILD_KEYS_LANE_PRESETS_KIT, TX_SAVE_AS_KEYS_1_4_EDIT_STORE, TX_KIT_BLACK_1_BUILD
+#endif
 };
 
 static const char *const nav_scale_names[BB_NAV_SCALES] = { "OFF", "MINOR", "MAJOR", "DORIAN", "PENTA" };
@@ -130,6 +138,13 @@ static int nav_is_drum(const bb_nav_state *s)
 #endif
 static int nav_has(const bb_nav_state *s, unsigned f) { return ((BB_NAV_FEATURES_BUILD & f) != 0) && (s->features & f) != 0; }
 static int nav_steps(const bb_nav_state *s) { return s->play_keys == BB_NAV_PLAY_STEPS; }
+#if BB_WITH_USER_KITS
+/* 2.0 kit builder: KIT on drum A (an 808-family layer, focus row 0) has BUILD; drum B and Dillo do not. */
+static int nav_build_ok(const bb_nav_state *s)
+{
+    return s->page == BB_NAV_KIT && s->instrument == BB_NAV_INSTR_DRUM && s->focus == 0;
+}
+#endif
 static void nav_knob_roles(const bb_nav_state *s, uint8_t r[4], uint8_t idx[4]);
 
 /* v2.1 section pages: how many pages the current pattern needs (>= 1). */
@@ -159,7 +174,11 @@ static uint8_t nav_entry_message(const bb_nav_state *s)
     case BB_NAV_PLAY:
         if (nav_steps(s)) return BB_NAV_MSG_PLAY_STEPS;
         return nav_is_drum(s) ? BB_NAV_MSG_PLAY_PADS : BB_NAV_MSG_PLAY_KEYS;
+#if BB_WITH_USER_KITS
+    case BB_NAV_KIT: return nav_build_ok(s) ? BB_NAV_MSG_KIT_BUILD : nav_is_drum(s) ? BB_NAV_MSG_KIT : BB_NAV_MSG_PRESET;
+#else
     case BB_NAV_KIT: return nav_is_drum(s) ? BB_NAV_MSG_KIT : BB_NAV_MSG_PRESET;
+#endif
     case BB_NAV_PATTERN: return BB_NAV_MSG_PATTERN;
     case BB_NAV_SOUND: return bb_nav_bank_count(s, BB_NAV_SOUND) > 1 ? BB_NAV_MSG_SOUND : BB_NAV_MSG_SOUND_KNOBS;
     case BB_NAV_FX: return BB_NAV_MSG_FX;
@@ -202,6 +221,7 @@ static void nav_drain(bb_nav_state *s, bb_nav_out *o, uint32_t hold)
 {
     nav_drop_routes(o);
     nav_release_keys(s, o, s->keys_active);
+    s->step_hold = 0; s->step_hold_used = 0;   /* a held step is dropped with the page, never toggled late */
     s->keys_blocked |= hold;
     o->block_held_keys = 1;
 }
@@ -251,7 +271,7 @@ static void nav_finish(const bb_nav_state *s, bb_nav_out *o)
 {
     o->page = s->page;
     o->bank = s->bank;
-    o->help = s->help;
+    o->help = s->help || s->rec_help;   /* REC's overlay never blocks keys or chords (key_mode below) */
     o->key_octave = s->key_octave;
     o->scale = s->scale;
     o->root = s->root;
@@ -370,6 +390,9 @@ static uint8_t nav_keyboard(const bb_nav_state *s, uint8_t key, uint8_t *arg)
 
 int bb_nav_key_is_sound(uint8_t role)
 {
+#if BB_WITH_USER_KITS
+    if (role == BB_NAV_K_LANE) return 1;      /* a BUILD lane plays like a pad: REC held = accent */
+#endif
     return role == BB_NAV_K_PAD || role == BB_NAV_K_NOTE || role == BB_NAV_K_STEP;
 }
 
@@ -416,6 +439,16 @@ uint8_t bb_nav_key_role(const bb_nav_state *s, uint8_t key, int rec, uint8_t *ar
         return BB_NAV_K_NONE;
     case BB_NAV_KIT:
         *arg = n;
+#if BB_WITH_USER_KITS
+        if (nav_build_ok(s)) {
+            if (s->bank == BB_NAV_KIT_SAVE_AS) return white && n < 4 ? BB_NAV_K_UK_SLOT : BB_NAV_K_NONE;
+            if (!white && n == 0) return BB_NAV_K_BUILD;
+            if (s->bank == BB_NAV_KIT_BUILD) {
+                if (!white && n <= 6) *arg = (uint8_t)(n + 10);     /* black 2-7: LC MC HC CL MA RD */
+                return (white && n < 11) || (!white && n <= 6) ? BB_NAV_K_LANE : BB_NAV_K_NONE;
+            }
+        }
+#endif
         return white ? BB_NAV_K_PICK : BB_NAV_K_NONE;
     case BB_NAV_PATTERN:
         *arg = white ? n : (uint8_t)(s->sec_page * BB_NAV_SECTION_KEYS + n);
@@ -425,15 +458,17 @@ uint8_t bb_nav_key_role(const bb_nav_state *s, uint8_t key, int rec, uint8_t *ar
         if (white && n < 4) return rec ? BB_NAV_K_SLOT_LOAD : BB_NAV_K_SLOT;
         return BB_NAV_K_NONE;
     case BB_NAV_GLOBAL:
-        /* The ANIMATION / SCOPE / METERS display toggles belonged to the legacy faces. Every
-         * player-facing page is now the shared v3 frame, which has no scope view and is always
-         * animated, so offering them would be a false choice: the keys are dark and inert. */
-        return BB_NAV_K_NONE;
+        /* The ANIMATION / SCOPE / METERS display toggles belonged to the legacy faces and stay gone.
+         * White 1, 2 and 5 open MIDI, CLOCK and the Dillo kit view (bb_midi_ui_input.inc,
+         * bb_dillo_kit_firmware.inc). Name them as roles so their LEDs are lit and help lists them. */
+        *arg = n;
+        return (white && (n == 0 || n == 1 || n == 4)) ? BB_NAV_K_SUBPAGE : BB_NAV_K_NONE;
     case BB_NAV_EVOLVE:
         *arg = n;
         if (white) return rec ? BB_NAV_K_EVO_LOCK : BB_NAV_K_EVO_KEY;
         if (n == 0) return BB_NAV_K_EVO_FREEZE;
         if (n == 1) return BB_NAV_K_EVO_HOME;
+        if (n == 2) return BB_NAV_K_GEN_MODE;
         return BB_NAV_K_NONE;
     default:
         return BB_NAV_K_NONE;
@@ -468,6 +503,13 @@ static void nav_knob_roles(const bb_nav_state *s, uint8_t r[4], uint8_t idx[4])
         break;
     case BB_NAV_KIT:
         r[0] = drum ? BB_NAV_R_LAYER_LEVEL : BB_NAV_R_SYNTH_LEVEL;
+#if BB_WITH_USER_KITS
+        if (s->bank == BB_NAV_KIT_BUILD) {
+            r[0] = BB_NAV_R_UK_LEVEL; r[1] = BB_NAV_R_UK_TUNE; r[2] = BB_NAV_R_UK_DECAY; r[3] = BB_NAV_R_UK_VOICE;
+        } else if (s->bank == BB_NAV_KIT_SAVE_AS) {
+            r[0] = BB_NAV_R_NONE;               /* SAVE AS: white 1-4 pick the slot, EDIT stores */
+        }
+#endif
         break;
     case BB_NAV_SOUND:
         if (s->instrument == BB_NAV_INSTR_DRUM_909) {
@@ -516,6 +558,8 @@ void bb_nav_knobs(const bb_nav_state *s, uint8_t roles[4], const char *labels[4]
     unsigned k;
     nav_knob_roles(s, roles, idx);
     for (k = 0; k < 4; k++) labels[k] = nav_role_labels[roles[k]];
+    /* 2.0: while a drum step is held on STEPS, K4 sets that step's ratchet (bb_nav_input 10a); say so */
+    if (s->step_hold && s->page == BB_NAV_PLAY && nav_steps(s) && nav_is_drum(s)) labels[3] = "RATCHET";
 }
 
 const char *bb_nav_role_label(uint8_t role) { return role < BB_NAV_ROLES ? nav_role_labels[role] : ""; }
@@ -524,12 +568,36 @@ const char *bb_nav_page_name(const bb_nav_state *s)
     if (s->page == BB_NAV_KIT && !nav_is_drum(s)) return "PATCH";
     return s->page < BB_NAV_PAGES ? nav_page_names[s->page] : "";
 }
-const char *bb_nav_message_text(uint8_t msg) { return msg < BB_NAV_MESSAGES ? nav_messages[msg] : ""; }
+/* 2.0 navigation (N1): the page with the control that opens it, where the panel's printed name differs.
+ * The ALGO and PRESET encoders open PATTERN and KIT; ENV, LFO, GLO and HOME are printed differently from
+ * the page they open. FX and SAVE match. */
+const char *bb_nav_page_label(const bb_nav_state *s)
+{
+    switch (s->page) {
+    case BB_NAV_STUDIO: return BB_TX(TX_STUDIO_HOME);
+    case BB_NAV_PLAY: return nav_steps(s) ? BB_TX(TX_STEPS_SEQ) : "PLAY \xB7 ARP";
+    case BB_NAV_KIT: return nav_is_drum(s) ? BB_TX(TX_KIT_PRESET) : BB_TX(TX_PATCH_PRESET);
+    case BB_NAV_PATTERN: return BB_TX(TX_PATTERN_ALGO);
+    case BB_NAV_SOUND: return BB_TX(TX_SOUND_ENV);
+    case BB_NAV_EVOLVE: return BB_TX(TX_EVOLVE_LFO);
+    case BB_NAV_GLOBAL: return BB_TX(TX_GLOBAL_GLO);
+    default: return bb_nav_page_name(s);
+    }
+}
+const char *bb_nav_message_text(uint8_t msg)
+{
+    if (msg == BB_NAV_MSG_AUDIO_FAULT)
+        return "AUDIO FAULT / LOAD BLOCKED";
+    return msg < BB_NAV_MESSAGES && nav_messages[msg] ? bb_tx(nav_messages[msg]) : "";
+}
 const char *bb_nav_scale_name(uint8_t scale) { return scale < BB_NAV_SCALES ? nav_scale_names[scale] : ""; }
 
 const char *bb_nav_bank_name(const bb_nav_state *s)
 {
     if (s->page == BB_NAV_FX && s->bank < 5) return nav_fx_bank_names[s->bank];
+#if BB_WITH_USER_KITS
+    if (s->page == BB_NAV_KIT && s->bank) return s->bank == BB_NAV_KIT_BUILD ? "BUILD" : "SAVE AS";
+#endif
     if (s->page != BB_NAV_SOUND) return "";
     switch (s->instrument) {
     case BB_NAV_INSTR_DRUM: return s->bank ? "COLOUR" : "BASIC";
@@ -545,12 +613,19 @@ static int nav_save_blocked(const bb_nav_facts *f) { return f->saving || f->runn
 const char *bb_nav_edit_label(const bb_nav_state *s, const bb_nav_facts *f)
 {
     switch (s->page) {
-    case BB_NAV_STUDIO: return "OPEN";
+    case BB_NAV_STUDIO: return "SONG";
+#if BB_WITH_USER_KITS
+    case BB_NAV_KIT:
+        if (s->bank == BB_NAV_KIT_BUILD) return "SAVE AS";
+        if (s->bank == BB_NAV_KIT_SAVE_AS) return nav_save_blocked(f) ? "" : "STORE";
+        return nav_is_drum(s) ? "CHOOSE" : "LOAD";
+#else
     case BB_NAV_KIT: return nav_is_drum(s) ? "CHOOSE" : "LOAD";
+#endif
     case BB_NAV_PATTERN: return "CHOOSE";
-    case BB_NAV_SOUND: case BB_NAV_FX: return bb_nav_bank_count(s, s->page) > 1 ? "NEXT" : "";
     case BB_NAV_SAVE: return nav_save_blocked(f) ? "" : "STORE";
     case BB_NAV_EVOLVE: return "CAPTURE";
+    case BB_NAV_FX: return bb_nav_bank_count(s, BB_NAV_FX) > 1 ? "NEXT" : "";   /* D1 alias, 2.0 only */
     case BB_NAV_PLAY: return (!nav_is_drum(s) && nav_steps(s)) ? "TYPE" : "";
     default: return "";
     }
@@ -676,16 +751,34 @@ static int nav_button(bb_nav_state *s, bb_nav_out *o, uint8_t b, int rec, const 
         if (rec) { o->actions |= BB_NAV_A_REVERT; return 0; }
         return nav_enter(s, o, BB_NAV_SOUND);
     case BB_NAV_B_SEQ:
+        /* 2.0: on PLAY/STEPS with a drum kit in focus, REC+SEQ records into the pattern that is playing
+         * (OCT+ and black 11 already page the bank). Elsewhere, and on Dillo, it is unchanged. */
+        if (rec && s->page == BB_NAV_PLAY && nav_is_drum(s)) { o->actions |= BB_NAV_A_RECORD; return 0; }
         if (rec) o->actions |= BB_NAV_A_STEP_BANK_NEXT;
         return nav_enter_play(s, o, BB_NAV_PLAY_STEPS);
     case BB_NAV_B_ARP:
         if (rec) { o->actions |= BB_NAV_A_LAYER_ENABLE; return 0; }
         return nav_enter_play(s, o, BB_NAV_PLAY_LIVE);
     case BB_NAV_B_EDIT:
+        /* 2.0: REC+EDIT is Undo where patterns are edited and recorded (PLAY/STEPS); mute stays on
+         * STUDIO white 1-3 and PLAY black 8-10. Other pages keep REC+EDIT = mute. */
+        if (rec && s->page == BB_NAV_PLAY) { o->actions |= BB_NAV_A_UNDO; return 0; }
         if (rec) { o->actions |= BB_NAV_A_MUTE; return 0; }
         switch (s->page) {
-        case BB_NAV_STUDIO: return nav_enter_play(s, o, s->play_keys);
+        case BB_NAV_STUDIO: o->actions |= BB_NAV_A_HOME_AGAIN; return 0;   /* EDIT: SONG (ARP/SEQ open PLAY) */
         case BB_NAV_KIT:
+#if BB_WITH_USER_KITS
+            /* BUILD: EDIT opens SAVE AS (the screen names it); SAVE AS: EDIT stores, stopped only, as SAVE. */
+            if (s->bank == BB_NAV_KIT_BUILD) {
+                s->bank = BB_NAV_KIT_SAVE_AS; o->actions |= BB_NAV_A_BUILD; o->message = BB_NAV_MSG_SAVE_AS;
+                return 1;
+            }
+            if (s->bank == BB_NAV_KIT_SAVE_AS) {
+                if (nav_save_blocked(f)) o->message = f->saving ? BB_NAV_MSG_WAIT : BB_NAV_MSG_STOP_FIRST;
+                else o->actions |= BB_NAV_A_UK_STORE;
+                return 0;
+            }
+#endif
             o->actions |= BB_NAV_A_KIT_CONFIRM;
             s->q_since[0] = 0; s->q_late &= (uint8_t)~1u;      /* retry restarts the wait */
             return 0;
@@ -693,7 +786,9 @@ static int nav_button(bb_nav_state *s, bb_nav_out *o, uint8_t b, int rec, const 
             o->actions |= BB_NAV_A_PATTERN_CONFIRM;
             s->q_since[1] = 0; s->q_late &= (uint8_t)~2u;
             return 0;
-        case BB_NAV_SOUND: case BB_NAV_FX:
+        /* 2.0 N2: EDIT commits; SOUND banks page with OCT -/+ only. D1 (locked scope, Joe 1 Nov): on FX, EDIT
+         * stays NEXT (forward, wrapping) beside OCT as a 2.0 alias, removed in 2.1. */
+        case BB_NAV_FX:
             count = bb_nav_bank_count(s, s->page);
             if (count < 2) return 0;
             s->bank = (uint8_t)((s->bank + 1u) % count);
@@ -746,6 +841,9 @@ static int nav_button(bb_nav_state *s, bb_nav_out *o, uint8_t b, int rec, const 
             if (rec) return nav_section_page(s, o, dir);
             /* fall through */
         case BB_NAV_KIT:
+#if BB_WITH_USER_KITS
+            if (s->bank) return 0;                 /* BUILD and SAVE AS are one page each: OCT is dark */
+#endif
             o->oct = BB_NAV_OCT_LIST_PAGE; o->oct_dir = (int8_t)dir;
             return 0;
         case BB_NAV_SOUND: case BB_NAV_FX: {
@@ -834,6 +932,12 @@ static int nav_key_presses(bb_nav_state *s, const bb_nav_in *in, bb_nav_out *o, 
         default:
             break;
         }
+        /* 2.0 ratchets: a held drum step waits for its release, so hold + K4 can set a ratchet without
+         * toggling the hit. A tap within one scan, REC/accent steps and Dillo steps act at once as before. */
+        if (role == BB_NAV_K_STEP && !flags && nav_is_drum(s) && (held & bit) && !s->step_hold) {
+            s->step_hold = bit; s->step_hold_key = k; s->step_hold_arg = arg; s->step_hold_used = 0;
+            continue;
+        }
         if (role == BB_NAV_K_NOTE || role == BB_NAV_K_FILL) {
             nav_release_keys(s, o, bit);                     /* missed release */
             nav_emit(o, k, role, arg, flags);
@@ -894,6 +998,13 @@ void bb_nav_input(bb_nav_state *s, const bb_nav_in *in, bb_nav_out *o)
         return;
     }
 
+    /* 4a. 2.0 N5: REC held alone for the hold time shows this page's help (its REC chords). Unlike HOME's help it
+     * is not modal: any button, key or knob hides it at once and that chord works as it always did. */
+    if (pressed & B(REC)) { s->rec_since = in->now_ms; s->rec_used = 0; s->rec_help = 0; }
+    if (!rec) { s->rec_used = 0; s->rec_help = 0; }
+    else if ((pressed & ~B(REC)) || any_enc || kedge) { s->rec_used = 1; s->rec_help = 0; }
+    else if (!s->rec_used && (uint32_t)(in->now_ms - s->rec_since) >= s->hold_ms) s->rec_help = 1;
+
     /* 4. HOME gesture bookkeeping: press starts, chord cancels, hold = help. */
     if (pressed & B(HOME)) {
         nav_reset_home(s);
@@ -923,6 +1034,16 @@ void bb_nav_input(bb_nav_state *s, const bb_nav_in *in, bb_nav_out *o)
         int tap_ = !s->home_used;
         nav_reset_home(s);
         if (tap_) {
+#if BB_WITH_USER_KITS
+            /* SAVE AS -> BUILD -> the KIT list: one level per tap (D1: HOME goes back, never forward). */
+            if (s->page == BB_NAV_KIT && s->bank) {
+                s->bank--; o->actions |= BB_NAV_A_BUILD;
+                o->message = s->bank ? BB_NAV_MSG_BUILD : nav_entry_message(s);
+                nav_drain(s, o, hold); nav_finish(s, o);
+                return;
+            }
+#endif
+            /* HOME only ever goes back. SONG opens from EDIT on STUDIO (bb_nav_edit_label "SONG"). */
             (void)nav_go_home(s, o);
             nav_drain(s, o, hold);
             nav_finish(s, o);
@@ -955,6 +1076,9 @@ void bb_nav_input(bb_nav_state *s, const bb_nav_in *in, bb_nav_out *o)
             if (rec) { r->target = BB_NAV_TO_TEMPO; r->flags = BB_NAV_RF_COALESCE; r->delta = d; }
             else {
                 nav_drain(s, o, hold);      /* focus changes: nothing else this scan */
+#if BB_WITH_USER_KITS
+                if (s->page == BB_NAV_KIT && s->bank) { s->bank = BB_NAV_KIT_LIST; o->actions |= BB_NAV_A_BUILD; }
+#endif
                 r->target = BB_NAV_TO_INSTRUMENT; r->delta = d;
                 nav_finish(s, o);
                 return;
@@ -997,6 +1121,21 @@ void bb_nav_input(bb_nav_state *s, const bb_nav_in *in, bb_nav_out *o)
         }
     }
 
+    /* 10a. 2.0 ratchets: release of the held drum step toggles it unless K4 was turned meanwhile;
+     * while it is held, K4 sets that step's ratchet instead of its usual role. */
+    if (s->step_hold) {
+        if (!(kheld & s->step_hold) || s->page != BB_NAV_PLAY || !nav_steps(s) || !nav_is_drum(s)) {
+            if (!s->step_hold_used && s->page == BB_NAV_PLAY && nav_steps(s) && nav_is_drum(s))
+                nav_emit(o, s->step_hold_key, BB_NAV_K_STEP, s->step_hold_arg, 0);
+            s->step_hold = 0; s->step_hold_used = 0;
+        } else if (enc[BB_NAV_E_K4]) {
+            bb_nav_route *r = &o->enc[BB_NAV_E_K4];
+            r->target = BB_NAV_TO_RATCHET; r->role = 0; r->index = s->step_hold_arg;
+            r->flags = BB_NAV_RF_COALESCE; r->delta = enc[BB_NAV_E_K4];
+            enc[BB_NAV_E_K4] = 0; s->step_hold_used = 1;
+        }
+    }
+
     /* 10. K1-K4: the page's four labelled roles, all "latest value wins". */
     if (!skip_knobs) {
         uint8_t roles[4], idx[4];
@@ -1010,6 +1149,19 @@ void bb_nav_input(bb_nav_state *s, const bb_nav_in *in, bb_nav_out *o)
         }
     }
 
+#if BB_WITH_USER_KITS
+    /* 10b. KIT black 1 (drum A): BUILD on, or back to the list. Every key's meaning changes, so drain. */
+    if (!others && !skip_keys && (kedge & ~s->keys_blocked & (1u << BB_NAV_BLACK(1)))) {
+        uint8_t a;
+        if (bb_nav_key_role(s, BB_NAV_BLACK(1), rec, &a) == BB_NAV_K_BUILD) {
+            s->bank = s->bank ? BB_NAV_KIT_LIST : BB_NAV_KIT_BUILD;
+            o->actions |= BB_NAV_A_BUILD;
+            o->message = s->bank ? BB_NAV_MSG_BUILD : nav_entry_message(s);
+            nav_drain(s, o, hold); nav_finish(s, o);
+            return;
+        }
+    }
+#endif
     /* 11. Keys: any panel button in the same scan wins over key presses. */
     if (!others && !skip_keys && nav_key_presses(s, in, o, rec) && s->page == BB_NAV_SOUND) {
         for (i = BB_NAV_E_K1; i < BB_NAV_ENCODERS; i++) {   /* labels changed under the knobs */
@@ -1027,6 +1179,28 @@ void bb_nav_input(bb_nav_state *s, const bb_nav_in *in, bb_nav_out *o)
     nav_finish(s, o);
 }
 
+/* Use the same role resolver and HOME state machine as ordinary input, then
+ * retain only non-authoring events. A STEPS key can never become a live pad. */
+void bb_nav_input_count_busy(bb_nav_state *s,const bb_nav_in *in,bb_nav_out *out)
+{
+    if(!s||!in||!out)return;
+    bb_nav_in safe=*in;uint32_t pads=0;uint8_t arg;
+    for(unsigned k=0;k<BB_NAV_KEYS;k++)
+        if(bb_nav_key_role(s,(uint8_t)k,(in->held&B(REC))!=0,&arg)==BB_NAV_K_PAD)pads|=1u<<k;
+    safe.pressed&=B(HOME);safe.held&=B(HOME)|B(REC)|B(FX);
+    memset(safe.enc,0,sizeof safe.enc);safe.keys&=pads;
+    s->keys_blocked|=in->keys&~pads; /* blocked authoring never replays after the wait */
+    bb_nav_input(s,&safe,out);
+    unsigned keep=0;
+    for(unsigned i=0;i<out->kev_count;i++){
+        bb_nav_key_ev event=out->kev[i];
+        if(event.role==BB_NAV_K_PAD||((event.flags&BB_NAV_KF_RELEASE)&&
+           (event.role==BB_NAV_K_NOTE||event.role==BB_NAV_K_FILL)))out->kev[keep++]=event;
+    }
+    out->kev_count=(uint8_t)keep;out->actions&=BB_NAV_A_PANIC|BB_NAV_A_THROW_OFF;
+    memset(out->enc,0,sizeof out->enc);out->oct=0;out->oct_dir=0;out->uboot=0;
+}
+
 /* ---------------------------------------------------------------- LEDs */
 
 static uint8_t nav_key_led(const bb_nav_state *s, const bb_nav_facts *f, uint8_t k, uint32_t keys_held)
@@ -1039,6 +1213,7 @@ static uint8_t nav_key_led(const bb_nav_state *s, const bb_nav_facts *f, uint8_t
         if (s->scale != BB_NAV_SCALE_OFF && k % nav_scale_len[s->scale] == 0) return BB_NAV_LED_LIT; /* root keys */
         return BB_NAV_LED_DIM;
     case BB_NAV_K_ROOT: return BB_NAV_LED_BREATH;
+    case BB_NAV_K_SUBPAGE: return BB_NAV_LED_DIM;
     case BB_NAV_K_STEP: return (f->steps >> arg) & 1u ? BB_NAV_LED_LIT : BB_NAV_LED_DIM;
     case BB_NAV_K_KIT_SLOT:
         if ((q & BB_NAV_Q_KIT) && f->kit_slot_queued == arg) return BB_NAV_LED_BREATH;
@@ -1071,6 +1246,10 @@ static uint8_t nav_key_led(const bb_nav_state *s, const bb_nav_facts *f, uint8_t
         return f->list_playing == arg ? BB_NAV_LED_LIT : BB_NAV_LED_DIM;
     }
     case BB_NAV_K_SLOT: return f->slot == arg ? BB_NAV_LED_LIT : BB_NAV_LED_DIM;
+#if BB_WITH_USER_KITS
+    case BB_NAV_K_BUILD: return s->bank ? BB_NAV_LED_LIT : BB_NAV_LED_DIM;
+    case BB_NAV_K_LANE: case BB_NAV_K_UK_SLOT: return f->list_cursor == arg ? BB_NAV_LED_LIT : BB_NAV_LED_DIM;
+#endif
     case BB_NAV_K_ANIMATION: return (f->display & BB_NAV_DISP_ANIMATION) ? BB_NAV_LED_LIT : BB_NAV_LED_DIM;
     case BB_NAV_K_SCOPE: return (f->display & BB_NAV_DISP_SCOPE) ? BB_NAV_LED_LIT : BB_NAV_LED_DIM;
     case BB_NAV_K_METERS: return (f->display & BB_NAV_DISP_METERS) ? BB_NAV_LED_LIT : BB_NAV_LED_DIM;
@@ -1126,4 +1305,64 @@ void bb_nav_leds(const bb_nav_state *s, const bb_nav_facts *f, uint32_t keys_hel
             l->button[BB_NAV_B_EDIT] = BB_NAV_LED_LIT;                              /* confirm waits */
     }
     for (k = 0; k < BB_NAV_KEYS; k++) l->key[k] = nav_key_led(s, f, k, keys_held);
+}
+
+/* 2.0 D4: the page's one-line key legend, built from the key role table above (no REC), so it can never disagree
+ * with routing or the LEDs (which come from the same roles). White keys read 1-16 and black keys B1-B11;
+ * neighbouring keys that do the same job share one range ("1-11 PADS  B1-4 MUTE  B5 FILL"). whites = 0 leaves the
+ * white-key runs out and spaces runs by one, not two: the caller asks for that when the whole line would not fit the
+ * screen (PLAY drums, STEPS, EVOLVE: the page itself shows what the white keys do). Short words only:
+ * they stay in the app (a table, not help text). */
+static const char nav_leg_word[BB_NAV_KEY_ROLES][8] = {
+    [BB_NAV_K_PAD] = "PADS", [BB_NAV_K_NOTE] = "NOTES", [BB_NAV_K_STEP] = "STEPS", [BB_NAV_K_KIT_SLOT] = "KITS",
+    [BB_NAV_K_GROUP_MUTE] = "MUTE", [BB_NAV_K_FILL] = "FILL", [BB_NAV_K_SECTION_PREV] = "SECT",
+    [BB_NAV_K_SECTION_NEXT] = "SECT", [BB_NAV_K_KILL] = "KILL", [BB_NAV_K_VOICE] = "VOICE",
+    [BB_NAV_K_ACCENT_HOLD] = "ACCENT", [BB_NAV_K_BANK_PREV] = "BANK", [BB_NAV_K_BANK_NEXT] = "BANK",
+    [BB_NAV_K_STEP_PITCH] = "PITCH", [BB_NAV_K_INSTR_MUTE] = "MUTE", [BB_NAV_K_SECTION] = "SECTION",
+    [BB_NAV_K_PICK] = "PICK", [BB_NAV_K_SLOT] = "SLOT", [BB_NAV_K_ANIMATION] = "ANIM", [BB_NAV_K_SCOPE] = "SCOPE",
+    [BB_NAV_K_METERS] = "METERS", [BB_NAV_K_EVO_KEY] = "PARTS", [BB_NAV_K_EVO_FREEZE] = "FREEZE",
+    [BB_NAV_K_EVO_HOME] = "RETURN", [BB_NAV_K_ROOT] = "ROOT", [BB_NAV_K_GEN_MODE] = "MODE",
+#if BB_WITH_USER_KITS
+    [BB_NAV_K_BUILD] = "BUILD", [BB_NAV_K_LANE] = "LANE", [BB_NAV_K_UK_SLOT] = "SLOT",
+#endif
+};
+static const char *nav_leg(const bb_nav_state *s, unsigned k)
+{
+    uint8_t a, r = bb_nav_key_role(s, (uint8_t)k, 0, &a);
+    if (r == BB_NAV_K_SUBPAGE) return a == 0 ? "MIDI" : a == 1 ? "CLOCK" : "DILLO VIEW";
+    return r < BB_NAV_KEY_ROLES ? nav_leg_word[r] : "";
+}
+static int nav_leg_eq(const char *a, const char *b)       /* (the firmware links no strcmp) */
+{
+    while (*a && *a == *b) { a++; b++; }
+    return *a == *b;
+}
+static unsigned nav_leg_num(char *o, unsigned v)
+{
+    unsigned n = 0;
+    if (v >= 10u) o[n++] = (char)('0' + v / 10u);
+    o[n++] = (char)('0' + v % 10u);
+    return n;
+}
+unsigned bb_nav_legend(const bb_nav_state *s, char *out, unsigned cap, int whites)
+{
+    unsigned n = 0, k = whites ? 0u : 16u;
+    while (k < BB_NAV_KEYS) {
+        const char *w = nav_leg(s, k);
+        unsigned e = k + 1u, lim = k < 16u ? 16u : BB_NAV_KEYS, base = k < 16u ? 0u : 16u;
+        unsigned len = 0;
+        while (w[len]) len++;
+        while (e < lim && nav_leg_eq(nav_leg(s, e), w)) e++;
+        if (len && n + 11u + len <= cap) {   /* "  B10-11 " + the word + NUL */
+            if (n) { out[n++] = ' '; if (whites) out[n++] = ' '; }
+            if (base) out[n++] = 'B';
+            n += nav_leg_num(out + n, k - base + 1u);
+            if (e - 1u > k) { out[n++] = '-'; n += nav_leg_num(out + n, e - base); }
+            out[n++] = ' ';
+            while (*w && n + 1u < cap) out[n++] = *w++;
+        }
+        k = e;
+    }
+    if (cap) out[n < cap ? n : cap - 1u] = 0;
+    return n;
 }

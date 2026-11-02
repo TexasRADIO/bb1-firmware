@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Included in the main console after storage and audio definitions. */
 #include "bb_asset_transfer.h"
+#include "bb/bb_text_block.h"
 static int bb_session_busy(void);
 static bb_asset_transfer bb_asset_tx;
 static uint32_t bb_asset_mode, bb_asset_bytes, bb_asset_expected, bb_asset_header_expected;
@@ -79,6 +80,7 @@ static int bb_asset_command(const char *p) {
         bb_target_leave(0,token);
         if(!safe)goto reply;
         if(!bb_asset_ready()){rc=1;goto reply;}
+        bb_tx_state=2u; /* region A is being rewritten: no help text until the restart re-checks it */
         const bb_asset_io io={0,bb_asset_read,bb_asset_erase,bb_asset_program};
         rc=bb_asset_begin(&bb_asset_tx,&io,mode,bytes,expected,header)?0u:2u;
         bb_asset_screen();goto reply;

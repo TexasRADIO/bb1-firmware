@@ -5,6 +5,9 @@ static uint8_t bb_ui_909_page;
 /* r9.9: a sampled kit reads as on the KIT page (LinnDrum, DrumTraks, DMX), not the native kit it last had. */
 static const char *bb_ui_kit_name(unsigned layer){
     const char *native=bb_drum_kit_names[bb_face.requested.drums[layer].kit];
+#if BB_WITH_USER_KITS
+    if(bb_uk_layer_name(layer))return bb_uk_layer_name(layer);
+#endif
 #if BB_WITH_BROWSER && BB_SAMPLE_HOST_INTEGRATION && defined(BB_SAMPLE_HYBRID_TRIAL)
     bb_sample_status s;
     int ok=bb_sound_pick.sample_count&&bb_audio_sample_status_layer(&bb_sound,layer,&s);
@@ -15,7 +18,7 @@ static const char *bb_ui_kit_name(unsigned layer){
 #endif
 }
 static const char *bb_ui_voice_name(void){
-    return bb_kit_family[bb_face.machine]==1?(bb_face.voice==11?"OH NINE OH / KIT":bb909_sequence_voice_name(bb_face.voice)):
+    return bb_kit_family[bb_face.machine]==1?(bb_face.voice==11?BB_TX(TX_OH_NINE_OH_KIT):bb909_sequence_voice_name(bb_face.voice)):
         bb_drum_voice_name(&bb_face.requested.drums[bb_face.machine].sound,bb_face.voice);
 }
 static int bb_ui_kit_choose(int delta){
@@ -37,11 +40,11 @@ static int bb_ui_909_knob(unsigned knob,int delta){
     int max=bb909_control_max(voice,parameter);
     if(max<0){bb_say("NO CONTROL");return 0;}
     uint32_t epoch=bb909_audio_epoch();
-    if(!epoch){bb_say("909 NOT READY");return 0;}
+    if(!epoch){bb_say(BB_TX(TX_909_NOT_READY));return 0;}
     bb_command c={0};c.type=BB_CMD_909_PARAMETER;c.target=bb_face.machine;
     c.voice=(uint8_t)voice;c.step=(uint8_t)parameter;
     c.value=(uint16_t)bb_limit((int)bb_c1_909_controls.value[voice][parameter]+bb_limit(delta,-127,127),0,max);
     c.note=(bb_note){(uint8_t)epoch,(uint8_t)(epoch>>8),(uint8_t)(epoch>>16),(uint8_t)(epoch>>24)};
-    if(!bb_command_push(&bb_sound.commands,&c)){bb_say("BUSY / RETRY");return 0;}
+    if(!bb_command_push(&bb_sound.commands,&c)){bb_say(BB_TX(TX_BUSY_RETRY_2));return 0;}
     bb_dirty=1;return 1; /* applied values publish only after checked audio */
 }

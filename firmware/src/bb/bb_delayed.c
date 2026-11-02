@@ -19,6 +19,11 @@ void bb_delayed_stop(bb_delayed *q) {
     if(!q)return;
     memset(q->items,0,sizeof q->items);q->count=0;q->active=0;
 }
+int bb_delayed_native_step(bb_delayed *q,uint64_t frame){
+    if(!valid(q))return BB_DELAYED_INVALID;
+    if(q->count)memset(q->items,0,q->count*sizeof q->items[0]);
+    q->count=0;q->floor=frame;q->active=1;return BB_DELAYED_OK;
+}
 int bb_delayed_offer(bb_delayed *q,uint64_t now,const bb_delayed_event *events,unsigned n) {
     if(!valid(q) || !n || n>BB_DELAYED_CAPACITY ||
        !separate(q,sizeof *q,events,n*sizeof *events))return BB_DELAYED_INVALID;
@@ -55,4 +60,12 @@ int bb_delayed_pop(bb_delayed *q,uint64_t frame,bb_delayed_event *out) {
     for(unsigned i=0;i<q->count;i++)q->items[i]=q->items[i+1];
     memset(&q->items[q->count],0,sizeof q->items[0]);q->floor=frame;
     return BB_DELAYED_OK;
+}
+
+int bb_delayed_remove_mask(bb_delayed *q,uint32_t mask){
+    if(!valid(q)||!mask)return BB_DELAYED_INVALID;
+    unsigned n=0,old=q->count;
+    for(unsigned i=0;i<old;i++)if(!(q->items[i].payload&mask))q->items[n++]=q->items[i];
+    for(unsigned i=n;i<old;i++)memset(&q->items[i],0,sizeof q->items[i]);
+    q->count=(uint8_t)n;return BB_DELAYED_OK;
 }

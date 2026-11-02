@@ -20,7 +20,11 @@ typedef struct {
     uint32_t family_epoch;
     uint8_t edited,enabled,muted,running,queue_idle,stop_queued;
 #if BB_SAMPLE_HOST_INTEGRATION
+#if BB_WITH_SLOOP_KITS
+    uint64_t sample_compatible; /* 808 + up to8 samples +31 actual recipes */
+#else
     uint16_t sample_compatible; /* hybrid list needs nine bits:808 + eight samples */
+#endif
     uint8_t sample_result,sample_requested;
 #endif
 } bb_sound_picker_view;
@@ -30,6 +34,8 @@ typedef struct {
     int (*busy)(void *);
 } bb_sound_picker_kits;
 
+/* Non-USER rows; shared by picker display and firmware USER intent routing. */
+unsigned bb_sound_picker_machine_items(unsigned sample_count);
 unsigned bb_sound_picker_count(bb_page);
 const char *bb_sound_picker_name(bb_page,unsigned index);
 unsigned bb_sound_picker_items(const bb_sound_picker *);
@@ -56,4 +62,11 @@ int bb_sound_picker_poll(bb_sound_picker *,bb_audio *,const bb_sound_picker_kits
 /* Returns the same applied snapshot used to resolve the request. The view is
  * published only on success; callers need not observe the audio state twice. */
 int bb_sound_picker_poll_view(bb_sound_picker *,bb_audio *,const bb_sound_picker_kits *,bb_sound_picker_view *);
+#if BB_WITH_USER_KITS && BB_SAMPLE_HOST_INTEGRATION && defined(BB_SAMPLE_HYBRID_TRIAL)
+/* 2.0 kit builder: drum A's list runs on from the machines into USER 1-4 (rows after bb_sound_picker_machine_items(sample_count)). The firmware
+ * supplies their labels and which one drum A plays (-1: none). Choosing one is the firmware's (a kit intent). */
+#define BB_SOUND_PICKER_USER_ROWS 4u
+const char *bb_sound_picker_user_name(unsigned slot);
+int bb_sound_picker_user_active(void);
+#endif
 #endif

@@ -15,7 +15,7 @@ static inline bb_midi_compat_settings bb_midi_settings_default(void){
 }
 static inline int bb_midi_compat_settings_valid(const bb_midi_compat_settings *c){
  if(!c||(c->clock_source!=BB_MIDI_CLOCK_USB&&c->clock_source!=BB_MIDI_CLOCK_TRS)||
-    c->tempo_follow>1||c->transport>1||c->clock_out)return 0; /* out is stage2 */
+    c->tempo_follow>1||c->transport>1||c->clock_out>1)return 0; /* USB-only output boolean; OFF remains default */
  uint32_t used=0;
  for(unsigned i=0;i<4;i++){
   unsigned ch=i<2?c->drum_channel[i]:c->synth_channel[i-2];

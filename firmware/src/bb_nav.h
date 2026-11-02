@@ -16,6 +16,9 @@
 #define BB_NAV_H
 #include <stdint.h>
 
+#ifndef BB_WITH_USER_KITS
+#define BB_WITH_USER_KITS 0
+#endif
 #define BB_NAV_VERSION 2
 #define BB_NAV_REVISION 1   /* v2.1: FM-1 keyboard order, paged sections, held-layer encoder latch */
 
@@ -32,6 +35,13 @@ enum {
     BB_NAV_E_SELECT, BB_NAV_E_ALGO, BB_NAV_E_PRESET,
     BB_NAV_E_K1, BB_NAV_E_K2, BB_NAV_E_K3, BB_NAV_E_K4, BB_NAV_ENCODERS
 };
+#if BB_WITH_USER_KITS
+/* 2.0 kit builder: BUILD is a sub-mode of KIT on drum A, held in bb_nav_state.bank (0 on every page change, so
+ * any other page leaves it). HOME steps back one level: SAVE AS -> BUILD -> the KIT list. */
+enum { BB_NAV_KIT_LIST, BB_NAV_KIT_BUILD, BB_NAV_KIT_SAVE_AS };
+#define BB_NAV_UK_LANES 17u
+#define BB_NAV_HAS_BUILD 1
+#endif
 /* Logical keys: bit 0..15 = white keys 1..16 (left to right),
  * bit 16..26 = black keys 1..11 (left to right). The FM-1 keyboard runs
  * F..G (27 keys, F3..G5 on the panel; fm1_input.h note bit 0 = F). v2.1:
@@ -144,6 +154,13 @@ typedef enum {
     BB_NAV_K_EVO_LOCK,      /* REC+: existing evolve step lock              */
     BB_NAV_K_EVO_FREEZE, BB_NAV_K_EVO_HOME,
     BB_NAV_K_ROOT,          /* after REC+SCL: arg = new root 0..11          */
+    BB_NAV_K_GEN_MODE,       /* EVOLVE black3: Evolve / Euclid / Random */
+    BB_NAV_K_SUBPAGE,        /* GLOBAL: arg 0 MIDI, 1 CLOCK, 4 DILLO VIEW (opened by their firmware adapters) */
+#if BB_WITH_USER_KITS
+    BB_NAV_K_BUILD,          /* 2.0 kit builder: KIT black 1 opens BUILD, in BUILD it goes back to the list */
+    BB_NAV_K_LANE,           /* BUILD: arg lane 0..16 (white 1-11, black 2-7): focus + hear it */
+    BB_NAV_K_UK_SLOT,        /* SAVE AS: arg USER slot 0..3 */
+#endif
     BB_NAV_KEY_ROLES
 } bb_nav_key_role_t;
 
@@ -162,6 +179,7 @@ typedef enum {
     BB_NAV_TO_VOICE,       /* REC+PRESETS, drums: selected voice           */
     BB_NAV_TO_STEP_PITCH,  /* REC+PRESETS, Dillo steps: step pitch         */
     BB_NAV_TO_KNOB,        /* K1-K4: role in .role, control index .index   */
+    BB_NAV_TO_RATCHET,     /* 2.0: K4 while a drum step key is held: .index step 0..15, .delta turns */
     BB_NAV_TARGETS
 } bb_nav_target;
 /* Route flags: COALESCE = continuous value, "latest value wins": the
@@ -186,6 +204,9 @@ typedef enum {
     BB_NAV_R_SPRING_DAMP, BB_NAV_R_SPRING_WET, BB_NAV_R_ECHO_MOTION,
     BB_NAV_R_SEND_ECHO, BB_NAV_R_SEND_SPRING,
     BB_NAV_R_SLOT, BB_NAV_R_EVO_AMOUNT, BB_NAV_R_EVO_EVERY, BB_NAV_R_EVO_ROOT, BB_NAV_R_EVO_SCALE,
+#if BB_WITH_USER_KITS
+    BB_NAV_R_UK_LEVEL, BB_NAV_R_UK_TUNE, BB_NAV_R_UK_DECAY, BB_NAV_R_UK_VOICE,   /* BUILD: the focused lane */
+#endif
     BB_NAV_ROLES
 } bb_nav_role;
 
@@ -213,8 +234,19 @@ enum {
     BB_NAV_A_THROW_OFF      = 1u << 19, /* FX released after a throw (always paired)  */
     BB_NAV_A_SAVE_STORE     = 1u << 20, /* EDIT on SAVE: store to chosen slot         */
     BB_NAV_A_QUICK_SAVE     = 1u << 21, /* REC+SAVE: store to current slot            */
-    BB_NAV_A_KEY_OCTAVE     = 1u << 22  /* out.key_octave changed (keys only)         */
+    BB_NAV_A_KEY_OCTAVE     = 1u << 22, /* out.key_octave changed (keys only)         */
+    BB_NAV_A_HOME_AGAIN     = 1u << 23, /* EDIT on STUDIO: open SONG (HOME only goes back)  */
+    BB_NAV_A_UNDO           = 1u << 24, /* REC+EDIT on PLAY/STEPS: undo the last pattern edit or kept take */
+    BB_NAV_A_RECORD         = 1u << 25  /* REC+SEQ on PLAY/STEPS, drums: record into the playing pattern */
+#if BB_WITH_USER_KITS
+    ,BB_NAV_A_BUILD         = 1u << 26  /* KIT: BUILD or SAVE AS opened or closed; out.bank says which */
+    ,BB_NAV_A_UK_STORE      = 1u << 27  /* EDIT on SAVE AS: store the kit in the chosen USER slot */
+#endif
+#define BB_NAV_HAS_HOME_AGAIN 1
+#define BB_NAV_HAS_RATCHET_HOLD 1
 };
+#define BB_NAV_HAS_UNDO 1   /* 2.0: BB_NAV_A_UNDO exists (tests compile on older trees without it) */
+#define BB_NAV_HAS_RECORD 1 /* 2.0: BB_NAV_A_RECORD exists */
 
 /* What OCT-/OCT+ mean this scan (firmware performs). KEY_OCTAVE is done by
  * the module itself (out.key_octave); it never transposes the pattern. */
@@ -246,6 +278,9 @@ typedef enum {
     BB_NAV_MSG_EVOLVE_OFF,
     /* v2.1 */
     BB_NAV_MSG_SECTIONS_1, BB_NAV_MSG_SECTIONS_2, BB_NAV_MSG_SECTIONS_3, BB_NAV_MSG_SOUND_KNOBS,
+#if BB_WITH_USER_KITS
+    BB_NAV_MSG_BUILD, BB_NAV_MSG_SAVE_AS, BB_NAV_MSG_KIT_BUILD,
+#endif
     BB_NAV_MESSAGES
 } bb_nav_msg;
 
@@ -301,6 +336,10 @@ typedef struct {
     uint8_t play_keys;      /* BB_NAV_PLAY_LIVE / BB_NAV_PLAY_STEPS */
     /* HOME gesture + help overlay */
     uint8_t home_down, home_used, help;
+    uint8_t rec_used, rec_help;   /* 2.0 N5: REC held alone shows this page's chords (non-modal) */
+    uint32_t step_hold;           /* 2.0 ratchets: the drum step key held (bit), toggled on release unless K4 turned */
+    uint8_t step_hold_key, step_hold_arg, step_hold_used;
+    uint32_t rec_since;
     uint32_t home_since;
     /* context supplied by firmware */
     uint8_t instrument, sound_banks, voice;
@@ -366,6 +405,10 @@ typedef struct { uint8_t button[BB_NAV_BUTTONS]; uint8_t key[BB_NAV_KEYS]; } bb_
 void bb_nav_init(bb_nav_state *s, uint8_t home_page, uint16_t hold_ms);
 void bb_nav_set_features(bb_nav_state *s, uint8_t features);
 void bb_nav_input(bb_nav_state *s, const bb_nav_in *in, bb_nav_out *out);
+/* Count-ACK wait: HOME keeps its normal back/help semantics; only actual live
+ * PAD roles and owed releases survive. All authoring/encoder routes are blocked.
+ * The firmware admits PLAY as STOP separately, never as a deferred START. */
+void bb_nav_input_count_busy(bb_nav_state *s,const bb_nav_in *in,bb_nav_out *out);
 
 /* Firmware feedback (call after performing the corresponding action). */
 void bb_nav_set_instrument(bb_nav_state *s, uint8_t instrument, uint8_t sound_banks);
@@ -383,6 +426,9 @@ void bb_nav_cancel(bb_nav_state *s);
 
 /* Read-only queries for drawing. */
 const char *bb_nav_page_name(const bb_nav_state *s);
+/* The page name with the control that opens it ("PATTERN \xB7 ALGO"); the status bar's label (2.0, N1). */
+const char *bb_nav_page_label(const bb_nav_state *s);
+#define BB_NAV_HAS_PAGE_LABEL 1
 const char *bb_nav_bank_name(const bb_nav_state *s);
 uint8_t bb_nav_bank_count(const bb_nav_state *s, uint8_t page);
 uint8_t bb_nav_section_page(const bb_nav_state *s);   /* v2.1: 0 = sections 1-11 */
@@ -391,6 +437,10 @@ const char *bb_nav_role_label(uint8_t role);
 const char *bb_nav_edit_label(const bb_nav_state *s, const bb_nav_facts *f); /* "" = EDIT does nothing */
 uint8_t bb_nav_keys_for(const bb_nav_state *s);
 uint8_t bb_nav_key_role(const bb_nav_state *s, uint8_t key, int rec, uint8_t *arg);
+/* 2.0 D4: the one-line key legend from the role table ("1-11 PADS  B1-4 MUTE"); whites = 0: black keys only.
+ * Writes at most cap bytes with the NUL; returns the length. */
+unsigned bb_nav_legend(const bb_nav_state *s, char *out, unsigned cap, int whites);
+#define BB_NAV_HAS_LEGEND 1
 int bb_nav_key_is_sound(uint8_t role);
 void bb_nav_leds(const bb_nav_state *s, const bb_nav_facts *f, uint32_t keys_held, bb_nav_led_out *l);
 const char *bb_nav_message_text(uint8_t msg);

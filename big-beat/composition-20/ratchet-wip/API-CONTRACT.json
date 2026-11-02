@@ -1,0 +1,27 @@
+{
+  "status": "WIP for lead UI integration/review; no installation or final acceptance",
+  "base": "0b7ce28c17789706625a7d607d904890baa7b461",
+  "work_split_comment": "6544441074",
+  "Codex": "data API/native+rich playback/owner admission/metadata/scenes/final gates/patch freeze",
+  "Claude": "nav gesture and tick drawing/captures; REC+step remains accent per latest Joe/lead correction",
+  "api": {
+    "get": "unsigned bb_audio_ratchet_get(bb_audio *a,unsigned machine,unsigned voice,unsigned step)",
+    "request": "int bb_audio_ratchet_request(bb_audio *a,unsigned machine,unsigned voice,unsigned step,unsigned count)",
+    "UI_wrappers": "bb_ratchet_get(m,v,s) => bb_audio_ratchet_get(&bb_sound,m,v,s); bb_ratchet_request(m,v,s,n) => bb_audio_ratchet_request(&bb_sound,m,v,s,n)",
+    "header": "firmware/src/bb/bb_audio_phrase.h",
+    "voice": "Native: physical lane0..10. Rich: actual BB_FDV_* source identity including SH, not collapsed808 lane. Existing bb_rich_sources[] supplies it.",
+    "get_result": "1..4; empty valid cell defaults1. 0 means invalid or mixed original ordinals (use bb_phrase_view_cell.mixed for explicit UI indication).",
+    "request_result": "1 queued;0 immediate refusal/full/empty/invalid. Queued is not applied; actual owner checks source ticket and capacity; view.edits/refusals refresh actual state.",
+    "step": "Zero-based full0..63, not bank-local index.",
+    "count": "1..4; source duplicates for same voice/cell are updated together; original event words/modifiers remain unchanged.",
+    "packed_getter": "Renamed bb_ratchet_bits_get to leave the requested bb_ratchet_get UI wrapper name available."
+  },
+  "preserved": "Both drum layers, Dillo, echo/spring, default x1 PCM; existing modifiers; no quality reduction or raised deadline",
+  "unfinished": [
+    "Complete combined final oracles/168scenes/capture tickframes on merged UI+engine",
+    "Native build/stack cost of latest owner/API changes; earlier fit is historical",
+    "Sampled/mixed/tempo/mute broader cases; production device timing/usability",
+    "Complete working-part editing/Undo integration beyond scene copied-owner edits"
+  ],
+  "device": "Lead owns next2.0 session; no Codex device contact/install/updater; no FWSC produced"
+}

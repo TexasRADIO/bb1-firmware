@@ -1,16 +1,8 @@
 #include "bb_factory_pattern.h"
 #include "bb_note_expression_catalogue.h"
 #include <string.h>
-static int key_is(const bb_catalogue *c, bb_catalogue_id id, const char *wanted) {
-    const uint8_t *p; size_t n, length = 0;
-    while (wanted[length]) length++;
-    return bb_catalogue_text(c, id, &p, &n) && n == length && !memcmp(p, wanted, n);
-}
-static int integer(const bb_catalogue *c, bb_catalogue_id id, unsigned limit, unsigned *out) {
-    uint32_t value;
-    if (!bb_catalogue_unsigned(c, id, limit, &value)) return 0;
-    *out = (unsigned)value; return 1;
-}
+#define key_is(a,b,c) bb_catalogue_text_is(a,b,c)
+#define integer(a,b,c,d) bb_catalogue_uint(a,b,c,d)
 static int boolean(const bb_catalogue *c, bb_catalogue_id id, uint8_t *out) {
     int kind = bb_catalogue_kind(c, id);
     if (kind != BB_CAT_FALSE && kind != BB_CAT_TRUE) return 0;

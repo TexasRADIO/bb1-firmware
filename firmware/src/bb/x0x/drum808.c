@@ -1,3 +1,4 @@
+#include "../bb_optional_storage.h"
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* X0X 808 drum part: a C99 / float / no-libm port of 8W8 (see drum808.h).
  *
@@ -1795,7 +1796,7 @@ static int voice_run(drum808_t *d, int l, float *buf, int m, const float *bus, c
 /* the track each lane belongs to (its pan): the clave is the RS track's, the maracas the CP's */
 static const uint8_t k_lane_track[L_NUM] = {D8_BD, D8_SD, D8_LT, D8_MT, D8_HT, D8_RS, D8_RS, D8_CP, D8_CP,
                                             D8_CB, D8_CH, D8_OH, D8_CY};
-static float *d8_dry_r;         /* the render in progress: its right side (0: mono) */
+static float *d8_dry_r BB_OPTIONAL_BSS("d8_dry_r");         /* the render in progress: its right side (0: mono) */
 
 static void lane_mix(drum808_t *d, d8_lane_t *l, const float *buf, int m, float *dry, float *rev, float *dly)
 {

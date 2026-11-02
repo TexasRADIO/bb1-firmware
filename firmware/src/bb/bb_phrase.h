@@ -7,6 +7,7 @@ enum {BB_PHRASE_SHAKER=BB_FDV_COUNT,BB_PHRASE_VOICES};
 typedef struct {
     uint16_t events[BB_FACTORY_DRUM_EVENTS];
     uint8_t length,count,lattice,bars;
+    uint8_t ratchets[(BB_FACTORY_DRUM_EVENTS+3u)/4u]; /* two bits per source hit; zero=x1 */
 } bb_phrase;
 typedef struct {uint8_t voice,step,intensity,modifiers;} bb_phrase_event;
 /* Source order is retained: ordinal identifies the original catalogue event.
@@ -17,5 +18,12 @@ typedef struct {uint8_t voice,step,intensity,modifiers;} bb_phrase_event;
 /* Explicit source SH to independent maracas-based shaker adaptation. */
 int bb_phrase_pack_shaker(const bb_factory_drum_data *,bb_phrase *);
 int bb_phrase_pack(const bb_factory_drum_data *,bb_phrase *);
+/* Cell setter updates every source ordinal for that voice/step, preserving
+ * source order, accents and original flam/retrigger metadata. No hit is added.
+ * Step is zero-based; failure leaves the phrase unchanged. */
+/* Canonical sidecar: unused ordinals zero; control events never repeat. */
+int bb_phrase_ratchets_valid(const bb_phrase *);
+unsigned bb_phrase_ratchet_count(const bb_phrase *,unsigned ordinal);
+int bb_phrase_ratchet_set(bb_phrase *,unsigned voice,unsigned step,unsigned count);
 int bb_phrase_read(const bb_phrase *,unsigned,bb_phrase_event *);
 #endif

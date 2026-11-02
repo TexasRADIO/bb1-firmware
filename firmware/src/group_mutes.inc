@@ -11,7 +11,7 @@ static void bb_group_mutes_input(uint32_t notes,uint32_t pressed,int rec) {
         int result=bb_group_input(&bb_sound.commands,bb_sound.groups,
             bb_face.machine,BB_GROUP_TOGGLE,(unsigned)group,0,&view);
         bb_dirty=1;
-        if(result==BB_GROUP_REFUSED){bb_face.rejected++;bb_say("GROUP BUSY - RETRY");}
+        if(result==BB_GROUP_REFUSED){bb_face.rejected++;bb_say(BB_TX(TX_GROUP_BUSY_RETRY));}
         else bb_face.rejected=0;
     }
 }

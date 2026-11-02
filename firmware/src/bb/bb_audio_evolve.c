@@ -56,7 +56,14 @@ void bb_audio_evolve_tick(void *ctx,bb_core *core) {
         a->evolve.conflict=1;a->evolve.frozen=1;
         a->evolve_result=BB_EV_RESULT_CONFLICT;return;
     }
+    /* Rich phrases are a separate owner: never mutate inaudible legacy grids.
+     * Keep the user's part selection intact; main-loop generation handles rich. */
+    uint8_t parts=a->evolve.settings.parts;
+#if BB_WITH_RICH_DRUM_RENDER
+    for(unsigned m=0;m<BB_RICH_DRUMS;m++)if(a->rich.valid[m])a->evolve.settings.parts&=(uint8_t)~(1u<<m);
+#endif
     bb_evolve_before_tick(&a->evolve,core);
+    a->evolve.settings.parts=parts;
     if(a->evolve.conflict)a->evolve_result=BB_EV_RESULT_CONFLICT;
 }
 void bb_audio_evolve_command(bb_audio *a,const bb_command *c) {

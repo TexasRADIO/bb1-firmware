@@ -1,5 +1,5 @@
 {
- "purpose": "current candidate (r9.7): boot42 link order and roots; -fdata-sections with the recipe-owned linker overlay in link/",
+ "purpose": "BB1 2.0 alpha1 integration: unchanged 1.5 DSP quality, tempo+MIDI stage2+rich Euclid/Random; no publication or hardware acceptance",
  "link_order": [
   "crt0",
   "fm1_vec",
@@ -13,6 +13,10 @@
   "bb_x0x_drum808",
   "bb_player",
   "bb_audio_pattern",
+  "bb_audio_section",
+  "bb_arr_controller",
+  "bb_arr_sources",
+  "bb_arrangement",
   "bb_factory_launch",
   "bb_factory_drum",
   "bb_factory_drum_launch",
@@ -23,6 +27,7 @@
   "bb_parts",
   "bb_trio",
   "bb_audio_trio",
+  "bb_gen",
   "bb_evolve",
   "bb_audio_evolve",
   "bb_session",
@@ -120,12 +125,16 @@
   "drum909_render",
   "drum909_render_st",
   "drum909_set",
-  "drum909_trigger"
+  "drum909_trigger",
+  "bb_audio_section_submit",
+  "bb_audio_section_status_read",
+  "bb_audio_section_cancel_submit",
+  "bb_arr_source_fork"
  ],
  "linker_script": "/link/run-r3/guarded-gc.ld",
  "asset_symbols": "/assets/asset-symbols.ld",
  "flag_edits": {
-  "-DFELUCCA_ID=\"FM-1_900\"": "-DFELUCCA_ID=\"FM-1_92200105\""
+  "-DFELUCCA_ID=\"FM-1_900\"": "-DFELUCCA_ID=\"FM-1_92200200\""
  },
  "extra_flags": [
   "-fdata-sections"

@@ -8,7 +8,7 @@ static int outside(const bb_audio *a,const void *p,size_t length) {
     return bb_audio_groups_outside(a,p,length);
 }
 static int phrase_valid(unsigned n) { return n==16 || n==32 || n==48 || n==64; }
-static int data_valid(const bb_pattern_data *data) {
+int bb_audio_pattern_data_valid(const bb_pattern_data *data) {
     if(!data || !data->length || data->length>BB_STEPS)return 0;
     for(unsigned i=0;i<BB_STEPS;i++) {
         const bb_note *n=&data->notes[i];
@@ -28,7 +28,7 @@ static void leave(bb_audio *a,uintptr_t token) { if(a->commands.leave)a->command
 int bb_audio_pattern_submit(bb_audio *a,unsigned synth,const bb_pattern_data *data,unsigned phrase,uint32_t *out) {
     if(!a || !a->patterns.ready || synth>=BB_SYNTHS || !phrase_valid(phrase) ||
        !outside(a,data,sizeof *data) || (out && !outside(a,out,sizeof *out)) ||
-       (!a->commands.enter!=!a->commands.leave) || !data_valid(data))return 0;
+       (!a->commands.enter!=!a->commands.leave) || !bb_audio_pattern_data_valid(data))return 0;
     if(out && !((uintptr_t)out+sizeof *out<=(uintptr_t)data ||
                 (uintptr_t)data+sizeof *data<=(uintptr_t)out))return 0;
     uintptr_t token=enter(a);unsigned slot;
@@ -68,7 +68,7 @@ void bb_audio_pattern_cancel(bb_audio *a,int clear_labels) {
 void bb_audio_pattern_transport(bb_audio *a) {
     bb_audio_pattern_cancel(a,0);a->patterns.position=0;
 }
-static void apply_pattern(bb_audio *a,unsigned s) {
+void bb_audio_pattern_apply_owned(bb_audio *a,unsigned s) {
     bb_pattern_pending *pending=&a->patterns.pending[s];
 #if BB_WITH_EVOLVE
     int matching=!a->evolve.ready || bb_audio_evolve_matches(a);
@@ -107,9 +107,12 @@ void bb_audio_pattern_command(bb_audio *a,const bb_command *command) {
         /* A stale/raw token must not free somebody else's live reservation. */
         status->seen=ticket;status->result=BB_PATTERN_REJECTED;return;
     }
-    if(!phrase_valid(payload->phrase) || !data_valid(&payload->data)) {
+    if(!phrase_valid(payload->phrase) || !bb_audio_pattern_data_valid(&payload->data)) {
         payload->state=BB_PATTERN_SLOT_FREE;status->seen=ticket;status->result=BB_PATTERN_REJECTED;return;
     }
+#if BB_WITH_RICH_DRUM_RENDER
+    bb_audio_section_external_edit_owned(a);
+#endif
     bb_pattern_pending *pending=&a->patterns.pending[command->target];
     pending->data=payload->data;pending->ticket=ticket;pending->phrase=payload->phrase;pending->ready=1;
     payload->state=BB_PATTERN_SLOT_FREE;
@@ -128,7 +131,7 @@ void bb_audio_pattern_command(bb_audio *a,const bb_command *command) {
     }
     #endif
 #endif
-    if(!a->core.running)apply_pattern(a,command->target);
+    if(!a->core.running)bb_audio_pattern_apply_owned(a,command->target);
 }
 void bb_audio_pattern_tick(bb_audio *a) {
     unsigned position=a->patterns.position;
@@ -136,7 +139,7 @@ void bb_audio_pattern_tick(bb_audio *a) {
     for(unsigned s=0;s<BB_SYNTHS;s++)if(a->patterns.pending[s].ready) {
         unsigned phrase=a->patterns.pending[s].phrase;
         int boundary=phrase==48?(position==0 || position==48 || position==96 || position==144):!(position&(phrase-1u));
-        if(boundary)apply_pattern(a,s);
+        if(boundary)bb_audio_pattern_apply_owned(a,s);
     }
     a->patterns.position=(uint8_t)(position+1u==192u?0u:position+1u);
 }
@@ -283,6 +286,9 @@ void bb_audio_drum_pattern_command(bb_audio *a,const bb_command *command) {
         payload->state=BB_PATTERN_SLOT_FREE;report->state.seen=ticket;
         report->state.result=BB_PATTERN_REJECTED;report->error=BB_DRUM_PATTERN_ERROR_DATA;return;
     }
+#if BB_WITH_RICH_DRUM_RENDER
+    bb_audio_section_external_edit_owned(a);
+#endif
     bb_drum_pattern_pending *pending=&a->drum_patterns.pending[command->target];
 #if BB_WITH_RICH_DRUM_RENDER
     bb_audio_phrase_cancel_pending(a,command->target);

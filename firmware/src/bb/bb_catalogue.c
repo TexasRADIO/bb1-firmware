@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "bb_catalogue.h"
+#include <string.h>
 int bb_catalogue_open(bb_catalogue*c,const uint8_t*b,size_t n,bb_pc_cache*w){return bb_pr_open(c,b,n,w);}
 int bb_catalogue_kind(const bb_catalogue*c,bb_catalogue_id id){return bb_pr_kind(c,id);}
 size_t bb_catalogue_count(const bb_catalogue*c,bb_catalogue_id id){return bb_pr_count(c,id);}
@@ -19,4 +20,14 @@ int bb_catalogue_private(const bb_catalogue*c,const void*p,size_t n){
  return c && separated(p,n,c,sizeof *c) &&
   separated(p,n,c->container.bytes,c->container.length)&&
   separated(p,n,c->container.cache,sizeof *c->container.cache);
+}
+int bb_catalogue_text_is(const bb_catalogue *c,bb_catalogue_id id,const char *wanted) {
+    const uint8_t *bytes;size_t count,n=0;while(wanted[n])n++;
+    return bb_catalogue_text(c,id,&bytes,&count) && count==n && !memcmp(bytes,wanted,n);
+}
+int bb_catalogue_has_text(const bb_catalogue *c,bb_catalogue_id id) {
+    const uint8_t *bytes;size_t count;return bb_catalogue_text(c,id,&bytes,&count) && count;
+}
+int bb_catalogue_uint(const bb_catalogue *c,bb_catalogue_id id,unsigned limit,unsigned *out) {
+    uint32_t value;if(!bb_catalogue_unsigned(c,id,limit,&value))return 0;*out=(unsigned)value;return 1;
 }

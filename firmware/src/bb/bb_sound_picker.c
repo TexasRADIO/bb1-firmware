@@ -1,15 +1,27 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "bb_sound_picker.h"
+#include "bb_ui_kit_label.h"
 #include <string.h>
 #if defined(BB_SAMPLE_HYBRID_TRIAL)
 #include "bb_hybrid_selection.h"
 static int hybrid_index(unsigned id,unsigned count){
+#if BB_WITH_SLOOP_KITS
+    if(id>=BB_SLOOP_ID_FIRST&&id<BB_SLOOP_ID_LIMIT)return (int)(1+count+id-BB_SLOOP_ID_FIRST);
+#endif
     bb_hybrid_selection s={id==BB_SAMPLE_808_ID?BB_HYBRID_808:BB_HYBRID_SAMPLE,
                            id==BB_SAMPLE_808_ID?0:(uint8_t)id};
     unsigned index;
     return bb_hybrid_to_index(s,count,&index)?(int)index:-1;
 }
 #endif
+
+unsigned bb_sound_picker_machine_items(unsigned samples) {
+    return samples + 1u
+#if BB_WITH_SLOOP_KITS
+        + SL_NKITS
+#endif
+        ;
+}
 
 unsigned bb_sound_picker_count(bb_page page) {
     if(page==BB_DRUMS)return BB_DRUM_KITS
@@ -32,10 +44,16 @@ const char *bb_sound_picker_name(bb_page page,unsigned i) {
 }
 unsigned bb_sound_picker_items(const bb_sound_picker *p) {
     if(!p)return 0;
+#if BB_WITH_USER_KITS && BB_SAMPLE_HOST_INTEGRATION && defined(BB_SAMPLE_HYBRID_TRIAL)
+    if(p->sample_count)return bb_sound_picker_machine_items(p->sample_count)+(p->machine?0u:BB_SOUND_PICKER_USER_ROWS);
+#endif
 #if BB_SAMPLE_HOST_INTEGRATION
     if(p->sample_count)return p->sample_count
 #if defined(BB_SAMPLE_HYBRID_TRIAL)
         +1u
+#if BB_WITH_SLOOP_KITS
+        +SL_NKITS
+#endif
 #endif
         ;
 #endif
@@ -46,9 +64,15 @@ const char *bb_sound_picker_item_name(const bb_sound_picker *p,unsigned i){
 #if BB_SAMPLE_HOST_INTEGRATION
     if(p->sample_count){
 #if defined(BB_SAMPLE_HYBRID_TRIAL)
-        return i?p->sample_names[i-1]:"808";
+#if BB_WITH_USER_KITS
+        if(i>=bb_sound_picker_machine_items(p->sample_count))return bb_sound_picker_user_name(i-bb_sound_picker_machine_items(p->sample_count));
+#endif
+#if BB_WITH_SLOOP_KITS
+        if(i>p->sample_count)return bb_sloop_review_names[i-1-p->sample_count];
+#endif
+        return bb_ui_kit_display_name(i?p->sample_names[i-1]:"808");
 #else
-        return p->sample_names[i];
+        return bb_ui_kit_display_name(p->sample_names[i]);
 #endif
     }
 #endif
@@ -61,7 +85,7 @@ static int valid(const bb_sound_picker *p) {
 int bb_sound_picker_available(const bb_sound_picker *p,const bb_sound_picker_view *v,unsigned i){
     if(!valid(p)||!v||i>=bb_sound_picker_items(p))return 0;
 #if BB_SAMPLE_HOST_INTEGRATION
-    if(p->sample_count)return !!(v->sample_compatible&(1u<<i));
+    if(p->sample_count)return !!(v->sample_compatible&(UINT64_C(1)<<i));
 #endif
     return 1;
 }
@@ -92,9 +116,16 @@ int bb_sound_picker_observe(const bb_sound_picker *p,bb_audio *a,bb_sound_picker
         view.sample_compatible=s.compatible;view.sample_result=s.result;view.sample_requested=s.requested;
 #if defined(BB_SAMPLE_HYBRID_TRIAL)
         view.active_index=hybrid_index(s.selected,s.count);
+#if BB_WITH_USER_KITS
+        if(s.selected==BB_SAMPLE_USER_ID&&!p->machine&&bb_sound_picker_user_active()>=0)
+            view.active_index=(int)bb_sound_picker_machine_items(s.count)+bb_sound_picker_user_active();
+#endif
         view.sample_requested=(uint8_t)hybrid_index(s.requested,s.count);
         view.sample_compatible=(uint16_t)((unsigned)s.compatible<<1);
         if(s.native_compatible)view.sample_compatible|=1u;
+#if BB_WITH_SLOOP_KITS
+        if(s.sloop_compatible)view.sample_compatible|=((UINT64_C(1)<<SL_NKITS)-1u)<<(s.count+1u);
+#endif
 #endif
         uintptr_t token=a->commands.enter?a->commands.enter(a->commands.lock_context):0;
         view.running=a->core.running;view.enabled=a->core.drums[p->machine].enabled;view.muted=a->core.drums[p->machine].muted;
@@ -216,13 +247,19 @@ int bb_sound_picker_commit(bb_sound_picker *p,bb_audio *a,const bb_sound_picker_
 #if BB_SAMPLE_HOST_INTEGRATION
     if(p->sample_count){
         if(!view.queue_idle)return BB_SP_BUSY;
-        if(!(view.sample_compatible&(1u<<p->cursor))){p->status=BB_SP_FAILED;return BB_SP_REFUSED;}
+        if(!(view.sample_compatible&(UINT64_C(1)<<p->cursor))){p->status=BB_SP_FAILED;return BB_SP_REFUSED;}
         bb_command command={0};command.type=BB_CMD_SAMPLE_KIT;command.value=p->cursor;
         command.target=p->machine;
 #if defined(BB_SAMPLE_HYBRID_TRIAL)
+#if BB_WITH_SLOOP_KITS
+        if(p->cursor>p->sample_count&&p->cursor<bb_sound_picker_machine_items(p->sample_count))command.value=BB_SLOOP_ID_FIRST+p->cursor-p->sample_count-1u;
+        else
+#endif
+        {
         bb_hybrid_selection selection;
         if(!bb_hybrid_from_index(p->cursor,p->sample_count,&selection))return BB_SP_INVALID;
         command.value=selection.kind==BB_HYBRID_808?BB_SAMPLE_808_ID:selection.sample;
+        }
 #endif
         accepted=bb_command_push(&a->commands,&command);
     } else

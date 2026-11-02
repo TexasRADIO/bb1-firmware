@@ -27,16 +27,19 @@ unsigned bb_audio_phrase_playhead(const bb_audio *a,unsigned m){
   return step?step-1:length-1;
  return step;
 }
-int bb_audio_phrase_preflight_playable(const bb_phrase_index *p,uint32_t playable){
+static int preflight_edit(const bb_phrase_index *p,uint32_t playable,unsigned voice,unsigned selected,unsigned edit_count){
  if(!bb_phrase_index_valid(p,playable))return 0;
- uint8_t repeats[BB_STEPS]={0},flams[BB_STEPS]={0};
+ uint8_t repeats[BB_STEPS]={0},flams[BB_STEPS]={0},groups[BB_STEPS]={0};
  for(unsigned step=1;step<=p->phrase.length;step++){
-  unsigned r=0,f=0;
+  unsigned r=0,f=0,classes=0;
   for(unsigned at=p->start[step-1];at<p->start[step];at++){
-   unsigned mods=p->phrase.events[p->ordinal[at]]>>13;
+   unsigned ordinal=p->ordinal[at],word=p->phrase.events[ordinal],mods=word>>13;
+   unsigned source=word&31u,count=edit_count&&step==selected+1u&&source==voice?edit_count:bb_phrase_ratchet_count(&p->phrase,ordinal);
+   if(source!=BB_FDV_ACCENT&&source!=BB_FDV_ACC&&count>1u)classes|=1u<<count;
    f+=!!(mods&BB_FDM_FLAM);r+=2u*!!(mods&BB_FDM_RETRIGGER_RATE);
   }
-  if(r+f>BB_DELAYED_CAPACITY)return 0;
+  if(r+f>BB_PHRASE_MODIFIER_BATCH_LIMIT)return 0;
+  for(unsigned count=2;count<=4;count++)if(classes&(1u<<count))groups[step-1]+=(uint8_t)(count-1u);
   repeats[step-1]=(uint8_t)r;flams[step-1]=(uint8_t)f;
  }
  /* Absolute-frame repeats retain their original forecast after a tempo edit.
@@ -55,7 +58,10 @@ int bb_audio_phrase_preflight_playable(const bb_phrase_index *p,uint32_t playabl
   index=index?index-1:p->phrase.length-1;
  }
  for(unsigned step=0;step<p->phrase.length;step++){
-  if(repeat_sum+flam_sum>BB_DELAYED_CAPACITY)return 0;
+  /* User groups are removed at the next source step. Only the current
+   * step's <=6 groups overlap retained annotations; reserve them before
+   * publishing the phrase so offer() cannot fail midway through playback. */
+  if(repeat_sum+flam_sum+groups[step]>BB_DELAYED_CAPACITY)return 0;
   if(step+1==p->phrase.length)break;
   repeat_sum=repeat_sum-repeats[old_repeat]+repeats[step+1];
   flam_sum=flam_sum-flams[old_flam]+flams[step+1];
@@ -63,6 +69,15 @@ int bb_audio_phrase_preflight_playable(const bb_phrase_index *p,uint32_t playabl
   if(++old_flam==p->phrase.length)old_flam=0;
  }
  return 1;
+}
+int bb_audio_phrase_preflight_playable(const bb_phrase_index *p,uint32_t playable){
+ return preflight_edit(p,playable,0,0,0);
+}
+int bb_audio_phrase_ratchet_preflight(const bb_phrase_index *p,unsigned voice,unsigned step,unsigned count){
+ if(!p||voice>=BB_PHRASE_VOICES||voice==BB_FDV_ACCENT||voice==BB_FDV_ACC||step>=p->phrase.length||count<1u||count>4u)return 0;
+ unsigned found=0;for(unsigned i=0;i<p->phrase.count;i++)
+  if((p->phrase.events[i]&31u)==voice&&((p->phrase.events[i]>>5)&63u)==step){found=1;break;}
+ return found&&preflight_edit(p,UINT32_MAX,voice,step,count);
 }
 int bb_audio_phrase_preflight(const bb_phrase_index *p){
  return bb_audio_phrase_preflight_playable(p,UINT32_MAX);
@@ -79,12 +94,14 @@ void bb_audio_phrase_restart(bb_audio *a,unsigned m){
 }
 void bb_audio_phrase_transport(bb_audio *a,unsigned start){
  if(!start&&a->aux)bb_aux_voices_stop(a->aux);
- for(unsigned m=0;m<BB_RICH_DRUMS;m++)if(a->rich.valid[m]){
-  if(start)bb_audio_phrase_restart(a,m);else bb_delayed_stop(&a->rich.player[m].queue);
+ for(unsigned m=0;m<BB_RICH_DRUMS;m++){
+  if(a->rich.valid[m]&&start)bb_audio_phrase_restart(a,m);
+  else{bb_delayed_stop(&a->rich.player[m].queue);a->rich.player[m].ratchets.active=0;}
  }
 }
 void bb_audio_phrase_legacy(bb_audio *a,unsigned m){
  if(m>=BB_RICH_DRUMS)return;
+ bb_audio_section_external_edit_owned(a);
  if(a->aux)bb_aux_voices_stop_machine(a->aux,m);
  bb_audio_phrase_cancel_pending(a,m);a->rich.valid[m]=0;
  a->rich.status[m].result=BB_RICH_CANCELLED;
@@ -101,6 +118,9 @@ int bb_audio_phrase_scene_install_reset(bb_audio *a,const bb_phrase p[2],unsigne
   bb_sample_audio_binding *s=bb_audio_sample_layer(a,m);
   if(s)for(unsigned i=0;i<s->count;i++)if(s->slots[i].voice.active)return 0;
   if(bb_aux_voices_active(a->aux,m))return 0;
+#if BB_WITH_SLOOP_KITS
+  if(bb_audio_sloop_busy(a,m))return 0;
+#endif
  }
  for(unsigned m=0;m<2;m++)if(mask&(1u<<m)){
   bb_phrase_index scratch;
@@ -127,6 +147,25 @@ int bb_audio_phrase_scene_install_reset(bb_audio *a,const bb_phrase p[2],unsigne
 }
 int bb_audio_phrase_admit(void *context,const bb_command *c){
  bb_audio *a=context;int reject=0;
+ if(c->type==BB_CMD_DRUM_RATCHET){
+  uint32_t applied=(uint32_t)c->note.note|((uint32_t)c->note.gate<<8)|
+      ((uint32_t)c->note.accent<<16)|((uint32_t)c->note.slide<<24);
+  reject=c->target>=BB_RICH_DRUMS;
+  if(!reject)reject=a->rich.valid[c->target]||a->drum_patterns.family[c->target]||
+      a->drum_patterns.status[c->target].state.applied!=applied;
+  if(reject)a->rich.edit_refusals++;return !reject;
+ }
+
+ if(c->type==BB_CMD_DRUM_SOURCE_RATCHET){
+  uint32_t applied=(uint32_t)c->note.note|((uint32_t)c->note.gate<<8)|
+      ((uint32_t)c->note.accent<<16)|((uint32_t)c->note.slide<<24);
+  reject=c->target>=BB_RICH_DRUMS;
+  if(!reject)reject=!a->rich.valid[c->target]||a->drum_patterns.family[c->target]||
+      a->rich.status[c->target].applied!=applied||a->rich.edit_revision[c->target]==UINT32_MAX||
+      !bb_audio_phrase_ratchet_preflight(&a->rich.active[c->target],c->voice,c->step,c->value);
+  if(reject)a->rich.edit_refusals++;return !reject;
+ }
+
  if(c->type==BB_CMD_DRUM_SOURCE_PARAMETER){
   uint32_t epoch=(uint32_t)c->note.note|((uint32_t)c->note.gate<<8)|
       ((uint32_t)c->note.accent<<16)|((uint32_t)c->note.slide<<24);
@@ -140,9 +179,10 @@ int bb_audio_phrase_admit(void *context,const bb_command *c){
  if(c->target<BB_RICH_DRUMS&&a->rich.valid[c->target]){
   /* Until rich edits/save are integrated, refuse rather than edit an inaudible
    * legacy grid or let generic evolution mutate it behind the phrase. */
-  reject|=c->type==BB_CMD_DRUM_STEP||c->type==BB_CMD_DRUM_LENGTH||c->type==BB_CMD_DRUM_TOGGLE;
+  reject|=c->type==BB_CMD_DRUM_STEP||c->type==BB_CMD_DRUM_LENGTH||
+      c->type==BB_CMD_DRUM_TOGGLE||c->type==BB_CMD_DRUM_RATCHET;
  }
- if(c->type==BB_CMD_EVOLVE&&(a->rich.valid[0]||a->rich.valid[1]))reject=1;
+ /* Evolve captures the real owner; its grid path masks rich drums. */
  /* Sample selection is validated by its audio-owner handler. That handler
   * preserves the current binding on rejection and publishes a result serial.
   * Dropping it here drains the FIFO without completing the picker request. */
@@ -160,6 +200,15 @@ static int strike(bb_audio *a,unsigned m,uint64_t frame,uint32_t payload){
  if(!a->core.drums[m].enabled||a->core.drums[m].muted)return 1;
  bb_phrase_index *p=&a->rich.active[m];
  int result;
+#if BB_WITH_DILLO_KIT_VIEW
+ unsigned sounding_voice=payload&31u;
+#endif
+#if BB_WITH_SLOOP_KITS
+ if(bb_audio_sloop_selected(a,m)){
+  bb_phrase_hit hit;result=bb_phrase_hit_resolve(&p->phrase,&p->controls,payload,&hit);
+  if(result==1&&!bb_audio_sloop_phrase_hit(a,m,hit.voice,hit.velocity))return 0;
+ }else
+#endif
 #if BB_SAMPLE_HOST_INTEGRATION
  /* Release performance policy: drum B keeps the immutable source event but
   * maps auxiliary-only SY/ZAP to native 808 voices.  This is the same
@@ -170,6 +219,9 @@ static int strike(bb_audio *a,unsigned m,uint64_t frame,uint32_t payload){
   if(result==1){
    unsigned voice=bb_voice_fallback(hit.voice,BB_RICH_808_NATIVE_VOICES);
    if(voice==BB_FALLBACK_NONE||!bb_drum808_source_trigger(&a->kit[m],voice,hit.velocity))return 0;
+#if BB_WITH_DILLO_KIT_VIEW
+   sounding_voice=voice;
+#endif
   }
  /* The shared SY/ZAP bank belongs to the phrase, not the selected kit.
   * The 808 path must route these two voices to that bank as well. Inspecting
@@ -195,12 +247,25 @@ static int strike(bb_audio *a,unsigned m,uint64_t frame,uint32_t payload){
 #endif
  if(!result)return 0;
  if(result==1){
+#if BB_WITH_DILLO_KIT_VIEW
+  if(sounding_voice<BB_PHRASE_VOICES)a->rich.strikes[m][sounding_voice]++;
+#endif
   a->hits[m]++;if((payload>>23)&3)a->rich.player[m].delayed++;else a->rich.player[m].primary++;
 #if BB_RICH_TRACE
   bb_rich_trace(a,m,frame,payload);
 #else
   (void)frame;
 #endif
+ }
+ return 1;
+}
+static int strike_queued(bb_audio *a,unsigned m,uint64_t frame,uint32_t payload){
+ if(!(payload&BB_RATCHET_GROUP))return strike(a,m,frame,payload);
+ bb_phrase_index *p=&a->rich.active[m];unsigned step=payload&63u;
+ if(step>=p->phrase.length)return 0;
+ for(unsigned at=p->start[step];at<p->start[step+1];at++){
+  uint32_t hit;int result=bb_phrase_ratchet_group_hit(p,&a->rich.player[m].ratchets,payload,p->ordinal[at],&hit);
+  if(result<0||(result&&!strike(a,m,frame,hit)))return 0;
  }
  return 1;
 }
@@ -215,13 +280,18 @@ int bb_audio_phrase_render(bb_audio *a,unsigned m,gg_state *groups,
  unsigned offset=0;
  while(offset<frames){
   uint64_t frame=first+offset;bb_delayed_event event;int status;
+  if(a->rich.player[m].pending&&a->rich.player[m].ratchets.active){
+   if(bb_delayed_remove_mask(q,BB_RATCHET_GROUP)!=BB_DELAYED_OK)goto fail;
+   a->rich.player[m].ratchets.active=0;
+  }
   /* Already pending equal-frame strikes precede the next primary step. A
    * transport/pattern change has already canceled obsolete generations. */
   while((status=bb_delayed_peek(q,&event))==BB_DELAYED_OK&&event.frame==frame){
-   if(bb_delayed_pop(q,frame,&event)!=BB_DELAYED_OK||!strike(a,m,frame,event.payload))goto fail;
+   if(bb_delayed_pop(q,frame,&event)!=BB_DELAYED_OK||!strike_queued(a,m,frame,event.payload))goto fail;
   }
   if(status!=BB_DELAYED_OK&&status!=BB_DELAYED_WAIT)goto fail;
   if(status==BB_DELAYED_OK&&event.frame<frame)goto fail;
+  bb_audio_phrase_apply_seamless(a,m,frame);
   unsigned lattice=p->phrase.lattice;
   uint32_t increment=(uint32_t)a->core.bpm*(lattice==BB_FDL_EIGHTHS?200u:lattice==BB_FDL_TRIPLETS?600u:400u);
   if(a->rich.player[m].pending){
@@ -233,6 +303,7 @@ int bb_audio_phrase_render(bb_audio *a,unsigned m,gg_state *groups,
     unsigned ordinal=p->ordinal[at];uint32_t payload=p->phrase.events[ordinal]|(ordinal<<16);
     if(!strike(a,m,frame,payload))goto fail;
    }
+   bb_phrase_ratchet_snapshot(p,step,&a->rich.player[m].ratchets);
    if(bb_phrase_index_delays(p,step+1,frame,duration,a->core.sample_rate,q)!=BB_DELAYED_OK)goto fail;
    a->rich.player[m].sounded=1;
    a->rich.player[m].pending=0;

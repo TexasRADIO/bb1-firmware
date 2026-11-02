@@ -10,10 +10,7 @@ static bb_catalogue_id bank(const bb_catalogue *c, unsigned group, size_t index)
 static bb_catalogue_id parts(const bb_catalogue *c, bb_catalogue_id b) {
     return bb_catalogue_find(c, b, "parts");
 }
-static int text(const bb_catalogue *c, bb_catalogue_id id) {
-    const uint8_t *p; size_t n;
-    return bb_catalogue_text(c, id, &p, &n) && n > 0;
-}
+#define text(a,b) bb_catalogue_has_text(a,b)
 static int same_text(const bb_catalogue *c, bb_catalogue_id a, bb_catalogue_id b) {
     const uint8_t *x, *y; size_t nx, ny;
     return bb_catalogue_text(c, a, &x, &nx) && bb_catalogue_text(c, b, &y, &ny) && nx == ny && !memcmp(x, y, nx);

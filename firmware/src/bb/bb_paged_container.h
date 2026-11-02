@@ -7,10 +7,12 @@
 #define BB_PC_MAX_BYTES 1048576u
 /* Exclusive control/startup owner, not IRQ/thread-safe. Copies of views may
  * share this scratch sequentially. No globals/heap; text never points here. */
+/* Decoded-page LRU. Boot's catalogue walk revisits ~6 pages in rotation; 2 slots thrashed (13,782 decodes). */
+#define BB_PC_SLOTS 6u
 typedef struct {
-    const uint8_t *source;size_t length;uint32_t crc,tag[2],hits,misses;
-    uint8_t valid[2],next;
-    uint8_t page[2][BB_PC_PAGE];
+    const uint8_t *source;size_t length;uint32_t crc,tag[BB_PC_SLOTS],hits,misses,age[BB_PC_SLOTS],clock;
+    uint8_t valid[BB_PC_SLOTS],next;
+    uint8_t page[BB_PC_SLOTS][BB_PC_PAGE];
 } bb_pc_cache;
 typedef struct {
     const uint8_t *bytes;size_t length;bb_pc_cache *cache;
@@ -30,4 +32,6 @@ int bb_pc_read_metadata(const bb_pc_view *,uint32_t offset,void *,size_t);
 /* Public text pointers are into immutable source bytes, valid until source
  * lifetime ends; cache eviction does not affect them. No NUL is implied. */
 int bb_pc_text_bytes(const bb_pc_view *,uint32_t offset,size_t,const uint8_t **);
+/* Shared helper of the paged readers: little-endian u32. */
+uint32_t bb_pc_u32(const uint8_t *);
 #endif

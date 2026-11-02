@@ -7,9 +7,7 @@ static int unity(const uint8_t *p){
     for(unsigned i=0;i<GG_SCENE_MIX_BYTES;i++)if(p[i]!=127)return 0;
     return 1;
 }
-static uint32_t checksum(const uint8_t *p,size_t n){
-    return ~bb_crc32_add(bb_crc32_add(UINT32_MAX,p,12),p+16,n-16);
-}
+#define checksum(a,b) bb_crc32_record(a,b)
 int gg_scene_capture(const gg_state bank[4],uint8_t packed[GG_SCENE_MIX_BYTES]){
     if(!bb_wire_separated(bank,4*sizeof *bank,packed,GG_SCENE_MIX_BYTES))return 0;
     for(unsigned k=0;k<4;k++)for(unsigned g=0;g<GG_COUNT;g++)

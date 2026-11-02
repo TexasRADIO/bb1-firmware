@@ -10,9 +10,15 @@ int bb_panel_sync_patterns_mask(bb_panel *p,bb_commands *q,const bb_core *c,unsi
     if(!mask)return 1;
     token=q->enter?q->enter(q->lock_context):0;
     if(!bb_commands_idle(q)){if(q->leave)q->leave(q->lock_context,token);return 0;}
+    /* Song loads submit tempo/swing directly to the owner queue. Once that
+     * queue is idle, mirror their committed values with the applied notes.
+     * Never overwrite a newer knob request while its command is pending. */
+    changed|=p->requested.bpm!=c->bpm || p->requested.swing!=c->swing;
+    p->requested.bpm=c->bpm;p->requested.swing=c->swing;
     for(unsigned k=0;k<BB_MACHINES;k++)if(mask&(1u<<k)) {
         bb_machine *to=&p->requested.drums[k];const bb_machine *from=&c->drums[k];
         changed|=to->length!=from->length || memcmp(to->steps,from->steps,sizeof to->steps)!=0;
+        changed|=to->enabled!=from->enabled;to->enabled=from->enabled;
         to->length=from->length;memcpy(to->steps,from->steps,sizeof to->steps);
         /* Factory patterns can commit required voice modes with the notes.
          * Keep the knob/display mirror aligned, without copying other pots. */

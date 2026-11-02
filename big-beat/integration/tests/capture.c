@@ -91,6 +91,21 @@ static void lint(const char *what)
 static FILE *out; static unsigned shots;
 static bb_ui u; static bb_ui_in in;
 static char ktext[4][16];
+static char legend[64];
+/* 2.0 D4: the key legend exactly as the firmware makes it (bb_v3_common): the whole line, or black keys only when the
+ * whole line is wider than the screen. It shows only after BB_EV_LEGEND, but every route's legend is checked here:
+ * it must fit the 224 px band and must not be truncated by the 64-byte buffer (the same text with a large buffer). */
+static void set_legend(const bb_nav_state *s)
+{
+    char big[160];
+    int whites = 1;
+    (void)bb_nav_legend(s, legend, sizeof legend, 1);
+    if (text_w(&AF_S, legend) > 224) { (void)bb_nav_legend(s, legend, sizeof legend, 0); whites = 0; }
+    (void)bb_nav_legend(s, big, sizeof big, whites);
+    if (strcmp(big, legend)) FAIL("legend cut by its buffer: \"%s\" / \"%s\"", legend, big);
+    if (text_w(&AF_S, legend) > 224) FAIL("legend wider than the band: \"%s\"", legend);
+    in.legend = legend;
+}
 static void shot(const char *name)
 {
     lint_on = 1; ntext = 0;
@@ -114,6 +129,7 @@ static void base(const bb_nav_state *s, uint8_t row, uint8_t page)
     in.running = 1; in.beat = 1; in.ticks = 37; in.bpm_x10 = 1200; in.level = 120;
     in.events = BB_EV_INPUT;                   /* a button was just used: HOME, not attract */
     bb_nav_knobs(s, roles, lab);
+    set_legend(s);
     for (int k = 0; k < 4; k++) {
         snprintf(ktext[k], sizeof ktext[k], "%d", 40 + 15 * k);
         in.knob[k].label = lab[k][0] ? lab[k] : 0; in.knob[k].text = ktext[k];
@@ -179,6 +195,12 @@ int main(int argc, char **argv)
                         in.help = 1; snprintf(name, sizeof name, "%s-help", PN[page]); shot(name); in.help = 0;
                         in.notice = "BUSY / SELECT AGAIN"; snprintf(name, sizeof name, "%s-notice", PN[page]); shot(name); in.notice = 0;
                     }
+                    if (bank == 0 && row != 1 && legend[0]) {               /* 2.0 D4: the transient key legend */
+                        uint32_t ev = in.events;
+                        in.events |= BB_EV_LEGEND;
+                        snprintf(name, sizeof name, "%s-%s%s-legend", PN[page], RN[row], keys ? "-steps" : ""); shot(name);
+                        in.events = ev;
+                    }
                 }
             }
     /* loading states and the fault */
@@ -207,6 +229,69 @@ int main(int argc, char **argv)
             snprintf(nm, sizeof nm, "play-a-popup-%u", i); shot(nm);
         }
         in.knob_turning = BB_UI_NO;
+    }
+    {   /* 2.0 D4. (1) A turned knob shows NAME + value for about 1 s on every page: the pop-up now also on the KNOBS
+         * pages (SOUND) and, below, SONG. (2) The generator's own knobs on EVOLVE (EUCLID, RANDOM). (3) Every new
+         * QUEUED / APPLIED notice. (4) The transient legend on the kit builder's pages, and HOME keeping the quick
+         * start and the Dillo NEXT line (no legend over them). */
+        bb_nav_state s; bb_nav_out o; char nm[48];
+        bb_nav_init(&s, BB_NAV_STUDIO, 600); bb_nav_set_focus(&s, 0);
+        memset(&o, 0, sizeof o); bb_nav_goto(&s, BB_NAV_SOUND, &o);
+        base(&s, 0, BB_UI_KNOBS); in.title = "KICK"; in.subtitle = "EDIT: STORE";
+        in.knob_turning = 1; in.events |= BB_EV_KNOB; in.ev_knob = 1; shot("sound-a-turn");
+        in.knob_turning = BB_UI_NO;
+        memset(&o, 0, sizeof o); bb_nav_goto(&s, BB_NAV_EVOLVE, &o);
+        static const char *const EU[4] = {"HITS", "STEPS", "ROTATE", "ACCENTS"}, *const RA[4] = {"DENSITY", "ACCENT", "ANCHOR", "SEED"};
+        static const char *const EUV[4] = {"5", "16", "0", "2"}, *const RAV[4] = {"70", "30", "100", "9999"};
+        for (unsigned g = 0; g < 2; g++) {
+            base(&s, 0, BB_UI_KNOBS); in.title = g ? "RANDOM" : "EUCLID"; in.subtitle = "EDIT: APPLY";
+            for (int k = 0; k < 4; k++) { in.knob[k].label = g ? RA[k] : EU[k]; in.knob[k].text = g ? RAV[k] : EUV[k]; in.knob[k].flags = 0; }
+            in.knob_turning = 3; in.events |= BB_EV_KNOB; in.ev_knob = 3;
+            snprintf(nm, sizeof nm, "evolve-a-%s-turn", g ? "random" : "euclid"); shot(nm);
+        }
+        in.knob_turning = BB_UI_NO;
+        static const uint16_t NOTE[] = {TX_NEXT_SECTION_QUEUED, TX_SECTION_APPLIED, TX_VARIATION_QUEUED_B2_RETURN,
+                                        TX_VARIATION_APPLIED, TX_KIT_QUEUED, TX_KIT_APPLIED, TX_SOUND_QUEUED, TX_SOUND_APPLIED};
+        static const char *const NOTE_N[] = {"section-queued", "section-applied", "variation-queued", "variation-applied",
+                                             "kit-queued", "kit-applied", "sound-queued", "sound-applied"};
+        static const uint8_t NOTE_PAGE[] = {BB_NAV_STUDIO, BB_NAV_STUDIO, BB_NAV_EVOLVE, BB_NAV_EVOLVE, BB_NAV_PATTERN,
+                                            BB_NAV_PLAY, BB_NAV_PATTERN, BB_NAV_PATTERN};
+        for (unsigned i = 0; i < sizeof NOTE / sizeof NOTE[0]; i++) {
+            uint8_t row = i >= 6 ? 2 : 0, v3;
+            bb_nav_init(&s, BB_NAV_STUDIO, 600);
+            bb_nav_set_instrument(&s, row < 2 ? BB_NAV_INSTR_DRUM : BB_NAV_INSTR_DILLO, row < 2 ? 2 : 1); bb_nav_set_focus(&s, row);
+            memset(&o, 0, sizeof o); bb_nav_goto(&s, NOTE_PAGE[i], &o);
+            v3 = bb_v3_route(&s, 0); base(&s, row, v3);
+            if (v3 == BB_UI_PATTERN) browse(v3);
+            if (v3 == BB_UI_KNOBS) { in.title = "EVOLVE  DRUM A"; in.subtitle = "EDIT: CAPTURE"; }
+            in.notice = bb_tx(NOTE[i]);
+            snprintf(nm, sizeof nm, "notice-%s", NOTE_N[i]); shot(nm); in.notice = 0;
+        }
+#if defined(BB_WITH_USER_KITS) && BB_WITH_USER_KITS
+        for (uint8_t b = BB_NAV_KIT_BUILD; b <= BB_NAV_KIT_SAVE_AS; b++) {
+            bb_nav_init(&s, BB_NAV_STUDIO, 600); bb_nav_set_focus(&s, 0);
+            memset(&o, 0, sizeof o); bb_nav_goto(&s, BB_NAV_KIT, &o); s.bank = b;
+            base(&s, 0, BB_UI_KIT); browse(BB_UI_KIT); in.page_name = bb_nav_page_name(&s);
+            in.title = b == BB_NAV_KIT_BUILD ? "USER 1" : "SAVE AS"; in.subtitle = "EDIT: SAVE AS";
+            in.playing_item = BB_UI_NO;
+            in.events |= BB_EV_LEGEND; shot(b == BB_NAV_KIT_BUILD ? "kit-a-build-legend" : "kit-a-save-as-legend");
+        }
+#endif
+        bb_nav_init(&s, BB_NAV_STUDIO, 600); bb_nav_set_focus(&s, 0);
+        /* HOME leaves the band to the Dillo NEXT line and the quick start even when the legend is due */
+        base(&s, 0, BB_UI_STUDIO); in.lane[2].next = "Acid Rain"; in.events |= BB_EV_LEGEND; shot("studio-a-dillo-next-legend");
+        base(&s, 0, BB_UI_STUDIO); in.quick_start = 1; in.running = 0; in.events |= BB_EV_LEGEND; shot("studio-a-quick-start-legend");
+        {   /* SONG (bb_arranger_draw.inc): its title line is its key legend; BARS turned */
+            static const char *const ROWS[] = {"01 INTRO", "02 VERSE", "03 HOOK"}, *const L[4] = {"ROW", "REPEATS", "BARS", "LOOP"},
+                              *const V[4] = {"2", "1", "4", "ON"};
+            base(&s, 0, BB_UI_ARRANGE); in.page_name = "SONG"; in.legend = 0;
+            in.pattern_name = "VERSE"; in.next_name = "HOOK"; in.subtitle = "RAM PROJECT / ADD A SECTION";
+            in.title = "KEY 1 ADD 3 COPY 4 DELETE"; in.items = 3;
+            for (int i = 0; i < 3; i++) in.item[i] = ROWS[i];
+            in.cursor = 1; in.playing_item = 1; in.queued_item = 2;
+            for (int k = 0; k < 4; k++) { in.knob[k].label = L[k]; in.knob[k].text = V[k]; in.knob[k].flags = 0; }
+            in.knob_turning = 2; in.events |= BB_EV_KNOB; in.ev_knob = 2; shot("song-turn"); in.knob_turning = BB_UI_NO;
+        }
     }
     {   /* STUDIO with real kit names (r9.9, #4 6471457725): a sampled kit reads as on the KIT page, and the
          * longest native and sample names must fit the lane next to the section name. */

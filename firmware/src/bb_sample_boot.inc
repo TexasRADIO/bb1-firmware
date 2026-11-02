@@ -38,6 +38,14 @@ static int bb_sample_rebind_cold(void){
  bb_sample_b_binding=entries[0];bb_sample_b_binding.slots=bb_sample_b_slots;
  if(!bb_audio_sample_bind_b(&bb_sound,&bb_sample_b_binding,BB_SAMPLE_808_ID))return 0;
 #endif
+#if BB_WITH_SLOOP_KITS
+ /* Lead bank contract #64 6557315129: the independent BS31 image occupies
+  * only the reserved tail of sound A. Missing/corrupt/wrong-family BS31
+  * leaves the native/sample bindings usable; the picker refuses SLOOP.
+  * This is a read-only cold bind, never an installer or a flash writer. */
+ if(bb_fsmp_u32(fm1_xip_ptr(0xA0000u)+8)<=0x39C00u)
+  (void)bb_audio_sloop_bind_cold(&bb_sound,fm1_xip_ptr(0xD9C00u),SL_BANK_BYTES);
+#endif
  return 1;
 }
 static void bb_sample_boot(void) {
@@ -83,16 +91,35 @@ static void bb_sample_boot(void) {
 static int bb_pair_session_capture(void){
  if(!bb_sample_boot_ready&&(bb_sound.sample||bb_sound.sample_b))return 0;
  bb_single_pause p=bb_single_target_pause();
+#if BB_WITH_USER_KITS
+ if(bb_pair_capture(&bb_sound,&bb_session_memory.pair.snapshot,&p,
+   bb_sample_library_header_crc,bb_sample_library_payload_crc)!=BB_SINGLE_OK)return 0;
+ bb_sample_scene_identity *id=&bb_session_memory.pair.snapshot.identities[0];
+ if(id->kind==2){   /* drum A plays the BUILD draft: the scene carries that copy and names its slot */
+  if(!bb_uk.live||bb_sound.user[0]!=&bb_uk.res)return 0;
+  id->kit=bb_uk.origin<BB_UK_SLOTS?bb_uk.origin:BB_UK_ORIGIN_DRAFT;
+ }
+ return 1;
+#else
  return bb_pair_capture(&bb_sound,&bb_session_memory.pair.snapshot,&p,
    bb_sample_library_header_crc,bb_sample_library_payload_crc)==BB_SINGLE_OK;
+#endif
 }
 static size_t bb_pair_session_encode(void){
  return bb_pair_encode_mode(&bb_session_memory.pair.snapshot,bb_session_memory.wire,
    sizeof bb_session_memory.wire,!bb_sample_boot_ready);
 }
 static int bb_pair_session_decode(const void *data,size_t bytes){
+#if BB_PAIR_SLOOP
+ bb_sample_sloop_bank_identity bank;
+ const uint8_t *b=bb_sound.sloop_bank.bytes;
+ if(b){bank.recipe_crc=bb_wire_get32(b+24);bank.image_crc=bb_wire_get32(b+20);}
+ return bb_pair_decode_bank(data,bytes,&bb_session_memory.pair,
+   bb_sample_library_header_crc,bb_sample_library_payload_crc,bb_sample_boot_ready?bb_sample_musical_count:0,b?&bank:NULL);
+#else
  return bb_pair_decode(data,bytes,&bb_session_memory.pair,
    bb_sample_library_header_crc,bb_sample_library_payload_crc,bb_sample_boot_ready?bb_sample_musical_count:0);
+#endif
 }
 static int bb_pair_session_restore(void){
  if(!bb_sample_boot_ready){bb_single_pause p=bb_single_target_pause();return bb_pair_restore_native(&bb_sound,&bb_session_memory.pair.snapshot,&p);}
@@ -103,9 +130,18 @@ static int bb_pair_session_restore(void){
   bb_session_memory.sample_entries[1][k].slots=bb_sample_b_slots;
  }
  bb_single_pause p=bb_single_target_pause();
+#if BB_WITH_USER_KITS
+ int user=!!(bb_uk.scene_mask&1u); /* resolution follows all pair admission checks inside restore */
+ int r=bb_pair_restore(&bb_sound,&bb_session_memory.pair.snapshot,&p,
+  bb_session_memory.sample_entries[0],bb_session_memory.sample_entries[1],bb_sample_musical_count,
+  bb_sample_library_header_crc,bb_sample_library_payload_crc);
+ if(r==BB_SINGLE_OK&&!bb_uk_scene_installed(user,bb_session_memory.pair.snapshot.identities[0].kit))r=BB_SINGLE_HELD_FAILURE;
+ return r;
+#else
  return bb_pair_restore(&bb_sound,&bb_session_memory.pair.snapshot,&p,
   bb_session_memory.sample_entries[0],bb_session_memory.sample_entries[1],bb_sample_musical_count,
   bb_sample_library_header_crc,bb_sample_library_payload_crc);
+#endif
 }
 #else
 static int bb_sample_session_capture(bb_sample_scene_identity *id){

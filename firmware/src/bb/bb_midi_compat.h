@@ -15,9 +15,15 @@ typedef struct {
     uint32_t last_us,elapsed_us;
     uint8_t primed,intervals,pending,pending_source;
     uint16_t last_bpm;
+    uint8_t bank_msb[BB_KEY_SOURCES][2],bank_lsb[BB_KEY_SOURCES][2];
     bb_command command; /* retry exact queued command, never recalculate from retry time */
 } bb_midi_compat_state;
 static inline void bb_midi_compat_reset(bb_midi_compat_state *s) { memset(s,0,sizeof *s); }
+static inline void bb_midi_compat_clock_reset(bb_midi_compat_state *s){
+    s->primed=s->intervals=0;s->elapsed_us=s->last_us=0;s->last_bpm=0;
+    if(s->pending&&(s->command.type==BB_CMD_TEMPO||s->command.type==BB_CMD_TRANSPORT_RESTART||
+       s->command.type==BB_CMD_TRANSPORT_RESUME||s->command.type==BB_CMD_TRANSPORT))s->pending=0;
+}
 static inline int bb_midi_compat_synth(unsigned n) {
     return (n==0 && BB_WITH_DILLO) || (n==1 && BB_WITH_TELEGRAM);
 }
@@ -39,12 +45,12 @@ static inline int bb_midi_compat_plan(bb_midi_compat_state *s,const bb_midi_comp
     unsigned cin=packet&15u,status=(packet>>8)&255u,a=(packet>>16)&255u,b=packet>>24;
     if(!bb_midi_compat_settings_valid(c) || (source!=BB_KEY_USB&&source!=BB_KEY_TRS) || (packet&0xf0u))return 0;
     memset(out,0,sizeof *out);
-    if(cin==15 && (status==0xf8 || status==0xfa || status==0xfc) && !a && !b) {
-        if(source!=c->clock_source)return 0;
+    if(cin==15 && (status==0xf8 || status==0xfa || status==0xfb || status==0xfc) && !a && !b) {
+        if(source!=c->clock_source || (c->clock_out && source==BB_KEY_USB))return 0;
         if(status!=0xf8) {
             if(!c->transport)return 0;
             s->primed=s->intervals=0;s->elapsed_us=0;s->last_bpm=0;
-            out->type=status==0xfa?BB_CMD_TRANSPORT_RESTART:BB_CMD_TRANSPORT;return 1;
+            out->type=status==0xfa?BB_CMD_TRANSPORT_RESTART:status==0xfb?BB_CMD_TRANSPORT_RESUME:BB_CMD_TRANSPORT;return 1;
         }
         if(!c->tempo_follow)return 0;
         uint32_t dt=now-s->last_us;s->last_us=now;
@@ -65,11 +71,21 @@ static inline int bb_midi_compat_plan(bb_midi_compat_state *s,const bb_midi_comp
         out->type=BB_CMD_DRUM_TRIGGER;out->target=(uint8_t)machine;
         out->voice=(uint8_t)lane;out->value=(uint16_t)b;return 1;
     }
+    for(unsigned synth=0;synth<2;synth++)if(bb_midi_compat_synth(synth)&&c->synth_channel[synth] && channel==c->synth_channel[synth]) {
+        if(cin==12 && !b) {
+            if(s->bank_msb[source][synth] || s->bank_lsb[source][synth] || a>=(synth?BB_TELEGRAM_PATCHES:BB_DILLO_PATCHES))return 0;
+            out->type=synth?BB_CMD_TELEGRAM_PATCH:BB_CMD_DILLO_PATCH;out->value=(uint16_t)a;return 1;
+        }
+        if(cin==14 || (cin==11 && (a==64 || a==121 || a==123))) {
+            out->type=BB_CMD_MIDI_PERFORMANCE;out->target=(uint8_t)synth;out->step=(uint8_t)source;
+            out->voice=(uint8_t)(cin==14?128:a);out->value=(uint16_t)(cin==14?a+(b<<7):b);return 1;
+        }
+        if(cin==11 && (a==0 || a==32)) {
+            if(a==0)s->bank_msb[source][synth]=(uint8_t)b;else s->bank_lsb[source][synth]=(uint8_t)b;
+            return 0;
+        }
+    }
     for(unsigned synth=0;synth<2;synth++)if(bb_midi_compat_synth(synth)&&c->synth_channel[synth] && channel==c->synth_channel[synth] && cin==11) {
-        /* CC121 resets transient performance controllers only. This adapter has
-         * no sustain/bend/expression state: keep volume and sound parameters,
-         * held notes, transport, and clock estimator unchanged. */
-        if(a==121)return 0;
         if(a==120){out->type=BB_CMD_SYNTH_SILENCE;out->target=synth;return 1;}
         if(a==7) { out->type=BB_CMD_BAND_LEVEL;out->target=(uint8_t)(BB_MIX_DILLO+synth);out->value=(uint16_t)b;return 1; }
         if(a==74 || a==71) {
@@ -79,7 +95,7 @@ static inline int bb_midi_compat_plan(bb_midi_compat_state *s,const bb_midi_comp
             out->value=(uint16_t)(lo+((hi-lo)*b+63u)/127u);return 1;
         }
     }
-    return 0; /* no PC, bank, bend, sustain, FB, F2 or MIDI-out equivalence */
+    return 0; /* no Song Position Pointer, GM bank remap or implicit THRU */
 }
 /* Consume one packet or return 0 to park it at the existing ring head.
  * Non-STOP additions leave four FIFO slots for physical playing/releases.
@@ -94,7 +110,7 @@ static inline int bb_midi_compat_dispatch(bb_midi_compat_state *s,const bb_midi_
     uintptr_t token=q->enter?q->enter(q->lock_context):0;
     unsigned count=q->count,stopping=q->stop_pending || q->stop_inflight;
     if(q->leave)q->leave(q->lock_context,token);
-    if(command.type==BB_CMD_TRANSPORT_RESTART && stopping) {
+    if((command.type==BB_CMD_TRANSPORT_RESTART || command.type==BB_CMD_TRANSPORT_RESUME) && stopping) {
         next.pending=0;*s=next;return 1; /* a newer owner STOP supersedes retry */
     }
     if((!stop && count>=BB_COMMAND_CAPACITY-4u) || !bb_command_push(q,&command)) {

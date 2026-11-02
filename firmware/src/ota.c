@@ -211,7 +211,7 @@ static int ota_memeq(const uint8_t *a, const uint8_t *b, uint32_t n)
 static int ota_stage_head(uint32_t len)
 {
     static const char NAME[16] = "LOADER.BIN";
-    uint8_t h[32];
+    uint8_t h[32], back[32];
     uint32_t i;
     for (i = 0; i < 32u; i++)
         h[i] = 0;
@@ -224,7 +224,11 @@ static int ota_stage_head(uint32_t len)
     for (i = 0; i < 16u; i++)
         h[16 + i] = (uint8_t)NAME[i];
     ota_wr16(h, ota_crc16(h + 2, 30, 0));
-    return ota_prog(OTA_AREA, h, 32);
+    if (ota_prog(OTA_AREA, h, sizeof h) ||
+        ota_fread(OTA_AREA, back, sizeof back) ||
+        !ota_memeq(back, h, sizeof h))
+        return -1;
+    return 0;
 }
 
 /* UFW header + entry list (hdr: 1 KiB) from the host -> offset / length of
@@ -328,12 +332,25 @@ static int ota_stage(void)                       /* steps 1..6; 0 = host said su
     return -13;
 }
 
-static void ota_unstage(void)
+/* 0: every staging sector erased and the two markers the SPL scans (loader head, update record) read back
+ * blank; -1 otherwise. A failed sector does not stop the others from being erased. */
+static int ota_unstage(void)
 {
+    uint8_t a[4], r[8];
     uint32_t i;
+    int rc = 0;
     for (i = 0; i < OTA_AREA_LEN; i += 0x1000u)
-        ota_erase(OTA_AREA + i);
+        if (ota_erase(OTA_AREA + i))
+            rc = -1;
+    if (ota_fread(OTA_AREA, a, sizeof a) || ota_fread(OTA_RES, r, sizeof r))
+        return -1;
+    for (i = 0; i < sizeof a; i++)
+        if (a[i] != 0xFFu) rc = -1;
+    for (i = 0; i < sizeof r; i++)
+        if (r[i] != 0xFFu) rc = -1;
+    return rc;
 }
+#define OTA_ERR_CLEANUP (-15)                       /* the staging area could not be cleared */
 
 /* returns only when nothing was committed (refused, failed, or dry run) */
 static int ota_session_body(void)
@@ -345,8 +362,7 @@ static int ota_session_body(void)
     ota_deadline = ota_now_ms() + 120000u;          /* step 1 normally takes ~5 s; a stalled host gives up after 2 min */
     rc = ota_stage();
     if (rc) {
-        ota_unstage();
-        ota_show(9, rc);
+        ota_show(9, ota_unstage() ? OTA_ERR_CLEANUP : rc);
         return rc;
     }
     /* 5./7. UPDATA_PARM (update_mode_api_v2 layout), flash copy first */
@@ -360,8 +376,7 @@ static int ota_session_body(void)
     ota_wr32(parm + 72, OTA_AREA);
     ota_wr16(parm, ota_crc16(parm + 2, 78, 0));
 #if FELUCCA_OTA_DRYRUN
-    ota_unstage();
-    ota_show(9, 1);                                 /* 1 = dry run complete */
+    ota_show(9, ota_unstage() ? OTA_ERR_CLEANUP : 1);   /* 1 = dry run complete */
     return 1;
 #endif
 #ifndef FELUCCA_OTA_RAMONLY
@@ -370,8 +385,7 @@ static int ota_session_body(void)
 #endif
     if (!FELUCCA_OTA_RAMONLY && (ota_prog(OTA_RES, parm, sizeof parm) || ota_fread(OTA_RES, back, sizeof back) ||
         !ota_memeq(back, parm, sizeof parm))) {
-        ota_unstage();
-        ota_show(9, -14);
+        ota_show(9, ota_unstage() ? OTA_ERR_CLEANUP : -14);
         return -14;
     }
     ota_show(5, 0);
@@ -393,18 +407,24 @@ static int ota_session(void)
 }
 
 /* boot: a staging area left over (we are running, so the update finished or
- * never started): erase it so the SPL does not re-enter the loader */
+ * never started): erase it so the SPL does not re-enter the loader.
+ * 0 nothing staged, 1 cleared, -1 unreadable, -15 still not clear after three attempts.
+ * The result stays in ota_boot_cleanup_rc for the console status (ota_cleanup). */
+static int ota_boot_cleanup_rc;
 static int ota_boot_cleanup(void)
 {
     uint8_t a[4], r[8];
-    uint32_t i, used = 0;
+    uint32_t i, used = 0, attempt;
     if (ota_fread(OTA_AREA, a, 4) || ota_fread(OTA_RES, r, 8))
-        return -1;
+        return ota_boot_cleanup_rc = -1;
     for (i = 0; i < 4u; i++)
         used |= a[i] != 0xFFu;
     for (i = 0; i < 8u; i++)
         used |= r[i] != 0xFFu;
-    if (used)
-        ota_unstage();
-    return (int)used;
+    if (!used)
+        return ota_boot_cleanup_rc = 0;
+    for (attempt = 0; attempt < 3u; attempt++)
+        if (!ota_unstage())
+            return ota_boot_cleanup_rc = 1;
+    return ota_boot_cleanup_rc = OTA_ERR_CLEANUP;
 }

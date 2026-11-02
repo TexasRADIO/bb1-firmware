@@ -2,9 +2,7 @@
  * Read-only main-loop command: copy a bounded snapshot with IRQs saved, then
  * format AFTER restoring interrupts. Never wait on USB while blocking audio.
  * Fields describe Big Beat, not unused stock track/preset state. */
-static void bb_diag_counter(const char *name,uint32_t value) {
-    con_puts(name);con_puts(" 0x");con_hex(value,8);con_puts("\r\n");
-}
+#define bb_diag_counter(name,value) con_kx(name,value)   /* the same "name 0xVALUE" line */
 #if BB_SAMPLE_HOST_INTEGRATION
 /* Short read-only kit acknowledgement snapshot. Copy only scalars under the
  * existing audio IRQ guard; format over USB after releasing it. In particular,

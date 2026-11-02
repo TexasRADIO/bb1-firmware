@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""BBPC v2 codec for the Big Beat performance catalogue (r9 step 4).
+"""BBPC v2/v3 codecs for the Big Beat performance catalogue.
 
 Decoder authority: firmware/src/bb/bb_paged_container.c, bb_paged_records.c and
-bb_catalogue_page.c (boot39). This module mirrors those rules and adds an encoder:
+bb_catalogue_page.c. This module mirrors those rules and adds an encoder:
 
   * Records are interned bottom-up (children before parents) by a post-order walk,
     deduplicated by value, so every child/shape reference is to a lower ID.
@@ -12,9 +12,13 @@ bb_catalogue_page.c (boot39). This module mirrors those rules and adds an encode
   * Metadata is cut into 768-byte pages. Each page is LZ4-packed with the
     project's shortest-parse packer (a line-for-line port of compress() in
     claude/library-audit-14/tools/repack_catalogue.mjs); a page stays raw when
-    the packed form is not strictly smaller.
+    the packed form is not strictly smaller. Version 3 instead uses independent
+    raw fixed-Huffman DEFLATE pages with a 1 KiB encoder window. Text remains
+    uncompressed and existing cache ownership is unchanged. The target accepts
+    fixed or stored blocks, not general dynamic-Huffman DEFLATE.
 
-Gate: encode(decode(installed)) == installed, byte for byte (see pack.py).
+The default encoder remains version 2. Version 3 must be selected explicitly.
+Gate: all decoded values and metadata pages must remain byte-identical.
 No device access.
 """
 import json
@@ -174,8 +178,8 @@ class Container:
         blob = bytes(blob)
         u16 = lambda o: struct.unpack_from('<H', blob, o)[0]
         u32 = lambda o: struct.unpack_from('<I', blob, o)[0]
-        if blob[:4] != MAGIC or u16(4) != 2 or u16(6) != PAGE or u32(8) != len(blob):
-            raise ValueError('not a BBPC v2 container')
+        if blob[:4] != MAGIC or u16(4) not in (2, 3) or u16(6) != PAGE or u32(8) != len(blob):
+            raise ValueError('not a BBPC v2/v3 container')
         if u32(12) != crc(blob):
             raise ValueError('CRC mismatch')
         self.blob = blob
@@ -191,7 +195,9 @@ class Container:
             off, field, size = struct.unpack_from('<IHH', blob, self.blocks + 8 * i)
             enc = blob[self.payload + off:self.payload + off + (field & 32767)]
             self.pages.append((off, field >> 15, field & 32767, size))
-            meta += enc if field & 32768 else lz4_decode(enc, size)
+            meta += enc if field & 32768 else zlib.decompress(enc, -10) if u16(4) == 3 else lz4_decode(enc, size)
+            if len(meta) != min((i + 1) * PAGE, self.metadata_bytes):
+                raise ValueError('decoded page length mismatch')
         if len(meta) != self.metadata_bytes:
             raise ValueError('metadata length mismatch')
         self.meta = bytes(meta)
@@ -293,7 +299,7 @@ def _number_bits(x):
     return struct.pack('<d', float(x))
 
 
-def encode(value, raw_pages=False, appends=()):
+def encode(value, raw_pages=False, appends=(), version=2):
     """Encode a JSON value as BBPC v2. Returns (bytes, report).
 
     value      the base layer, interned canonically: an object's values first,
@@ -305,6 +311,8 @@ def encode(value, raw_pages=False, appends=()):
                Records of earlier roots that the new root no longer reaches stay
                in the container (unreachable, never read).
     """
+    if version not in (2, 3):
+        raise ValueError("unsupported BBPC encoding version")
     records = []   # (kind, payload) in ID order
     seen = {}
 
@@ -374,7 +382,13 @@ def encode(value, raw_pages=False, appends=()):
     directory, payload = bytearray(), bytearray()
     for at in range(0, len(meta), PAGE):
         page = bytes(meta[at:at + PAGE])
-        packed = None if raw_pages else lz4_compress(page)
+        if raw_pages:
+            packed = None
+        elif version == 3:
+            compressor = zlib.compressobj(9, zlib.DEFLATED, -10, 9, zlib.Z_FIXED)
+            packed = compressor.compress(page) + compressor.flush()
+        else:
+            packed = lz4_compress(page)
         if packed is not None and len(packed) < len(page):
             enc, field = packed, len(packed)
         else:
@@ -387,7 +401,7 @@ def encode(value, raw_pages=False, appends=()):
     text_at = blocks_at + len(directory)
     payload_at = text_at + len(text)
     out = bytearray(payload_at + len(payload))
-    struct.pack_into('<4sHHIIIIIHHIIIIIII', out, 0, MAGIC, 2, PAGE, len(out), 0,
+    struct.pack_into('<4sHHIIIIIHHIIIIIII', out, 0, MAGIC, version, PAGE, len(out), 0,
                      len(records), root, len(meta), len(shape_ids), 0,
                      sparse_at, dict_at, blocks_at, len(directory) // 8, text_at, len(text), payload_at)
     for i, o in enumerate(sparse):

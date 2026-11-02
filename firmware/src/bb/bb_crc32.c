@@ -4,3 +4,6 @@ uint32_t bb_crc32_add(uint32_t c,const uint8_t *p,size_t n){
     while(n--){c^=*p++;for(unsigned bit=0;bit<8;bit++)c=(c>>1)^((0u-(c&1u))&UINT32_C(0xedb88320));}
     return c;
 }
+uint32_t bb_crc32_record(const uint8_t *p,size_t n){
+    return ~bb_crc32_add(bb_crc32_add(UINT32_MAX,p,12),p+16,n-16);
+}

@@ -4,11 +4,10 @@
 #define VALIDATED UINT32_C(0x42505231)
 typedef struct {uint32_t at,end,children;unsigned kind,field,count;} rec;
 static uint16_t u16(const uint8_t*p){return (uint16_t)((unsigned)p[0]|((unsigned)p[1]<<8));}
-static uint32_t u32(const uint8_t*p){return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);}
-static int span(const void*p,size_t n){return p && n<=UINTPTR_MAX-(uintptr_t)p;}
-static int disjoint(const void*a,size_t an,const void*b,size_t bn){
- uintptr_t x=(uintptr_t)a,y=(uintptr_t)b;return x<=y?an<=y-x:bn<=x-y;
-}
+#include "bb_catalogue_page.h"
+#define u32(p) bb_pc_u32(p)
+#define span(p,n) bb_catalogue_page_span(p,n)
+#define disjoint(a,b,c,d) bb_catalogue_page_disjoint(a,b,c,d)
 static int ok(const bb_pr_view*v){return span(v,sizeof *v) && !( (uintptr_t)v%_Alignof(bb_pr_view)) && v->validated==VALIDATED;}
 static int output(const bb_pr_view*v,const void*p,size_t n){return span(p,n)&&disjoint(p,n,v,sizeof *v)&&
  disjoint(p,n,v->container.bytes,v->container.length)&&disjoint(p,n,v->container.cache,sizeof *v->container.cache);}

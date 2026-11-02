@@ -5,11 +5,10 @@
 #include <string.h>
 #define STAMP UINT32_C(0x42504331)
 static uint16_t u16(const uint8_t*p){return (uint16_t)((unsigned)p[0]|((unsigned)p[1]<<8));}
-static uint32_t u32(const uint8_t*p){return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);}
-static int span(const void*p,size_t n){return p && n<=UINTPTR_MAX-(uintptr_t)p;}
-static int disjoint(const void*a,size_t an,const void*b,size_t bn){
-    uintptr_t x=(uintptr_t)a,y=(uintptr_t)b;return x<=y?an<=y-x:bn<=x-y;
-}
+uint32_t bb_pc_u32(const uint8_t*p){return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);}
+#define u32(p) bb_pc_u32(p)
+#define span(p,n) bb_catalogue_page_span(p,n)
+#define disjoint(a,b,c,d) bb_catalogue_page_disjoint(a,b,c,d)
 static int view_ok(const bb_pc_view*v){
     return span(v,sizeof *v) && v->stamp==STAMP && span(v->bytes,v->length) &&
         v->length>=64 && v->length<=BB_PC_MAX_BYTES && span(v->cache,sizeof *v->cache) &&
@@ -26,25 +25,27 @@ static void bind_cache(const bb_pc_view*v){
     bb_pc_cache*c=v->cache;
     if(c->source!=v->bytes || c->length!=v->length || c->crc!=v->crc){
         c->source=v->bytes;c->length=v->length;c->crc=v->crc;
-        c->valid[0]=c->valid[1]=0;c->next=0;
+        for(unsigned i=0;i<BB_PC_SLOTS;i++){c->valid[i]=0;c->age[i]=0;}   /* every LRU slot: a rebind must not serve another container's page */
+        c->clock=0;c->next=0;
     }
 }
 static const uint8_t *page(const bb_pc_view*v,uint32_t index){
     if(index>=v->block_count)return NULL;
     bb_pc_cache*c=v->cache;
-    for(unsigned i=0;i<2;i++)if(c->valid[i] && c->tag[i]==index){
-        c->next=(uint8_t)(i^1u);if(c->hits!=UINT32_MAX)c->hits++;return c->page[i];
+    for(unsigned i=0;i<BB_PC_SLOTS;i++)if(c->valid[i] && c->tag[i]==index){
+        c->age[i]=++c->clock;if(c->hits!=UINT32_MAX)c->hits++;return c->page[i];
     }
+    {unsigned oldest=0;for(unsigned i=0;i<BB_PC_SLOTS;i++){if(!c->valid[i]){oldest=i;break;}if(c->age[i]<c->age[oldest])oldest=i;}c->next=(uint8_t)oldest;}
     const uint8_t*d=v->bytes+v->blocks+8u*index;
     uint32_t offset=u32(d);unsigned field=u16(d+4),encoded=field&32767u,decoded=u16(d+6);
     unsigned expected=v->metadata_bytes-index*BB_PC_PAGE;if(expected>BB_PC_PAGE)expected=BB_PC_PAGE;
     if(!encoded || decoded!=expected || encoded>decoded || offset>v->length-v->payload ||
        encoded>v->length-v->payload-offset)return NULL;
     unsigned raw=field>>15;if((raw && encoded!=decoded)||(!raw && encoded>=decoded))return NULL;
-    unsigned slot=c->next&1u;c->valid[slot]=0;
+    unsigned slot=c->next;c->valid[slot]=0;
     if(!bb_catalogue_page_decode(c->page[slot],sizeof c->page[slot],v->bytes+v->payload+offset,encoded,decoded,
-        raw?BB_PAGE_RAW:BB_PAGE_LZ4))return NULL;
-    c->tag[slot]=index;c->valid[slot]=1;c->next=(uint8_t)(slot^1u);
+        raw?BB_PAGE_RAW:(u16(v->bytes+4)==3?BB_PAGE_DEFLATE_FIXED:BB_PAGE_LZ4)))return NULL;
+    c->tag[slot]=index;c->valid[slot]=1;c->age[slot]=++c->clock;
     if(c->misses!=UINT32_MAX)c->misses++;return c->page[slot];
 }
 int bb_pc_open_container(bb_pc_view*out,const uint8_t*bytes,size_t n,bb_pc_cache*cache){
@@ -52,7 +53,7 @@ int bb_pc_open_container(bb_pc_view*out,const uint8_t*bytes,size_t n,bb_pc_cache
        (uintptr_t)out%_Alignof(bb_pc_view)||(uintptr_t)cache%_Alignof(bb_pc_cache)||
        !disjoint(out,sizeof *out,cache,sizeof *cache)||!disjoint(out,sizeof *out,bytes,n)||
        !disjoint(cache,sizeof *cache,bytes,n))return 0;
-    if(memcmp(bytes,"BBPC",4)||u16(bytes+4)!=2||u16(bytes+6)!=BB_PC_PAGE||u32(bytes+8)!=n||u16(bytes+30)||u32(bytes+60))return 0;
+    if(memcmp(bytes,"BBPC",4)||(u16(bytes+4)!=2&&u16(bytes+4)!=3)||u16(bytes+6)!=BB_PC_PAGE||u32(bytes+8)!=n||u16(bytes+30)||u32(bytes+60))return 0;
     bb_pc_view v={.bytes=bytes,.length=n,.cache=cache,.nodes=0,.root=0,.metadata_bytes=0,
         .sparse=0,.dictionary=0,.blocks=0,.block_count=0,.text=0,.text_bytes=0,.payload=0,
         .crc=u32(bytes+12),.stamp=0,.shapes=0};

@@ -7,8 +7,8 @@ static void bb_home_result(int result) {
         result==BB_FTRIO_SWING?"UNSUPPORTED SWING":
         result==BB_FTRIO_REQUEST_OFF?"KIT A IS OFF":
         result==BB_PERFORMER_NO_BANK?"CHOOSE AN EXPERIENCE FIRST":
-        result==BB_FTRIO_REQUEST_BUSY?"BUSY - RETRY":
-        result==BB_FTRIO_REQUEST_UNAVAILABLE?"PERFORMANCE NOT READY":"SOURCE NOT SUPPORTED");
+        result==BB_FTRIO_REQUEST_BUSY?BB_TX(TX_BUSY_RETRY):
+        result==BB_FTRIO_REQUEST_UNAVAILABLE?"PERFORMANCE NOT READY":BB_TX(TX_SOURCE_NOT_SUPPORTED));
 }
 static void bb_home_poll(void) {
     const bb_performer *p=bb_home_view();bb_performance_status old=p->status;

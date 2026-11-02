@@ -1,3 +1,4 @@
+#include "../src/bb/bb_optional_storage.h"
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Big Beat guarded CPU1 bootstrap and private live worker. Startup register sequence and stack guards
  * adapted from retained fm1-x0x 47f8e4c4, after Melodee/JieLi AC79 startup.
@@ -97,7 +98,7 @@ static struct {
 
 #define BB_C1_909_OWNER_JOB UINT32_C(0xD5100005)
 static volatile uint32_t bb_c1_909_owner_armed,bb_c1_909_owner_worker_ticks;
-static bb909_request bb_c1_909_owner_request __attribute__((aligned(64)));
+static bb909_request bb_c1_909_owner_request __attribute__((aligned(64))) BB_OPTIONAL_BSS("bb_c1_909_owner_request");
 
 /* Only this fixed XIP entry can be called from the RAM worker. It never
  * publishes completion. The RAM caller acknowledges AFTER this returns. */

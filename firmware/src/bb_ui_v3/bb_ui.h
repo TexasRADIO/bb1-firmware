@@ -42,13 +42,17 @@ enum {
     BB_UI_FX,           /* FX: the echo machine                                           */
     BB_UI_KNOBS,        /* SOUND, SAVE, EVOLVE, GLOBAL: title + four meters                */
     BB_UI_ATTRACT,      /* 30 s idle on STUDIO: the full engraving, the only full-size one */
+    BB_UI_ARRANGE,       /* named-section RAM project and source chooser */
     BB_UI_PAGES
 };
 /* which page draws a bb_nav page (nav_page = bb_nav_page, play_keys =
  * BB_NAV_PLAY_LIVE/STEPS, synth = the focused instrument is Dillo/Telegram) */
 uint8_t bb_ui_page_for(uint8_t nav_page, uint8_t play_keys, uint8_t synth);
 
-enum { BB_UI_INST_A, BB_UI_INST_B, BB_UI_INST_DILLO };        /* colour identity */
+enum { BB_UI_INST_A, BB_UI_INST_B, BB_UI_INST_DILLO };
+#define BB_UI_HAS_QUICK_START 1
+#define BB_UI_HAS_RATCHET 1
+#define BB_UI_RATCHET_MIXED 0xFFu   /* ratchet[i]: the hit's copies have different counts */        /* colour identity */
 enum { BB_UI_LED_DARK, BB_UI_LED_DIM, BB_UI_LED_LIT, BB_UI_LED_BREATH };   /* = BB_NAV_LED_* */
 enum { BB_UI_Q_KIT = 1u, BB_UI_Q_PATTERN = 2u, BB_UI_Q_SECTION = 4u, BB_UI_Q_START = 8u }; /* = BB_NAV_Q_* */
 
@@ -67,7 +71,8 @@ enum {
     BB_EV_NOTE_ACCENT = 1u << 8,
     BB_EV_TAP    = 1u << 9,   /* tap tempo                                       */
     BB_EV_KNOB   = 1u << 10,  /* K1-K4 turned; which in ev_knob                  */
-    BB_EV_INPUT  = 1u << 11   /* any other key / button / encoder                */
+    BB_EV_INPUT  = 1u << 11,  /* any other key / button / encoder                */
+    BB_EV_LEGEND = 1u << 12   /* 2.0 D4: show the key legend (page entered, a key the page does not use) */
 };
 #define BB_EV_HITS (BB_EV_KICK | BB_EV_SNARE | BB_EV_HATS | BB_EV_PERC)
 
@@ -93,6 +98,9 @@ typedef struct {
 #define BB_UI_SECTIONS 11   /* = BB_NAV_SECTION_KEYS: one black key per drawn section */
 #define BB_UI_LIST 5
 #define BB_UI_NO 0xFFu
+/* Cursor state is distinct from an audio-owner request and acknowledgement. */
+enum { BB_UI_BROWSER_NONE, BB_UI_BROWSER_BROWSE, BB_UI_BROWSER_REQUESTED,
+       BB_UI_BROWSER_QUEUED, BB_UI_BROWSER_PLAYING, BB_UI_BROWSER_LOADED };
 
 typedef struct {
     uint32_t now_ms;
@@ -120,7 +128,7 @@ typedef struct {
     uint8_t ev_knob;
     /* knob bar + key map strip (mirrors the key LEDs) */
     bb_ui_knob knob[4];
-    uint8_t knob_turning;    /* 0..3: show the pop-up (bb_ui keeps it 600 ms) / BB_UI_NO */
+    uint8_t knob_turning;    /* 0..3: show the pop-up (bb_ui keeps it BB_UI_POPUP_MS) / BB_UI_NO */
     uint8_t key_led[27];     /* BB_UI_LED_* from bb_nav_leds(): white 1-16, black 1-11 */
     uint32_t keys_down;      /* held keys (drawn white)                            */
     uint32_t keys_red;       /* keys whose function is engaged as a cut: muted group, kill */
@@ -153,7 +161,11 @@ typedef struct {
     const char *title, *subtitle;    /* big name, one grey line                    */
     const char *item[BB_UI_LIST];
     uint8_t items, cursor, playing_item, queued_item;
+    uint8_t small_items; /* compact instructions, rather than section-name type */
     uint8_t progress;        /* 0..255 of the way to the boundary while queued     */
+    uint8_t browser_state;   /* BB_UI_BROWSER_* for the highlighted pattern        */
+    uint8_t quick_start;     /* 2.0 N7: nothing loaded yet: HOME shows the three first moves */
+    uint8_t ratchet[16];     /* 2.0: STEPS, selected voice: x1..x4 per visible step (0 or 1 = none) */
     uint8_t sections, sec_cur, sec_next;   /* sec_next BB_UI_NO = none            */
     const char *sec_name[BB_UI_SECTIONS];
     uint8_t sec_bars[BB_UI_SECTIONS];
@@ -164,6 +176,10 @@ typedef struct {
     uint8_t repeats;         /* feedback 0..255                                    */
     uint8_t heads;           /* bits: heads 1-3 on                                 */
     uint8_t banks_fx, bank_fx;
+    /* 2.0 D4: the page's one-line key legend (bb_nav_legend), or 0. Shown only for BB_UI_LEGEND_MS after
+     * BB_EV_LEGEND, over the key band (y 181-195: the key map, or OUT / DSP on PLAY drums); the page's own
+     * layout is untouched at rest. HOME gives it up while the quick start or the Dillo NEXT line needs the room. */
+    const char *legend;
 } bb_ui_in;
 
 /* ------------------------------------------------------------ state */
@@ -208,7 +224,9 @@ const bb_ui_stats *bb_ui_frame(bb_ui *u, const bb_ui_in *in);
 /* force a whole-screen redraw on the next frame (after a firmware overlay) */
 void bb_ui_invalidate(bb_ui *u);
 
-#define BB_UI_POPUP_MS 600u
+#define BB_UI_POPUP_MS 1000u      /* 2.0 D4: a turned knob's NAME + value for about 1 s, on every page */
+#define BB_UI_LEGEND_MS 2000u     /* 2.0 D4: the key legend, for about 2 s (shares the pop-up's timer) */
+#define BB_UI_POP_LEGEND 4u       /* pop_k: the legend, not a knob */
 #define BB_UI_FLASH_MS 120u
 #define BB_UI_ATTRACT_MS 30000u
 #define BB_UI_RING_MS 900u       /* installed: a ring lives 900 ms                  */

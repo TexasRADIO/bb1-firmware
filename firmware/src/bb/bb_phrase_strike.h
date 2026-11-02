@@ -5,7 +5,8 @@
 #include "bb_source_trigger.h"
 /* Audio-owner dispatch for a prepared immutable phrase/control pair.
  * Payload: original word bits0..15, ordinal16..22, kind23..24.
- * kind0 primary,1 flam,2/3 repeats; other bits must be zero.
+ * kind0 primary,1 flam,2/3 source repeats. Bit25 marks a programmed repeat
+ * with kind2 and the same .7 velocity factor; other bits must be zero.
  * Queue generation/timing checked by its owner before calling this function.
  * 0 refusal (engine unchanged),1 triggered,2 accent control (no audio).
  */

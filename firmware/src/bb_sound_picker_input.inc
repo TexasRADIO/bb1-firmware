@@ -55,7 +55,11 @@ static void bb_sound_pick_poll(void) {
     {
         uint16_t display=bb_sound_pick_display_state(&view);
 #if BB_SAMPLE_HOST_INTEGRATION
+#if BB_WITH_SLOOP_KITS
+        static uint64_t sample_compatible __attribute__((section(".pool")));
+#else
         static uint16_t sample_compatible;
+#endif
         if(bb_sound_pick.sample_count&&view.sample_compatible!=sample_compatible)bb_dirty=1;
         sample_compatible=view.sample_compatible;
 #endif
@@ -76,6 +80,9 @@ static void bb_sound_pick_poll(void) {
     if(status!=bb_sound_pick.status)bb_dirty=1;
     if(failed && was && !bb_sound_pick.pending && bb_sound_pick.status!=BB_SP_APPLIED)
         bb_say(bb_notice_text(BB_NOTICE_REQUEST_FAULT));
+    /* 2.0 D4: QUEUED -> APPLIED once the poll has resolved the request against the owner's applied sound */
+    else if(was && !bb_sound_pick.pending && bb_sound_pick.status==BB_SP_APPLIED)
+        bb_say(bb_sound_pick.page==BB_DRUMS?BB_TX(TX_KIT_APPLIED):BB_TX(TX_SOUND_APPLIED));
 }
 static const char *bb_sound_pick_refusal_message(void) {
     /* Sample requests do not use the native-kit selector. Never display its
@@ -84,11 +91,11 @@ static const char *bb_sound_pick_refusal_message(void) {
         bb_sound_picker_view view;
         if(bb_sound_picker_observe(&bb_sound_pick,&bb_sound,&view) &&
            !bb_sound_picker_available(&bb_sound_pick,&view,bb_sound_pick.cursor))
-            return "KIT / PATTERN MISMATCH";
-        return "SOUND REQUEST REFUSED";
+            return BB_TX(TX_KIT_PATTERN_MISMATCH);
+        return BB_TX(TX_SOUND_REQUEST_REFUSED);
     }
     return bb_sound_pick.page==BB_DRUMS&&bb_kit_switch_message?
-        bb_kit_switch_message:"SOUND REQUEST REFUSED";
+        bb_kit_switch_message:BB_TX(TX_SOUND_REQUEST_REFUSED);
 }
 /* Returns 1 when the choice was taken (requested, already loaded, or a
  * sample kit intent); navigation then continues to PATTERN. */
@@ -102,27 +109,38 @@ static int bb_sound_pick_commit_result(void) {
          * separate sound change. The selected phrase is confirmed next. */
         if(bb_sound_pick.pending || !bb_sound_pick.ready ||
            bb_sound_pick.machine>=BB_MACHINES ||
-           bb_sound_pick.cursor>bb_sound_pick.sample_count ||
+           bb_sound_pick.cursor>=bb_sound_picker_items(&bb_sound_pick) ||
            !bb_drum_library[bb_sound_pick.machine].ready) {
-            bb_say("KIT NOT READY");return 0;
+            bb_say(BB_TX(TX_KIT_NOT_READY));return 0;
         }
         unsigned kit=bb_sound_pick.cursor?bb_sound_pick.cursor-1u:BB_SAMPLE_808_ID;
+#if BB_WITH_SLOOP_KITS
+        if(bb_sound_pick.cursor>bb_sound_pick.sample_count&&
+           bb_sound_pick.cursor<bb_sound_picker_machine_items(bb_sound_pick.sample_count)){
+            kit=BB_SLOOP_ID_FIRST+bb_sound_pick.cursor-1u-bb_sound_pick.sample_count;
+            if(!bb_sound.sloop_bank.bytes){bb_say("SLOOP BANK MISSING / INVALID");return 0;}
+            bb_sample_status pair;
+            if(!bb_audio_sample_status_layer(&bb_sound,bb_sound_pick.machine,&pair)||!pair.sloop_compatible){
+                bb_say(BB_TX(TX_SLOOP_PAIR_NOT_AVAILABLE));return 0;
+            }
+        }
+#endif
 #if BB_WITH_RICH_DRUM_BROWSER
         if(!bb_player_preview_align_kit(&bb_drum_library[bb_sound_pick.machine],&bb_sound,kit)){
-            bb_say("NO PATTERNS FOR THIS KIT");return 0;
+            bb_say(BB_TX(TX_NO_PATTERNS_FOR_THIS_KIT));return 0;
         }
 #endif
         bb_kit_choice *intent=&bb_kit_intent[bb_sound_pick.machine];
         intent->id=(uint8_t)kit;
         intent->cursor=bb_sound_pick.cursor;intent->valid=1;
         bb_sound_pick_close();bb_library_page=1;
-        bb_say("CHOOSE PATTERN / EDIT: CHOOSE");return 1;
+        bb_say(BB_TX(TX_CHOOSE_PATTERN_EDIT_CHOOSE));return 1;
     }
 #endif
     int result=bb_sound_picker_commit(&bb_sound_pick,&bb_sound,&bb_sound_pick_kits);
-    if(result==BB_SP_OK)bb_say("SOUND REQUESTED / WAIT");
-    else if(result==BB_SP_UNCHANGED)bb_say("SOUND ALREADY LOADED");
-    else if(result==BB_SP_BUSY)bb_say("BUSY / SELECT AGAIN");
+    if(result==BB_SP_OK)bb_say(bb_sound_pick.page==BB_DRUMS?BB_TX(TX_KIT_QUEUED):BB_TX(TX_SOUND_QUEUED));   /* D4 */
+    else if(result==BB_SP_UNCHANGED)bb_say(BB_TX(TX_SOUND_ALREADY_LOADED));
+    else if(result==BB_SP_BUSY)bb_say(BB_TX(TX_BUSY_SELECT_AGAIN));
     else bb_say(bb_sound_pick_refusal_message());
     bb_dirty=1;
     return result==BB_SP_OK||result==BB_SP_UNCHANGED;
@@ -164,10 +182,10 @@ static int bb_sound_pick_input(uint32_t pressed,uint32_t *notes,int rec) {
              * sound request intact and require release before playing again. */
             for(unsigned k=0;k<7;k++)(void)bb_read_encoder(k);
             bb_keys_blocked|=fm1_in.notes;bb_keys_edges=bb_keys_taps=0;*notes=0;
-            bb_say("SOUND REQUEST STILL PENDING");return 1;
+            bb_say(BB_TX(TX_SOUND_REQUEST_STILL_PENDING));return 1;
         }
         if(!bb_sound_pick_open(bb_face.requested.page,bb_face.machine)) {
-            bb_say("SOUND LIST NOT READY");return 1;
+            bb_say(BB_TX(TX_SOUND_LIST_NOT_READY));return 1;
         }
         bb_sound_pick_page=1;bb_sound_pick_return=0;
         bb_library_page=0;bb_tone_page=0;
@@ -198,7 +216,7 @@ static int bb_sound_pick_input(uint32_t pressed,uint32_t *notes,int rec) {
             if(bb_sound_pick.pending){bb_say("WAIT FOR KIT CHANGE");return 1;}
             bb_select_layer(delta);
             if(!bb_sound_pick_open(BB_DRUMS,bb_face.machine)) {
-                bb_sound_pick_close();bb_say("SOUND LIST NOT READY");*notes=0;return 1;
+                bb_sound_pick_close();bb_say(BB_TX(TX_SOUND_LIST_NOT_READY));*notes=0;return 1;
             }
             bb_sound_pick_poll();bb_keys_blocked|=fm1_in.notes;bb_keys_edges=0;*notes=0;return 1;
         }
