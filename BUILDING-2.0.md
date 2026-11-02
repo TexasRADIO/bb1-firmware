@@ -1,4 +1,4 @@
-# BB-1 2.0 build
+# Big Beat Studio BB1 2.0 build
 
 ## Selected source and status — 2 November 2026
 
