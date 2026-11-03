@@ -24,5 +24,8 @@
   {"song":"You Spin Me Round","from":"Snare Variations","to":"Main Variation"},
   {"song":"Personal Jesus","from":"Tom Fill 1","to":"Fill"},
   {"song":"Never Gonna Give You Up","from":"Clap Variation 1","to":"Main Variation 1"},
-  {"song":"Never Gonna Give You Up","from":"Clap Variation 2","to":"Main Variation 2"}
+  {"song":"Never Gonna Give You Up","from":"Clap Variation 2","to":"Main Variation 2"},
+  {"song":"You Spin Me Round","part":2,"from":"1","to":"Alternate"},
+  {"song":"I Can't Go For That (No Can Do)","part":0,"from":"Part 1","to":"Part 1A"},
+  {"song":"I Can't Go For That (No Can Do)","part":1,"from":"Part 1","to":"Part 1B"}
 ]

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Apply the reviewed named-song section labels to JSON and the target BBPC.
 
-The map is exact: every source label must occur once in the named song.  Both
-the public catalogue and stripped firmware catalogue are decoded and checked
-so the only reader-visible differences are the mapped `parts[].name` strings.
+The map is exact: a source label must either occur once in the named song or
+name an explicit part index when duplicate source labels exist.  Already-
+renamed entries are accepted so the generator is safely repeatable.  Both the
+public catalogue and stripped firmware catalogue are decoded and checked so
+the only reader-visible differences are the mapped `parts[].name` strings.
 Roland preset shelves are intentionally outside the map.
 """
 from copy import deepcopy
@@ -29,10 +31,26 @@ def apply_map(value, mapping, label):
         if row["song"] not in songs:
             raise ValueError(f'{label}: missing song {row["song"]!r}')
         parts = songs[row["song"]]["parts"]
-        hits = [n for n, part in enumerate(parts) if part.get("name") == row["from"]]
-        if len(hits) != 1:
-            raise ValueError(f'{label}: {row["song"]!r} / {row["from"]!r} has {len(hits)} matches')
-        n = hits[0]
+        if "part" in row:
+            n = row["part"]
+            if not isinstance(n, int) or not 0 <= n < len(parts):
+                raise ValueError(f'{label}: {row["song"]!r} has invalid part index {n!r}')
+            current = parts[n].get("name")
+            if current == row["to"]:
+                continue
+            if current != row["from"]:
+                raise ValueError(
+                    f'{label}: {row["song"]!r} part {n} is {current!r}, expected '
+                    f'{row["from"]!r} or {row["to"]!r}'
+                )
+        else:
+            hits = [n for n, part in enumerate(parts) if part.get("name") == row["from"]]
+            renamed = [n for n, part in enumerate(parts) if part.get("name") == row["to"]]
+            if not hits and len(renamed) == 1:
+                continue
+            if len(hits) != 1:
+                raise ValueError(f'{label}: {row["song"]!r} / {row["from"]!r} has {len(hits)} matches')
+            n = hits[0]
         parts[n]["name"] = row["to"]
         changed.append({"song": row["song"], "part": n, "from": row["from"], "to": row["to"]})
     return out, changed
@@ -67,7 +85,7 @@ def main():
     tree = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
     report_path = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else None
     mapping = json.loads((HERE / "section-name-map.json").read_text())
-    if len(mapping) != len({(row["song"], row["from"]) for row in mapping}):
+    if len(mapping) != len({(row["song"], row.get("part"), row["from"]) for row in mapping}):
         raise ValueError("duplicate section-name mapping")
 
     public_path = tree / "big-beat/catalogue/catalogue.json"

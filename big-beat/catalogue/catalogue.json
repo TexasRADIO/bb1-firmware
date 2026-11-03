@@ -314024,7 +314024,7 @@
         },
         {
           "id": "BBSONG-160-03",
-          "name": "1",
+          "name": "Alternate",
           "pattern": {
             "id": "BBSONG-160-03",
             "label": "You Spin Me Round - 1",
@@ -328540,7 +328540,7 @@
       "parts": [
         {
           "id": "BBSONG-016-01",
-          "name": "Part 1",
+          "name": "Part 1A",
           "pattern": {
             "id": "BBSONG-016-01",
             "label": "I Can't Go For That (No Can Do) - Part 1",
@@ -329126,7 +329126,7 @@
         },
         {
           "id": "BBSONG-016-02",
-          "name": "Part 1",
+          "name": "Part 1B",
           "pattern": {
             "id": "BBSONG-016-02",
             "label": "I Can't Go For That (No Can Do) - Part 1",
