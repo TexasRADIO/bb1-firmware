@@ -5,14 +5,17 @@ Same procedure as boot42's verification/package-experimental.py: the release-dep
 pinned loader, packer, verifier and SDK payloads (all hash-checked), decode-and-verify of the
 written package, eight negative cases, and the installed boot42 package recorded as rollback.
 Writes only the sound-library-free firmware package: no asset or user-data region is touched.
-usage: package_candidate.py BUILD_DIR OUT_DIR NAME"""
+usage: package_candidate.py BUILD_DIR OUT_DIR NAME SOUND_LIBRARY"""
 from pathlib import Path
 import ast, hashlib, importlib.util, json, struct, sys, types
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'tools'))
 from bb_identity import PRODUCT, DISPLAY_NAME, require_compiled_identity, verifier_for_product
+from bb_library_identity import verify_library
 
+if len(sys.argv)!=5: raise SystemExit("usage: package_candidate.py BUILD_DIR OUT_DIR NAME SOUND_LIBRARY")
 build, outdir, name = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
+library = verify_library(sys.argv[4], Path(__file__).resolve().parents[3])
 digest = lambda data: hashlib.sha256(data).hexdigest()
 sha = lambda path: digest(Path(path).read_bytes())
 report = json.loads((build / 'report.json').read_text())
@@ -77,9 +80,9 @@ out = {'packaged': True, 'product': PRODUCT, 'display_name': DISPLAY_NAME, 'inst
        'asset_write': False, 'user_data_write': False, 'app_sha256': link['sha256'], 'app_bytes': link['bytes'],
        'fit': {k: link[k] for k in ('code_free', 'ram_free', 'pool_free', 'ram_text_bytes')},
        'package': {'path': str(package), 'sha256': sha(package), 'bytes': len(raw)},
-       'loader_sha256': sha(loader_path), 'rollback': {'what': 'Current corrected-ID BB-1 1.5 normal return; historical v1.5 tag remains unchanged', 'path': str(rollback), 'sha256': sha(rollback),
+       'loader_sha256': sha(loader_path), 'rollback': {'what': 'Verified corrected-ID 1.5 recovery dependency; not a claim of current installed state or final return target', 'path': str(rollback), 'sha256': sha(rollback),
        'product': 'FM-1_92200105', 'app_sha256': 'ce17d90b317a7a476be6e0026084717fb81f613bb8244a529eb5c790e7e2f6bf'},
-       'sound_library_expected_sha256': '9911a933e25a4bd507c4fa8240f86d53785eeb5ca6654e4e51215077ed447ada',
+       'sound_library_expected_sha256': library['sha256'], 'sound_library': library,
        'return_sound_library_sha256': '154ef6b92553af5803c3e003dc5d2c379aed4e0503f24f08ad8b024cff7d821e',
        'decoded': decoded, 'negative_cases': negative}
 (outdir / (name + '-package-report.json')).write_text(json.dumps(out, indent=2) + '\n')

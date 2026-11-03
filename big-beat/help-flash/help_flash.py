@@ -11,6 +11,8 @@
   help_flash.py compose LIB BLOCK OUT    sound-library image + block at region A + 0x37000 -> OUT (a new file).
                                          Refuses unless LIB keeps 0x37000..0x39000 erased and BBSK ends before it;
                                          reads its output back; prints the byte-diff map and the hashes.
+  help_flash.py replace LIB BLOCK OUT    replace one valid existing BBTX block in that guarded window.
+                                         Bytes outside the window and loader-record scan must remain identical.
 
 Selection rule (convert), for each string literal in the UI files of UI_FILES:
   * inside a function body, not in an excluded function (console, recovery, fault, startup, boot, OTA, USB, ISR,
@@ -353,19 +355,37 @@ def loader_would_erase(img, base):
         if rd(6) == 0x5441 and rd(0) and rd(0) == crc16(r[2:80]): hits.append(hex(base + s - 0x1000))
     return hits
 
-def compose(lib, block, out):
+def valid_block(B):
+    if len(B) < HEADER or struct.unpack_from('<I', B, 0)[0] != MAGIC: raise SystemExit('refused: not a BBTX block')
+    n, plen, pc = struct.unpack_from('<H', B, 6)[0], *struct.unpack_from('<II', B, 8)
+    if len(B) != HEADER + plen or crc(B[HEADER:]) != pc or crc(B[:28]) != struct.unpack_from('<I', B, 28)[0]:
+        raise SystemExit('refused: block header or CRC')
+    return n
+
+def compose(lib, block, out, replace=False):
     L, B = lib.read_bytes(), block.read_bytes()
     rel = FLASH_OFF - A_BASE
     if len(L) != A_SIZE: raise SystemExit(f'refused: library is {len(L)} B, not {A_SIZE}')
     if L[:4] != b'BBSK': raise SystemExit('refused: library does not start with BBSK')
     declared = struct.unpack_from('<I', L, 8)[0]
     if declared > rel: raise SystemExit(f'refused: BBSK declares {declared} B, past 0x{rel:x}')
-    if set(L[rel:rel + FLASH_MAX]) != {0xFF}: raise SystemExit('refused: 0x37000..0x39000 is not erased in the library')
-    if struct.unpack_from('<I', B, 0)[0] != MAGIC or len(B) > FLASH_MAX: raise SystemExit('refused: not a BBTX block')
-    n, plen, pc = struct.unpack_from('<H', B, 6)[0], *struct.unpack_from('<II', B, 8)
-    if len(B) != HEADER + plen or crc(B[HEADER:]) != pc or crc(B[:28]) != struct.unpack_from('<I', B, 28)[0]:
-        raise SystemExit('refused: block header or CRC')
-    img = L[:rel] + B + L[rel + len(B):]
+    old_sha = None
+    if replace:
+        W = L[rel:rel + FLASH_MAX]
+        if len(W) < HEADER or struct.unpack_from('<I', W, 0)[0] != MAGIC:
+            raise SystemExit('refused: guarded window does not start with BBTX')
+        old_len = HEADER + struct.unpack_from('<I', W, 8)[0]
+        old = W[:old_len]
+        valid_block(old)
+        if any(x != 0xFF for x in W[old_len:]): raise SystemExit('refused: data follows the existing BBTX block')
+        old_sha = hashlib.sha256(old).hexdigest()
+        base = L[:rel] + b'\xFF' * FLASH_MAX + L[rel + FLASH_MAX:]
+    else:
+        if set(L[rel:rel + FLASH_MAX]) != {0xFF}: raise SystemExit('refused: 0x37000..0x39000 is not erased in the library')
+        base = L
+    if len(B) > FLASH_MAX: raise SystemExit('refused: BBTX block is larger than its guarded window')
+    n = valid_block(B)
+    img = base[:rel] + B + base[rel + len(B):]
     assert len(img) == A_SIZE
     diff = [i for i in range(A_SIZE) if img[i] != L[i]]
     if diff and (min(diff) < rel or max(diff) >= rel + FLASH_MAX): raise SystemExit('refused: diff outside the text area')
@@ -380,6 +400,7 @@ def compose(lib, block, out):
         if i + 1 == len(diff) or diff[i + 1] != d + 1: ivs.append([s, d + 1]); s = None
     sha = lambda b: hashlib.sha256(b).hexdigest()
     print(json.dumps({'file': str(out), 'bytes': len(img), 'sha256': sha(img), 'base_sha256': sha(L),
+                      'mode': 'replace' if replace else 'compose', 'old_block_sha256': old_sha,
                       'block_sha256': sha(B), 'block_bytes': len(B), 'texts': n, 'bbsk_declared': declared,
                       'changed_bytes': len(diff), 'changed_intervals_a_relative': ivs,
                       'text_area_a_relative': [rel, rel + FLASH_MAX], 'declared_bbsk_unchanged': img[:declared] == L[:declared],
@@ -391,11 +412,12 @@ def main():
     c.add_argument('--native', type=Path)
     g = sp.add_parser('gen'); g.add_argument('tree', type=Path); g.add_argument('--check', action='store_true')
     o = sp.add_parser('compose'); o.add_argument('lib', type=Path); o.add_argument('block', type=Path); o.add_argument('out', type=Path)
+    r = sp.add_parser('replace'); r.add_argument('lib', type=Path); r.add_argument('block', type=Path); r.add_argument('out', type=Path)
     a = ap.parse_args()
     if a.cmd == 'convert':
         nat = {x['text'].encode('latin1') for x in json.loads(a.native.read_text())} if a.native else None
         convert(a.tree, a.min, nat)
     elif a.cmd == 'gen': gen(a.tree, a.check)
-    else: compose(a.lib, a.block, a.out)
+    else: compose(a.lib, a.block, a.out, a.cmd == 'replace')
 
 if __name__ == '__main__': main()

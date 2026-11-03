@@ -34,6 +34,8 @@ static int bb_arr_draw(void){
     if(!bb_v3_shown){bb_v3_init(&bb_v3,fm1_ms,bb_face.requested.running);bb_v3_invalidate(&bb_v3);}
     if(bb_arr_record_was!=!!bb_record.phase){bb_arr_record_was=(uint8_t)!!bb_record.phase;bb_v3_invalidate(&bb_v3);}
     memset(in,0,sizeof *in);bb_v3_common(in,BB_UI_ARRANGE);in->knob_turning=BB_UI_NO;in->legend=0;   /* D4: SONG's title line is its key legend */
+    if(!bb_record.phase&&text_w(&AF_S,bb_v3_legend)>224)(void)bb_nav_legend(&bb_nav,bb_v3_legend,sizeof bb_v3_legend,2);
+    if(!bb_record.phase&&text_w(&AF_S,bb_v3_legend)>224)(void)bb_nav_legend(&bb_nav,bb_v3_legend,sizeof bb_v3_legend,3);
     in->page_name=bb_arr_source_page?"SONG / ADD":BB_TX(TX_SONG_HOME);   /* N1 strip + N6 breadcrumb */
     bb_arr_row_name(c->playing_row,bb_arr_now,sizeof bb_arr_now);
     bb_arr_row_name(c->ticket?c->requested_row:BB_ARR_ROW_NONE,bb_arr_next,sizeof bb_arr_next);
@@ -45,7 +47,7 @@ static int bb_arr_draw(void){
 #endif
     in->subtitle=bb_arr_remove?BB_TX(TX_REMOVE_THIS_ROW_EDIT_HOME):c->view.ended?BB_TX(TX_SONG_ENDED_PLAY_FROM_START):
         file_state;
-    in->title=BB_TX(TX_KEY_1_ADD_3_COPY_4_DELETE);
+    in->title=bb_v3_legend;   /* 2.1 P1: the keys' line is bb_nav's legend (the same table as the lights) */
     in->cursor=in->playing_item=in->queued_item=BB_UI_NO;
     const char *labels[4]={"ROW","REPEATS","BARS","LOOP"};   /* D4: lengths in bars; stored in 16th steps */
     unsigned values[4]={m->row_count?c->selected+1u:0,0,0,c->loop};
@@ -84,7 +86,7 @@ static int bb_arr_draw(void){
 #endif
     if(bb_arr_source_page){
         bb_browser *b=&bb_arr_workspace.browse[bb_arr_source_target];bb_factory_choice choice;
-        in->title=BB_TX(TX_EDIT_ADDS_KEY_1_BACK_3_DILLO);
+        in->title=bb_v3_legend;
         in->subtitle=bb_arr_no_dillo?BB_TX(TX_DILLO_NONE_A_B_SOURCES_KEPT):BB_TX(TX_A_B_DILLO_PATTERNS_ONLY);
         labels[0]="TARGET";labels[1]="GROUP";labels[2]="PART";labels[3]="BARS";
         values[0]=bb_arr_source_target;values[1]=b->group;values[2]=b->part_index+1u;values[3]=bb_arr_ticks;
@@ -117,9 +119,7 @@ static int bb_arr_draw(void){
     /* Keep the A/B identity visible in the fixed-width target value. */
     if(bb_arr_source_page)in->knob[0].text=bb_arr_source_target==0?"KIT A":bb_arr_source_target==1?"KIT B":"DILLO";
     else in->knob[3].text=c->loop?"ON":"OFF";
-    in->key_led[0]=in->key_led[1]=in->key_led[2]=in->key_led[3]=BB_UI_LED_DIM;
-    in->key_led[16]=m->cursor?BB_UI_LED_LIT:BB_UI_LED_DIM;
-    in->key_led[17]=m->cursor<m->history_count?BB_UI_LED_LIT:BB_UI_LED_DIM;
+    /* 2.1 P1: the key map is bb_nav's LEDs (bb_v3_common), as on every page */
     bb_v3_turns(in,BB_UI_ARRANGE);   /* D4: ROW / REPEATS / BARS / LOOP show NAME + value when turned */
     bb_v3_frame(&bb_v3,in);bb_v3_shown=1;bb_dirty=0;return 1;
 }

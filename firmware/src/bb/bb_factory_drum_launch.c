@@ -8,6 +8,44 @@ int bb_factory_prepare_rich_drum(const bb_catalogue *c,const bb_factory_choice *
     if(!bb_phrase_pack_shaker(&data,&phrase)||!bb_phrase_index_prepare(&phrase,UINT32_MAX,out))return BB_FDRUM_EXPRESSION;
     return BB_FDRUM_OK;
 }
+int bb_factory_combine_drum(const bb_catalogue *c,const bb_factory_choice *ch,unsigned n,bb_factory_drum_data *acc_out){
+    bb_factory_drum_data next,*acc=acc_out;
+    if(!acc||!n||n>4u)return BB_FDRUM_INVALID;
+    for(unsigned i=0;i<n;i++){
+        int result=bb_factory_read_drum_scratch(c,&ch[i],&next);if(result)return result;
+        if(!i){*acc=next;acc->count=0;}
+        else if(next.length!=acc->length||next.lattice!=acc->lattice||next.bars!=acc->bars)return BB_FDRUM_LENGTH;
+        for(unsigned j=0;j<next.count;j++){
+            const bb_factory_drum_event *e=&next.events[j];unsigned k=0;
+            while(k<acc->count&&(acc->events[k].voice!=e->voice||acc->events[k].step!=e->step))k++;
+            if(k==acc->count){if(k>=BB_FACTORY_DRUM_EVENTS)return BB_FDRUM_LENGTH;acc->count++;}
+            acc->events[k]=*e;
+        }
+    }
+    return BB_FDRUM_OK;
+}
+int bb_factory_prepare_rich_combo(const bb_catalogue *c,const bb_factory_choice *ch,unsigned n,bb_phrase_index *out){
+    if(!out||!bb_catalogue_private(c,out,sizeof *out))return BB_FDRUM_INVALID;
+    bb_factory_drum_data acc;bb_phrase phrase;
+    int result=bb_factory_combine_drum(c,ch,n,&acc);if(result)return result;
+    /* Each event came from read_drum_scratch, including its original catalogue
+     * identity. A union is not the events array of acc.source: the single-pattern
+     * pack_shaker contract deliberately rejects that. Resolve shaker identity
+     * from each surviving event instead, then index the prepared union. */
+    if(!bb_phrase_pack(&acc,&phrase))return BB_FDRUM_EXPRESSION;
+    for(unsigned i=0;i<acc.count;i++){
+        const bb_factory_drum_event *e=&acc.events[i];
+        if(e->voice!=BB_FDV_HH)continue;
+        bb_catalogue_id field=bb_catalogue_find(c,e->source,"source_voice");
+        if(field==BB_CATALOGUE_NONE)continue;
+        const uint8_t *text;size_t count;
+        if(!bb_catalogue_text(c,field,&text,&count)||!count)return BB_FDRUM_EXPRESSION;
+        if(count==2&&text[0]=='S'&&text[1]=='H')
+            phrase.events[i]=(uint16_t)((phrase.events[i]&~31u)|BB_PHRASE_SHAKER);
+    }
+    if(!bb_phrase_index_prepare(&phrase,UINT32_MAX,out))return BB_FDRUM_EXPRESSION;
+    return BB_FDRUM_OK;
+}
 int bb_factory_request_rich_drum(bb_audio *a,const bb_catalogue *c,const bb_factory_choice *choice,
     unsigned machine,unsigned boundary,uint32_t *ticket){
  return bb_factory_request_rich_drum_launch(a,c,choice,machine,boundary,0,ticket);

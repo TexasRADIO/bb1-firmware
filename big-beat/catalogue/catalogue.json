@@ -181440,7 +181440,7 @@
       "parts": [
         {
           "id": "SOURCE-DPC-16-S01-V1",
-          "name": "Base Pattern",
+          "name": "Main",
           "pattern": {
             "id": "SOURCE-DPC-16-S01-V1",
             "label": "Tainted Love - Base Pattern",
@@ -182684,7 +182684,7 @@
         },
         {
           "id": "SOURCE-DPC-16-S01-V1-R3",
-          "name": "Rimshot 1",
+          "name": "Main Variation 1",
           "pattern": {
             "id": "SOURCE-DPC-16-S01-V1-R3",
             "label": "Tainted Love - Rimshot 1",
@@ -183270,7 +183270,7 @@
         },
         {
           "id": "SOURCE-DPC-16-S01-V1-R4",
-          "name": "Rimshot 2",
+          "name": "Main Variation 2",
           "pattern": {
             "id": "SOURCE-DPC-16-S01-V1-R4",
             "label": "Tainted Love - Rimshot 2",
@@ -183872,7 +183872,7 @@
         },
         {
           "id": "SOURCE-DPC-16-S01-V2",
-          "name": "Rimshot 3",
+          "name": "Main Variation 3",
           "pattern": {
             "id": "SOURCE-DPC-16-S01-V2",
             "label": "Tainted Love - Rimshot 3",
@@ -184490,7 +184490,7 @@
         },
         {
           "id": "SOURCE-DPC-16-S01-V1-R6",
-          "name": "Rimshot 4",
+          "name": "Main Variation 4",
           "pattern": {
             "id": "SOURCE-DPC-16-S01-V1-R6",
             "label": "Tainted Love - Rimshot 4",
@@ -185084,7 +185084,7 @@
         },
         {
           "id": "SOURCE-DPC-16-S01-V1-R7",
-          "name": "Rimshot 5",
+          "name": "Main Variation 5",
           "pattern": {
             "id": "SOURCE-DPC-16-S01-V1-R7",
             "label": "Tainted Love - Rimshot 5",
@@ -185686,7 +185686,7 @@
         },
         {
           "id": "SOURCE-DPC-16-S08",
-          "name": "Rimshot 6 (end)",
+          "name": "Ending",
           "pattern": {
             "id": "SOURCE-DPC-16-S08",
             "label": "Tainted Love - Rimshot 6 (end)",
@@ -186184,7 +186184,7 @@
         },
         {
           "id": "SOURCE-DPC-16-S01-V1-R9",
-          "name": "Claps 1",
+          "name": "Alternate 1",
           "pattern": {
             "id": "SOURCE-DPC-16-S01-V1-R9",
             "label": "Tainted Love - Claps 1",
@@ -186794,7 +186794,7 @@
         },
         {
           "id": "SOURCE-DPC-16-S01-V1-R10",
-          "name": "Claps 2",
+          "name": "Alternate 2",
           "pattern": {
             "id": "SOURCE-DPC-16-S01-V1-R10",
             "label": "Tainted Love - Claps 2",
@@ -187404,7 +187404,7 @@
         },
         {
           "id": "SOURCE-DPC-16-S01-V1-R11",
-          "name": "Claps 3",
+          "name": "Alternate 3",
           "pattern": {
             "id": "SOURCE-DPC-16-S01-V1-R11",
             "label": "Tainted Love - Claps 3",
@@ -200674,7 +200674,7 @@
       "parts": [
         {
           "id": "LIB-DPC-05-S01-16-1",
-          "name": "Part 1",
+          "name": "Main",
           "pattern": {
             "id": "LIB-DPC-05-S01-16-1",
             "label": "Computer Love - Part 1",
@@ -201364,7 +201364,7 @@
         },
         {
           "id": "LIB-DPC-05-S01-16-1-R2",
-          "name": "Part 1 · Kick 1",
+          "name": "Main Variation 1",
           "pattern": {
             "id": "LIB-DPC-05-S01-16-1-R2",
             "label": "Computer Love - Part 1 · Kick 1",
@@ -202054,7 +202054,7 @@
         },
         {
           "id": "LIB-DPC-05-S01-16-1-R3",
-          "name": "Part 1 · Kick 2",
+          "name": "Main Variation 2",
           "pattern": {
             "id": "LIB-DPC-05-S01-16-1-R3",
             "label": "Computer Love - Part 1 · Kick 2",
@@ -202752,7 +202752,7 @@
         },
         {
           "id": "LIB-DPC-05-S01-16-1-R4",
-          "name": "Part 1 · Kick 3",
+          "name": "Main Variation 3",
           "pattern": {
             "id": "LIB-DPC-05-S01-16-1-R4",
             "label": "Computer Love - Part 1 · Kick 3",
@@ -203458,7 +203458,7 @@
         },
         {
           "id": "LIB-DPC-05-S01-16-1-R5",
-          "name": "Part 1 · Kick 4",
+          "name": "Main Variation 4",
           "pattern": {
             "id": "LIB-DPC-05-S01-16-1-R5",
             "label": "Computer Love - Part 1 · Kick 4",
@@ -211032,7 +211032,7 @@
         },
         {
           "id": "LIB-DPC-07-S06-8-1-R4",
-          "name": "Part 3 · Kick 1",
+          "name": "Part 3 Variation 1",
           "pattern": {
             "id": "LIB-DPC-07-S06-8-1-R4",
             "label": "Radioactivity - Part 3 · Kick 1",
@@ -211474,7 +211474,7 @@
         },
         {
           "id": "LIB-DPC-07-S06-8-1-R5",
-          "name": "Part 3 · Kick 2",
+          "name": "Part 3 Variation 2",
           "pattern": {
             "id": "LIB-DPC-07-S06-8-1-R5",
             "label": "Radioactivity - Part 3 · Kick 2",
@@ -211924,7 +211924,7 @@
         },
         {
           "id": "LIB-DPC-07-S06-8-1-R6",
-          "name": "Part 3 · Kick 3",
+          "name": "Part 3 Variation 3",
           "pattern": {
             "id": "LIB-DPC-07-S06-8-1-R6",
             "label": "Radioactivity - Part 3 · Kick 3",
@@ -305694,7 +305694,7 @@
       "parts": [
         {
           "id": "BBSONG-057-01",
-          "name": "BasePattern",
+          "name": "Main",
           "pattern": {
             "id": "BBSONG-057-01",
             "label": "Word Up - BasePattern",
@@ -306336,7 +306336,7 @@
         },
         {
           "id": "BBSONG-057-02",
-          "name": "Kick+Snare2",
+          "name": "Main Variation 1",
           "pattern": {
             "id": "BBSONG-057-02",
             "label": "Word Up - Kick+Snare2",
@@ -306730,7 +306730,7 @@
         },
         {
           "id": "BBSONG-057-03",
-          "name": "Kick+Snare3",
+          "name": "Main Variation 2",
           "pattern": {
             "id": "BBSONG-057-03",
             "label": "Word Up - Kick+Snare3",
@@ -312556,7 +312556,7 @@
       "parts": [
         {
           "id": "BBSONG-160-01",
-          "name": "Base Pattern",
+          "name": "Main",
           "pattern": {
             "id": "BBSONG-160-01",
             "label": "You Spin Me Round - Base Pattern",
@@ -313430,7 +313430,7 @@
         },
         {
           "id": "BBSONG-160-02",
-          "name": "Snare Variations",
+          "name": "Main Variation",
           "pattern": {
             "id": "BBSONG-160-02",
             "label": "You Spin Me Round - Snare Variations",
@@ -319592,7 +319592,7 @@
         },
         {
           "id": "BBSONG-132-03",
-          "name": "Tom Fill 1",
+          "name": "Fill",
           "pattern": {
             "id": "BBSONG-132-03",
             "label": "Personal Jesus - Tom Fill 1",
@@ -367074,7 +367074,7 @@
         },
         {
           "id": "BBSONG-162-02",
-          "name": "Clap Variation 1",
+          "name": "Main Variation 1",
           "pattern": {
             "id": "BBSONG-162-02",
             "label": "Never Gonna Give You Up - Clap Variation 1",
@@ -367612,7 +367612,7 @@
         },
         {
           "id": "BBSONG-162-03",
-          "name": "Clap Variation 2",
+          "name": "Main Variation 2",
           "pattern": {
             "id": "BBSONG-162-03",
             "label": "Never Gonna Give You Up - Clap Variation 2",

@@ -11,7 +11,19 @@
  * object is written except through the existing command queue/helpers.
  * Included by bb_target_ui.c after the existing input helpers. */
 #define BB_NAV_FIRMWARE_INCLUDE 1
+/* 2.1 P1: keys that exist only with their firmware views are roles only in those builds */
+#if defined(BB_WITH_DILLO_KIT_VIEW) && BB_WITH_DILLO_KIT_VIEW
+#define BB_NAV_HAS_DILLO_VIEW 1
+#else
+#define BB_NAV_HAS_DILLO_VIEW 0
+#endif
+#if defined(BB_WITH_LIVE_CAPTURE) && BB_WITH_LIVE_CAPTURE
+#define BB_NAV_HAS_SONG_RECORD 1
+#else
+#define BB_NAV_HAS_SONG_RECORD 0
+#endif
 #include "bb_nav.c"
+#include "bb/bb_top_mode.h"
 #undef BB_NAV_FIRMWARE_INCLUDE
 #undef B
 #undef BOTH_OCT
@@ -25,10 +37,28 @@
 static bb_nav_state bb_nav;
 static bb_nav_out bb_nav_o;          /* 288 B: static, not on the stack */
 static bb_nav_out bb_nav_aux_o;      /* forced page / kit confirmed (never nested) */
-static bb_nav_facts bb_nav_f;        /* facts of the last scan (LEDs, drawing) */
+static bb_nav_facts bb_nav_f __attribute__((section(".pool")));   /* facts of the last scan (LEDs, drawing); 2.1 P1: pool */
+/* 2.1 P1: 2.0's 26-byte facts object stays in .bss as a copy of the 2.0 fields (written with the LEDs). The firmware
+ * is one translation unit whose small statics the compiler packs by size; keeping the set unchanged keeps every
+ * interrupt / CPU1 function byte-identical (Lane S timing identity), at no RAM cost against 2.0. */
+typedef struct { uint8_t b[22]; uint16_t steps; uint8_t slot, display; } bb_nav_facts20;   /* bb_nav_facts as in 2.0 */
+_Static_assert(sizeof(bb_nav_facts20) == 26 && offsetof(bb_nav_facts, gen_mode) == 26, "2.0 facts are the first 26 bytes");
+static bb_nav_facts20 bb_nav_f20;   /* 2.0 fields; the status bar reads its QUEUED byte */
 static void bb_arr_open(void);   /* bb_arranger_firmware.inc */
+/* 2.1 P1: SONG, MIDI and the Dillo kit view perform their bb_nav roles in their own files (bb_arranger_firmware.inc,
+ * bb_midi_ui_input.inc, bb_dillo_kit_firmware.inc, included after this one), reached through ONE hook in the pool that
+ * bb_arr_boot installs (bb_p1_ops). Calling them directly from here would make the compiler meet their statics
+ * earlier in the firmware's single translation unit, which repacks the small statics that interrupt code shares and
+ * changes those functions' code. With the hook every interrupt / CPU1 function stays byte-identical (Lane S). */
+enum { BB_P1_FACTS, BB_P1_SYNC, BB_P1_RECORD, BB_P1_EDIT, BB_P1_ARR_KNOB, BB_P1_MIDI_KNOB, BB_P1_SAVE, BB_P1_BANK,
+       BB_P1_KEY, BB_P1_OPEN_SONG, BB_P1_DILLO_VIEW, BB_P1_SONG_ARMED /* 2.1 P3b */ };
+static int (*bb_nav_p1_hook)(unsigned op,unsigned a,int b) __attribute__((section(".pool")));
+static int bb_nav_p1(unsigned op,unsigned a,int b){return bb_nav_p1_hook?bb_nav_p1_hook(op,a,b):0;}
 static void bb_nav_ratchet_turn(unsigned key_step,int delta);   /* 2.0 ratchets, below */
 static uint8_t bb_nav_row;           /* focus: 0 DRUM A, 1 DRUM B, 2 DILLO BASS, 3 DILLO LEAD (Duo) */
+static uint8_t bb_nav_top_mode;       /* SELECT: CONDUCTOR, BIG BEAT, DILLO */
+static uint8_t bb_nav_conductor_row;  /* local focus inside the Conductor; B1/B2/B3 own it */
+static uint8_t bb_nav_big_beat_row;   /* A/B layer last used inside the Big Beat instrument */
 static uint8_t bb_nav_shown_page=0xFF,bb_nav_shown_row=0xFF; /* last projection */
 static uint8_t bb_nav_meters;        /* GLOBAL white 3: meters on the GLOBAL page */
 static uint8_t bb_nav_swing_x2=112;  /* swing restored by SCL (x2 units, 112 = 56 %) */
@@ -95,6 +125,16 @@ static void bb_nav_focus_move(int delta) {
     bb_face.bank=0;
     bb_nav_focus_apply();
     bb_dirty=1;
+}
+
+/* B1/B2/B3 inside the Conductor choose the local player and retain their
+ * performance mute/solo job.  This focus is deliberately independent of the
+ * top-level SELECT destination. */
+static void bb_nav_conductor_focus(unsigned row) {
+    if(row>2u)return;
+    bb_nav_conductor_row=(uint8_t)row;
+    if(bb_nav_top_mode!=BB_TOP_CONDUCTOR||bb_nav_row==row)return;
+    bb_nav_row=(uint8_t)row;bb_face.bank=0;bb_nav_focus_apply();bb_dirty=1;
 }
 
 /* ------------------------------------------------------------ Dillo notes */
@@ -269,6 +309,7 @@ static unsigned bb_nav_instr_muted(void) {
            ((!!bb_face.requested.drums[1].muted||!bb_face.requested.drums[1].enabled)<<1) |
            ((!!bb_face.requested.synths[0].muted)<<2);
 }
+static void bb_cd_facts(bb_nav_facts *f);   /* 2.1 P3b: bb_conductor_firmware.inc */
 static void bb_nav_fill_facts(bb_nav_facts *f) {
     memset(f,0,sizeof *f);
     f->kit_slot=f->kit_slot_queued=f->section_queued=BB_NAV_NONE_IDX;
@@ -291,6 +332,7 @@ static void bb_nav_fill_facts(bb_nav_facts *f) {
             f->queued|=BB_NAV_Q_SECTION;f->section_queued=(uint8_t)(rq->part_index<255u?rq->part_index:255u);
         } else f->queued|=BB_NAV_Q_PATTERN;
     }
+    bb_cd_facts(f);   /* 2.1 P3b: HOME/SONGS and HOME/CONDUCT */
     if(bb_sound_pick.pending&&bb_sound_pick.page==bb_nav_face_page()&&
        (!bb_nav_is_drum()||bb_sound_pick.machine==bb_face.machine))f->queued|=BB_NAV_Q_KIT;
     if(bb_nav.page==BB_NAV_KIT && bb_sound_pick_visible()) {
@@ -334,6 +376,19 @@ static void bb_nav_fill_facts(bb_nav_facts *f) {
     f->steps=bb_nav_step_mask();
     f->display=(uint8_t)((bb_face.animate?BB_NAV_DISP_ANIMATION:0)|(bb_scope_enabled?BB_NAV_DISP_SCOPE:0)|
                          (bb_nav_meters?BB_NAV_DISP_METERS:0));
+    /* 2.1 P1: EVOLVE's keys show what is selected (parts, attributes, EUCLID's lane, locked steps); SONG's lights */
+#if BB_WITH_EVOLVE && BB_WITH_RICH_DRUM_RENDER
+    f->gen_mode=bb_gen_state.mode<BB_NAV_MODES?bb_gen_state.mode:0u;
+    f->gen_voice=bb_gen_state.voice;
+#endif
+#if BB_WITH_EVOLVE
+    f->evo_parts=bb_evo_view.settings.parts;f->evo_moves=bb_evo_view.settings.attributes;
+    if(bb_nav.page==BB_NAV_EVOLVE) {   /* steps: the focused part's locked steps on this bank (REC map) */
+        unsigned part=bb_nav_is_drum()?bb_face.machine:BB_MACHINES;
+        f->steps=(uint16_t)(bb_evo_view.settings.locked[part]>>(16u*(bb_face.bank&3u)));
+    }
+#endif
+    f->song=(uint8_t)bb_nav_p1(BB_P1_FACTS,0,0);
 }
 
 /* ------------------------------------------------------------ projection */
@@ -389,8 +444,9 @@ static void bb_nav_project(void) {
         bb_evo_page=1;
 #endif
         break;
-    default: break;  /* GLOBAL: own face (bb_nav_global_draw) */
+    default: break;  /* GLOBAL (and its MIDI banks): own face; SONG: bb_arr_draw */
     }
+    (void)bb_nav_p1(BB_P1_SYNC,(unsigned)page|(unsigned)bank<<8|(unsigned)bb_nav_shown_page<<16,0);   /* mirrors; leaving SONG */
     if(pick) {
         /* (Re)open the chooser on entry or a focus change, as the old
          * PRESETS entrance did; never while a request is still owed. */
@@ -415,6 +471,21 @@ static void bb_nav_force(uint8_t page) {
     bb_nav_do_keys(&bb_nav_aux_o);   /* releases only: never re-enters here */
     if(bb_nav_aux_o.message)bb_say(bb_nav_message_text(bb_nav_aux_o.message));
     bb_nav_project();
+}
+
+/* HOME exposes one of three peer instruments.  SELECT changes destination
+ * only on that landing screen; once a player/editor is open it keeps the
+ * established local A/B/Dillo focus job. */
+static void bb_nav_mode_move(int delta) {
+    unsigned next=bb_top_mode_step(bb_nav_top_mode,delta);
+    if(next==bb_nav_top_mode)return;
+    if(bb_nav_top_mode==BB_TOP_CONDUCTOR&&bb_nav_row<3u)bb_nav_conductor_row=bb_nav_row;
+    if(bb_nav_top_mode==BB_TOP_BIG_BEAT&&bb_nav_row<2u)bb_nav_big_beat_row=bb_nav_row;
+    bb_nav_top_mode=(uint8_t)next;
+    bb_nav_row=(uint8_t)bb_top_mode_row(next,bb_nav_conductor_row,bb_nav_big_beat_row,2u);
+    bb_nav.home_page=(uint8_t)bb_top_mode_home(next,BB_NAV_STUDIO,BB_NAV_PLAY);
+    bb_nav.play_keys=BB_NAV_PLAY_LIVE;bb_face.bank=0;bb_nav_focus_apply();
+    bb_nav_force(bb_nav.home_page);bb_nav.landing=1;bb_dirty=1;
 }
 
 /* ------------------------------------------------------------ knobs */
@@ -506,6 +577,8 @@ static void bb_nav_knob(unsigned role,unsigned index,int delta) {
 #if BB_WITH_USER_KITS
     if(role>=BB_NAV_R_UK_LEVEL&&role<=BB_NAV_R_UK_VOICE){bb_uk_knob(role,delta);return;}
 #endif
+    if(role>=BB_NAV_R_SONG_ROW&&role<=BB_NAV_R_SONG_LENGTH){(void)bb_nav_p1(BB_P1_ARR_KNOB,role,delta);return;}   /* 2.1 P1 */
+    if(role>=BB_NAV_R_MIDI_CH_A&&role<=BB_NAV_R_CLOCK_OUT){(void)bb_nav_p1(BB_P1_MIDI_KNOB,(role-BB_NAV_R_MIDI_CH_A)%4u,delta);return;}
     switch(role) {
     case BB_NAV_R_GROUP_KICK: case BB_NAV_R_GROUP_SNCL: case BB_NAV_R_GROUP_HATS: case BB_NAV_R_GROUP_PERC: {
         bb_group_view view;   /* bb_group_knobs_input body */
@@ -687,6 +760,8 @@ static void bb_nav_kit_chosen(void) {
     if(bb_nav_aux_o.message&&!bb_sound_pick.pending)bb_say(bb_nav_message_text(bb_nav_aux_o.message));
     bb_nav_project();
 }
+/* ------------------------------------------------------------ 2.1 P2: live Dillo patch audition (SPEC 3) */
+#include "bb_dillo_audition_firmware.inc"
 static int bb_nav_pattern_is_playing(const bb_player *p) {
     return p->playing.ticket&&p->playing.choice.group==p->view.group&&
         p->playing.choice.bank_index==p->view.bank_index&&p->playing.choice.part_index==p->view.part_index;
@@ -694,8 +769,11 @@ static int bb_nav_pattern_is_playing(const bb_player *p) {
 /* PLAY. On PATTERN while stopped: the highlighted pattern is the one that
  * starts (confirm, then START), with the queue room check of the old first
  * PLAY. Elsewhere: start/stop exactly as before. */
+static int bb_cd_play(void);
 static void bb_nav_transport(int pattern_play) {
     if(bb_arr_transport())return;
+    if(pattern_play==2&&bb_cd_play())return;   /* RC2 (Joe 10:26): PLAY on the song list = CHOOSE + start + PERFORM */
+    pattern_play=pattern_play==1;             /* (REC's record start passes 0: never the list's CHOOSE) */
     int start=!bb_face.requested.running;
     bb_player *p=bb_nav_player();
     if(start&&pattern_play&&p->ready) {
@@ -772,9 +850,12 @@ static void bb_nav_arm_poll(void) {
 }
 static void bb_record_pattern_begin(void);   /* bb_record_firmware.inc, after this file */
 /* ------------------------------------------------------------ actions */
+#include "bb_conductor_firmware.inc"   /* 2.1 P3b: the Rhythm Conductor */
 static void bb_nav_do_actions(const bb_nav_out *o) {
     uint32_t a=o->actions;
-    if(a&BB_NAV_A_HOME_AGAIN)bb_arr_open();   /* 2.0 N4: HOME again on STUDIO opens SONG */
+    if(a&BB_NAV_A_RESTORE)bb_audition_home(&bb_aud);
+    if((a&BB_NAV_A_KIT_CONFIRM)&&!bb_nav_is_drum()){a&=~(uint32_t)BB_NAV_A_KIT_CONFIRM;bb_aud_keep();}   /* 2.1 P2 */
+    if((a&BB_NAV_A_HOME_AGAIN)&&!bb_cd_open_list())bb_arr_open();   /* 2.0 N4: HOME again on STUDIO opens SONG */
     bb_machine *m=&bb_face.requested.drums[bb_face.machine];
     if(a&BB_NAV_A_TRANSPORT)bb_nav_transport(o->pattern_play);
     if(a&BB_NAV_A_PANIC) {
@@ -798,13 +879,18 @@ static void bb_nav_do_actions(const bb_nav_out *o) {
 #else
     if(a&BB_NAV_A_KIT_CONFIRM){if(bb_nav_kit_commit()){bb_nav_arm_kit();bb_nav_kit_chosen();}}
 #endif
+    if((a&BB_NAV_A_PATTERN_CONFIRM)&&bb_nav.page==BB_NAV_STUDIO){a&=~(uint32_t)BB_NAV_A_PATTERN_CONFIRM;bb_cd_choose();}
     if(a&BB_NAV_A_PATTERN_CONFIRM) {
         bb_player *p=bb_nav_player();
         if(!p->ready)bb_say("LIBRARY NOT READY");
         else{int r=bb_nav_confirm_pattern(p);if(r!=BB_FACTORY_PATTERN_OK||!p->request.has_kit)bb_library_result(r);}   /* D4: KIT QUEUED stays */
     }
     if(a&BB_NAV_A_UNDO)bb_pe_undo_last();   /* REC+EDIT on PLAY/STEPS */
-    if(a&BB_NAV_A_RECORD)bb_record_pattern_begin();   /* REC+SEQ on PLAY/STEPS, drums (bb_record_firmware.inc) */
+    if(a&BB_NAV_A_RECORD){   /* REC+SEQ on PLAY/STEPS, drums (bb_record_firmware.inc); a REC tap on SONG: a take */
+        if(bb_nav.page==BB_NAV_SONG)(void)bb_nav_p1(BB_P1_RECORD,0,0);else bb_record_pattern_begin();
+    }
+    if(a&BB_NAV_A_SONG_EDIT)(void)bb_nav_p1(BB_P1_EDIT,0,0);      /* 2.1 P1: EDIT on SONG */
+    if(a&BB_NAV_A_GLOBALS_SAVE)(void)bb_nav_p1(BB_P1_SAVE,0,0);   /* 2.1 P1: EDIT or SAVE on MIDI */
     if(a&BB_NAV_A_MUTE) {
         if(bb_nav_is_drum())bb_send(BB_CMD_DRUM_MUTE,!m->muted);
         else bb_send_synth(bb_nav_synth(),BB_CMD_SYNTH_MUTE,!bb_face.requested.synths[bb_nav_synth()].muted,0);
@@ -840,6 +926,7 @@ static void bb_nav_do_actions(const bb_nav_out *o) {
         else bb_evo_send(BB_EV_RUN,0,0,0);
     }
     if(a&BB_NAV_A_EVO_CAPTURE){if(bb_gen_state.mode)bb_gen_apply();else bb_evo_send(BB_EV_CAPTURE,0,0,0);}
+    if(a&BB_NAV_A_GEN_MODE)bb_gen_mode_next();     /* 2.1 P1: LFO on EVOLVE: EVOLVE -> EUCLID -> RANDOM (no music change) */
 #endif
     if(a&BB_NAV_A_TEMPO_SET)
         bb_send(BB_CMD_TEMPO,(unsigned)bb_limit(((int)o->tempo_x10+5)/10,30,300));
@@ -868,6 +955,8 @@ static void bb_nav_do_actions(const bb_nav_out *o) {
         if(o->oct_dir<0&&bb_face.bank)bb_face.bank--;
         if(o->oct_dir>0&&(bb_face.bank+1u)*16u<length)bb_face.bank++;
         bb_dirty=1;
+    } else if(o->oct==BB_NAV_OCT_LIST_PAGE&&bb_nav.page==BB_NAV_STUDIO) {
+        bb_cd_page(o->oct_dir);   /* 2.1 P3b: the song list page (RC2: the view's) */
     } else if(o->oct==BB_NAV_OCT_LIST_PAGE&&bb_nav.page==BB_NAV_PATTERN) {
         bb_player *p=bb_nav_player();
         if(p->ready){(void)bb_player_page(p,o->oct_dir,0);bb_dirty=1;}
@@ -887,7 +976,9 @@ static void bb_nav_do_encoders(const bb_nav_out *o) {
         int d=r->delta;
         if(r->target==BB_NAV_TO_NONE||!d)continue;
         switch(r->target) {
-        case BB_NAV_TO_INSTRUMENT: bb_nav_focus_move(d);break;
+        case BB_NAV_TO_INSTRUMENT:
+            if(bb_nav.landing)bb_nav_mode_move(d);else bb_nav_focus_move(d);
+            break;
         case BB_NAV_TO_TEMPO:
             bb_send(BB_CMD_TEMPO,(unsigned)bb_limit((int)bb_face.requested.bpm+bb_limit(d,-270,270),30,300));
             if(!bb_face.rejected)bb_say(BB_TX(TX_TEMPO_REC_SELECT));
@@ -900,9 +991,11 @@ static void bb_nav_do_encoders(const bb_nav_out *o) {
             if(bb_sound_pick_audio_failed()){bb_say("AUDIO FAULT / LOAD BLOCKED");break;}
             if(bb_sound_pick.pending){bb_say(BB_TX(TX_SOUND_REQUEST_STILL_PENDING));break;}
             bb_nav_project();   /* opens the chooser on this scan's entry */
-            if(bb_sound_pick_visible()){(void)bb_sound_picker_move(&bb_sound_pick,d);bb_dirty=1;bb_sound_pick_poll();}
+            if(bb_sound_pick_visible()){(void)bb_sound_picker_move(&bb_sound_pick,d);bb_dirty=1;bb_sound_pick_poll();
+                if(bb_aud_page())bb_aud_detent();}
             break;
         case BB_NAV_TO_PATTERN: {
+            if(bb_nav.page==BB_NAV_STUDIO){bb_cd_move(d);break;}   /* 2.1 P3b (RC2: the view) */
             bb_player *p=bb_nav_player();
             if(!p->ready){bb_say("LIBRARY NOT READY");break;}
             if(bb_nav_pattern_move(p,d))bb_dirty=1;else bb_library_result(BB_FACTORY_PATTERN_INVALID);
@@ -921,6 +1014,7 @@ static void bb_nav_do_encoders(const bb_nav_out *o) {
         case BB_NAV_TO_STEP_PITCH: bb_pitch_edit(0,d);break;
         case BB_NAV_TO_KNOB: bb_nav_knob(r->role,r->index,d);break;
         case BB_NAV_TO_RATCHET: bb_nav_ratchet_turn(r->index,d);break;   /* 2.0: hold a drum step + K4 */
+        case BB_NAV_TO_SONG_BANK: (void)bb_nav_p1(BB_P1_BANK,0,d);break;  /* 2.1 P1: ALGORITHM on SONG ADD */
         default: break;
         }
     }
@@ -1026,10 +1120,13 @@ static void bb_nav_do_keys(const bb_nav_out *o) {
             if(bb_nav_gsolo[bb_face.machine]){bb_nav_gsolo[bb_face.machine]=0;bb_nav_gsolo_muted[bb_face.machine]=0;}
             bb_nav_group_toggle(arg);break;
         case BB_NAV_K_GROUP_SOLO: bb_nav_group_solo(arg);break;
-        case BB_NAV_K_INSTR_MUTE: bb_nav_instr_mute(arg);break;
-        case BB_NAV_K_INSTR_SOLO: bb_nav_instr_solo(arg);break;
+        case BB_NAV_K_INSTR_MUTE: bb_nav_conductor_focus(arg);bb_nav_instr_mute(arg);break;
+        case BB_NAV_K_INSTR_SOLO: bb_nav_conductor_focus(arg);bb_nav_instr_solo(arg);break;
         case BB_NAV_K_KILL: bb_nav_instr_mute(arg);break;
         case BB_NAV_K_SECTION: bb_nav_section_launch(arg);break;
+        case BB_NAV_K_CONDUCT: bb_chord_press(&bb_cd.chord,e->key,arg,fm1_ms);break;   /* RC3: a chord (bb_cd_poll commits) */                                                  /* 2.1 P3b */
+        case BB_NAV_K_SONG_PICK: bb_cd_pick(arg);break;
+        case BB_NAV_K_COLLECTION: bb_cd_collection(arg);break;   /* RC2: SONGS / ERAS / PRESETS */
         case BB_NAV_K_SECTION_PREV: bb_nav_section_step(-1);break;
         case BB_NAV_K_SECTION_NEXT: bb_nav_section_step(1);break;
         case BB_NAV_K_PICK:
@@ -1055,8 +1152,8 @@ static void bb_nav_do_keys(const bb_nav_out *o) {
 #endif
         /* ANIMATION / SCOPE / METERS: no longer offered (bb_nav.c GLOBAL keys are inert on v3) */
 #if BB_WITH_EVOLVE
-        case BB_NAV_K_EVO_KEY:
-            if(bb_gen_state.mode){if(arg<16){bb_gen_state.voice=(uint8_t)arg;bb_dirty=1;}break;}
+        case BB_NAV_K_GEN_VOICE: if(arg<16){bb_gen_state.voice=(uint8_t)arg;bb_dirty=1;}break;   /* EUCLID's lane */
+        case BB_NAV_K_EVO_KEY: case BB_NAV_K_EVO_MOVE:   /* 2.1 P1: parts (white 1-3) and what moves (7-10) */
             if(!bb_evo_view.ready)break;
             if(arg<6)bb_evo_send(BB_EV_PARTS,bb_evo_view.settings.parts^(1u<<arg),0,0);
             else if(arg<10)bb_evo_send(BB_EV_ATTRIBUTES,bb_evo_view.settings.attributes^(1u<<(arg-6)),0,0);
@@ -1072,6 +1169,13 @@ static void bb_nav_do_keys(const bb_nav_out *o) {
         case BB_NAV_K_EVO_HOME: if(bb_evo_view.ready)bb_evo_send(BB_EV_HOME,0,0,0);break;
         case BB_NAV_K_GEN_MODE: bb_gen_mode_next();break;
 #endif
+        case BB_NAV_K_SUBPAGE:   /* 2.1 P1: GLOBAL white 4 SONG, white 5 the Dillo kit view (1 / 2: bb_nav's MIDI banks) */
+            if(arg==3u)(void)bb_nav_p1(BB_P1_OPEN_SONG,0,0);else if(arg==4u)(void)bb_nav_p1(BB_P1_DILLO_VIEW,0,0);
+            break;
+        case BB_NAV_K_SONG_ADD: case BB_NAV_K_BACK: case BB_NAV_K_SONG_COPY: case BB_NAV_K_SONG_DELETE:
+        case BB_NAV_K_SONG_UNDO: case BB_NAV_K_SONG_REDO: case BB_NAV_K_SONG_DILLO:
+            if(bb_nav.page==BB_NAV_SONG)(void)bb_nav_p1(BB_P1_KEY,e->role,(int)arg);
+            break;
 #if BB_WITH_USER_KITS
         case BB_NAV_K_LANE: bb_uk_lane_key(arg);break;
         case BB_NAV_K_UK_SLOT: bb_uk_slot_key(arg);break;
@@ -1094,15 +1198,43 @@ static void bb_nav_do_keys(const bb_nav_out *o) {
 static void bb_nav_boot(void) {
     bb_nav_map_init();
     bb_nav_init(&bb_nav,BB_NAV_STUDIO,HOLD_MS[settings_hold]);
+    bb_cd.welcome=1;
+    bb_nav.bank=BB_NAV_HOME_SONGS;   /* 2.1 P3b; RC2 (Joe 10:26): power-on is the song list, and PLAY plays it */
     bb_nav_set_features(&bb_nav,BB_NAV_FEATURES);
     memset(bb_nav_note_on,0,sizeof bb_nav_note_on);memset(bb_nav_note_owed,0,sizeof bb_nav_note_owed);
     memset(bb_nav_gsolo,0,sizeof bb_nav_gsolo);memset(bb_nav_gsolo_muted,0,sizeof bb_nav_gsolo_muted);
     bb_nav_isolo=bb_nav_isolo_muted=0;bb_nav_throw=0;bb_nav_meters=0;
+    bb_nav_top_mode=BB_TOP_CONDUCTOR;bb_nav_conductor_row=bb_nav_big_beat_row=0;
     bb_nav_row=0;bb_nav_shown_page=bb_nav_shown_row=0xFF;
     bb_nav_focus_apply();
     /* Power-on lands on STUDIO HOME (bb_nav_init above): the loaded patterns are the ready-to-play
      * choice. Joe, 28 Oct (#4 6466673215), replacing the earlier kit-first entrance on KIT. */
 }
+
+/* ------------------------------------------------------------ 2.1 P1: half-lit level
+ * Joe picked "half-lit" on the unit (spec 4.2.3, 8.2.1): MID 1/8 (Duke PR68 4a82b1d). Release builds light the
+ * half-lit LEDs at that mid level (BB_HALF_LIT_RELEASE, bb_half_pick.h) with the MENU > LEDS glow, and compile no
+ * picker. With BB_P1_HALF_LIT_PICKER 1 (bb_p1_measure.h), OCT- / OCT+ on GLOBAL (where they do nothing) step:
+ * today's glow, glow DIM HI (~1/30), glow DIM LO (~1/60), mid 1/8 (+ DIM HI glow), mid 1/12 (+ DIM LO glow). Main loop
+ * only: fm1_led_dim_level() and fm1_led_mid are the HAL's existing main-loop inputs; no interrupt code changes. */
+#include "bb_p1_measure.h"
+#if BB_P1_HALF_LIT_PICKER
+static uint8_t bb_half_pick __attribute__((section(".pool")));   /* 0 today's glow, 1..4 the four candidates */
+#endif
+#include "bb_half_pick.h"
+#if BB_P1_HALF_LIT_PICKER
+static void bb_half_pick_scan(uint32_t pressed,int quiet_before){
+    static const char *const name[5]={"HALF-LIT 0/4: TODAY (MENU)","HALF-LIT 1/4: GLOW DIM HI","HALF-LIT 2/4: GLOW DIM LO",
+                                      "HALF-LIT 3/4: MID 1/8","HALF-LIT 4/4: MID 1/12"};
+    int next=bb_half_pick_step(&bb_nav,quiet_before,bb_nav_buttons(pressed),bb_nav_buttons(fm1_in.buttons),bb_half_pick);
+    if(next<0)return;   /* also inactive inside help and while HOME is held (Duke #64) */
+    bb_half_pick=(uint8_t)next;
+    fm1_led_dim_level(bb_half_glow_lo(bb_half_pick,settings_leds==LEDS_DIM_LO));
+    bb_say(name[bb_half_pick]);
+}
+#else
+static void bb_half_pick_scan(uint32_t pressed,int quiet_before){(void)pressed;(void)quiet_before;}
+#endif
 
 /* ------------------------------------------------------------ the scan */
 static void bb_nav_scan_mode(uint32_t pressed,uint32_t notes,int count_busy) {
@@ -1118,6 +1250,13 @@ static void bb_nav_scan_mode(uint32_t pressed,uint32_t notes,int count_busy) {
     bb_nav_f=in.facts;
     if(count_busy)bb_nav_input_count_busy(&bb_nav,&in,&bb_nav_o);
     else bb_nav_input(&bb_nav,&in,&bb_nav_o);
+    /* HOME always restores the selected destination's own player. A local
+     * editor may have focused another row, but that must not make BIG BEAT
+     * reopen as Dillo (or vice versa). */
+    if(bb_nav.landing) {
+        unsigned row=bb_top_mode_row(bb_nav_top_mode,bb_nav_conductor_row,bb_nav_big_beat_row,2u);
+        if(row!=bb_nav_row){bb_nav_row=(uint8_t)row;bb_face.bank=0;bb_nav_focus_apply();bb_dirty=1;}
+    }
 #if BB_WITH_SESSION
     /* SAVE into other data (bb/bb_save_claim.h): after the refused STORE armed
      * the claim, a fresh SAVE press held 2 s on this page and slot, alone,
@@ -1142,11 +1281,17 @@ static void bb_nav_scan_mode(uint32_t pressed,uint32_t notes,int count_busy) {
     bb_nav_do_keys(&bb_nav_o);       /* releases come first in the array */
     bb_nav_do_actions(&bb_nav_o);
     bb_nav_do_encoders(&bb_nav_o);
+    bb_aud_poll();
+    bb_cd_chord(bb_nav_keys_logical(fm1_in.notes)&0xFFFFu,fm1_ms);   /* RC3: the PERFORM chord (white keys) */
+    bb_cd_poll();
     if(bb_nav.page!=BB_NAV_SOUND&&bb_face.voice>10)bb_face.voice=10;
     bb_nav_project();
 }
 
-static void bb_nav_scan(uint32_t pressed,uint32_t notes){bb_nav_scan_mode(pressed,notes,0);}
+static void bb_nav_scan(uint32_t pressed,uint32_t notes){
+    int quiet=BB_HALF_PICK_QUIET_BEFORE(&bb_nav);   /* help up or HOME held before this scan */
+    bb_nav_scan_mode(pressed,notes,0);bb_half_pick_scan(pressed,quiet);
+}
 static void bb_nav_scan_count_busy(uint32_t pressed,uint32_t notes){
     if(pressed&(1u<<panel.btn[B_PLAY])){bb_nav_notes_all_off();bb_send(BB_CMD_TRANSPORT,0);}
     bb_nav_scan_mode(pressed,notes,1);
@@ -1161,6 +1306,7 @@ static void bb_nav_leds_out(void) {
     uint8_t lit[FM1_NCOL]={0},dim[FM1_NCOL]={0},breath[FM1_NCOL]={0};
     bb_nav_fill_facts(&bb_nav_f);
     bb_nav_leds(&bb_nav,&bb_nav_f,bb_nav_keys_logical(fm1_in.notes),&bb_nav_l);
+    memcpy(&bb_nav_f20,&bb_nav_f,sizeof bb_nav_f20);
     for(unsigned b=0;b<BB_NAV_BUTTONS;b++) {
         unsigned id=panel.btn[b],v=bb_nav_l.button[b];
         led_put(v==BB_NAV_LED_LIT?lit:v==BB_NAV_LED_DIM?dim:breath,id,v!=BB_NAV_LED_DARK);
@@ -1170,5 +1316,5 @@ static void bb_nav_leds_out(void) {
         led_put(v==BB_NAV_LED_LIT?lit:v==BB_NAV_LED_DIM?dim:breath,id,v!=BB_NAV_LED_DARK);
     }
     if(bb_face.requested.running&&!bb_sound_pick_audio_failed())lit[LED_PLAY_GREEN>>3]|=(uint8_t)(1u<<(LED_PLAY_GREEN&7));
-    for(unsigned c=0;c<FM1_NCOL;c++){fm1_led[c]=lit[c];fm1_led_dim[c]=dim[c];fm1_led_breath[c]=breath[c];fm1_led_mid[c]=0;}
+    for(unsigned c=0;c<FM1_NCOL;c++){fm1_led[c]=lit[c];fm1_led_dim[c]=dim[c];fm1_led_breath[c]=breath[c];fm1_led_mid[c]=BB_HALF_MID(dim[c]);}
 }

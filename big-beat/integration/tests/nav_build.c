@@ -168,7 +168,12 @@ int main(int argc, char **argv)
     CHECK(o.enc[BB_NAV_E_PRESET].target == BB_NAV_TO_VOICE, "REC+PRESETS steps the lane");
     scan_k(&s, 0, 0, 0, 0, -1, 0);
     o = scan_k(&s, BIT(BB_NAV_B_ENV), BIT(BB_NAV_B_REC) | BIT(BB_NAV_B_ENV), 0, 0, -1, 0);
+#ifdef BB_NAV_HAS_P1   /* 2.1 P1: a drum voice has no revert (the firmware only said NOT IN THIS BUILD): dark, same words */
+    CHECK(!(o.actions & BB_NAV_A_REVERT) && o.message == BB_NAV_MSG_NOT_IN_BUILD && s.page == BB_NAV_KIT && s.bank == BB_NAV_KIT_BUILD,
+          "REC+ENV on drums: not in this build, stays");
+#else
     CHECK((o.actions & BB_NAV_A_REVERT) && s.page == BB_NAV_KIT && s.bank == BB_NAV_KIT_BUILD, "REC+ENV = revert, stays");
+#endif
     scan_k(&s, 0, 0, 0, 0, -1, 0);
     o = tap(&s, BB_NAV_B_OCTUP);
     CHECK(o.oct == BB_NAV_OCT_NONE && s.bank == BB_NAV_KIT_BUILD, "OCT dark in BUILD");
@@ -231,7 +236,9 @@ int main(int argc, char **argv)
     static const struct { uint8_t instr, focus; } none[] = {{BB_NAV_INSTR_DRUM, 1}, {BB_NAV_INSTR_DRUM_909, 0}, {BB_NAV_INSTR_DILLO, 2}};
     for (unsigned i = 0; i < 3; i++) {
         at_kit(&s, none[i].instr, none[i].focus);
-        CHECK(bb_nav_key_role(&s, BB_NAV_BLACK(1), 0, &a) == BB_NAV_K_NONE, "no BUILD role (case %u)", i);
+        /* 2.1 P2: on the Dillo PATCH page every key is a note; still no BUILD */
+        CHECK(bb_nav_key_role(&s, BB_NAV_BLACK(1), 0, &a) == (none[i].instr == BB_NAV_INSTR_DILLO ? BB_NAV_K_NOTE : BB_NAV_K_NONE),
+              "no BUILD role (case %u)", i);
         o = key(&s, BB_NAV_BLACK(1), 0);
         CHECK(!(o.actions & BB_NAV_A_BUILD) && s.bank == 0, "black 1 does nothing (case %u)", i);
         if (none[i].instr != BB_NAV_INSTR_DILLO) CHECK(bb_nav_key_role(&s, BB_NAV_WHITE(1), 0, &a) == BB_NAV_K_PICK, "list keys (case %u)", i);

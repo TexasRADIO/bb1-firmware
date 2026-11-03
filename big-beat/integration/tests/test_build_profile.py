@@ -7,11 +7,13 @@ and compilation side effects cannot run on the host.
 import ast
 import copy
 import json
+import sys
 from pathlib import Path
 
 source = Path(__file__).resolve().parents[3]
 builder = source / 'big-beat/integration/build/build_from_source.py'
-recipe = json.loads((source / 'big-beat/integration/build/recipes/composition-20-lean/recipe.json').read_text())
+recipe_path = Path(sys.argv[1]) if len(sys.argv) > 1 else source / 'big-beat/integration/build/recipes/composition-20-lean/recipe.json'
+recipe = json.loads(recipe_path.read_text())
 cmd_dir = source / 'big-beat/integration/build/cmds-r4-onepass'
 nodes = [n for n in ast.parse(builder.read_text()).body
          if isinstance(n, ast.FunctionDef) and n.name in ('rewrite', 'validate_profile')]

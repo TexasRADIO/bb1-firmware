@@ -1539,16 +1539,10 @@ static void bb_evo_draw(void) {
     cv_text(9,105,&AF_S,"BLACK 1: FREEZE / 2: RETURN",text);cv_blit(0,120);
 }
 #endif
-/* Navigation v2.1: the guide describes bb_nav's map for the page under it. */
+/* Navigation v2.1 legacy renderer (dead under BB_UI_V3): 2.1 P1 draws HELP from bb_nav_help in the v3 module. */
 static void bb_help_draw(void) {
-    const char *rows[9];
-    const char *title=bb_nav_help_rows(rows);
-    uint16_t ink=bb_face.requested.page==BB_DRUMS?BB_ORANGE:bb_face.requested.page==BB_DILLO?BB_GREEN:BB_TELEGRAM_INK;
-    bb_backdrop(0,120,0);cv_text(9,6,&AF_M,title,ink);
-    for(unsigned i=0;i<4;i++)cv_text(9,35+(int)i*23,&AF_S,rows[i],BB_TEXT);
-    cv_blit(0,0);bb_backdrop(120,120,0);
-    for(unsigned i=4;i<9;i++)cv_text(9,8+(int)(i-4)*23,&AF_S,rows[i],BB_TEXT);
-    cv_blit(0,120);
+    bb_backdrop(0,120,0);cv_text(9,6,&AF_M,bb_nav_page_name(&bb_nav),BB_TEXT);cv_blit(0,0);
+    bb_backdrop(120,120,0);cv_blit(0,120);
 }
 #if BB_WITH_BROWSER
 /* Full source strings stay in the catalogue. This display explicitly uses
@@ -2155,16 +2149,7 @@ static void bb_target_draw(void) {
  * replacing the per-face LED code. */
 static void bb_target_leds(void) {
     if(fm1_led_anim_on())return;
-    bb_nav_leds_out();
-    if(bb_arr_page){
-        for(unsigned k=0;k<BB_NAV_KEYS;k++){
-            unsigned id=14u+bb_nav_phys[k];
-            led_put(fm1_led,id,0);led_put(fm1_led_breath,id,0);
-            led_put(fm1_led_dim,id,k<4u||k==16u||k==17u);
-        }
-        if(bb_arr_workspace.model.cursor){led_put(fm1_led,14u+bb_nav_phys[16],1);led_put(fm1_led_dim,14u+bb_nav_phys[16],0);}
-        if(bb_arr_workspace.model.cursor<bb_arr_workspace.model.history_count){led_put(fm1_led,14u+bb_nav_phys[17],1);led_put(fm1_led_dim,14u+bb_nav_phys[17],0);}
-    }
+    bb_nav_leds_out();   /* 2.1 P1: SONG and MIDI are bb_nav pages: no override; one rule everywhere */
 }
 static void bb_target_splash(void) {
     bb_backdrop(0,120,2);cv_text(8,12,&AF_L,"BIG BEAT",BB_TEXT);cv_blit(0,0);

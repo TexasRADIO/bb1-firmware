@@ -10,23 +10,29 @@ static struct {
     bb_browser browse[3];
     bb_section_bundle preview;
 } bb_arr_workspace __attribute__((section(".pool")));
-static uint8_t bb_arr_ready,bb_arr_page,bb_arr_source_page,bb_arr_source_target,bb_arr_no_dillo,bb_arr_remove;
+/* 2.1 P1: SONG and its ADD sub-page are bb_nav's page and bank (one page variable); bb_arr_page and
+ * bb_arr_source_page are read-only mirrors of it, written by bb_nav_project() only */
+static uint8_t bb_arr_ready,bb_arr_source_target,bb_arr_no_dillo,bb_arr_remove;
+/* (words: 2.0's flags occupied a word each in the packed statics; keeping that size keeps the IRQ code identical) */
+static uint32_t bb_arr_page,bb_arr_source_page;
 static uint16_t bb_arr_ticks=16;
 static uint32_t bb_arr_remove_revision;
+static uint8_t bb_arr_source_page_wanted __attribute__((section(".pool")));   /* bb_arr_add: 0 added, 1 refused */
 static char bb_arr_prompt[48];
 static void bb_record_owner_reset(void),bb_record_boot(void);
 static void bb_arr_reset_owner(void){
     bb_record_owner_reset();
     if(bb_arr_ready)(void)bb_arr_controller_init(&bb_arr_workspace.controller,&bb_arr_workspace.model,&bb_arr_workspace.sources);
-    bb_arr_page=bb_arr_source_page=bb_arr_remove=0;
+    bb_arr_remove=0;if(bb_arr_page)bb_nav_force(BB_NAV_STUDIO);
 }
 static int bb_arr_midi_start(void);
+static int bb_p1_ops(unsigned op,unsigned a,int b);   /* bb_dillo_kit_firmware.inc: the 2.1 P1 hook */
 static void bb_arr_boot(void){
 #if BB_WITH_PROJECT_FILES
     bb_project_owner_scene_replaced();
 #endif
     bb_record_boot();
-    bb_arr_ready=0;bb_arr_page=bb_arr_source_page=bb_arr_source_target=bb_arr_no_dillo=bb_arr_remove=0;bb_arr_ticks=16;
+    bb_arr_ready=0;bb_arr_source_target=bb_arr_no_dillo=bb_arr_remove=0;bb_arr_ticks=16;
     if(!bb_factory_ready)return;
     bb_arr_init(&bb_arr_workspace.model);
     if(bb_arr_sources_init(&bb_arr_workspace.sources,&bb_factory_catalogue))return;
@@ -143,6 +149,7 @@ static void bb_arr_source_move(int banks,int parts){
     bb_dirty=1;
 }
 static void bb_arr_add(void){
+    bb_arr_source_page_wanted=1;
     if(!bb_arr_edit_allowed())return;
     bb_arrangement *m=&bb_arr_workspace.model;bb_arr_sources *s=&bb_arr_workspace.sources;
     if(m->row_count==BB_ARR_ROWS){bb_say(BB_TX(TX_64_ROWS_FULL));return;}
@@ -172,92 +179,113 @@ static void bb_arr_add(void){
         bb_say(error==BB_SOURCE_FULL?BB_TX(TX_96_SOURCE_REFERENCES_FULL):error==BB_SOURCE_KEY_LONG?BB_TX(TX_SOURCE_NAME_TOO_LONG):
             error==BB_SOURCE_AMBIGUOUS?BB_TX(TX_AMBIGUOUS_SOURCE_ID):error?BB_TX(TX_SOURCE_NOT_AVAILABLE):bb_arr_result(result));return;
     }
-    bb_arr_workspace.controller.selected=(uint8_t)(m->row_count-1);bb_arr_source_page=0;bb_dirty=1;bb_say("SECTION ADDED / RAM UNSAVED");
+    bb_arr_workspace.controller.selected=(uint8_t)(m->row_count-1);bb_arr_source_page_wanted=0;bb_dirty=1;bb_say("SECTION ADDED / RAM UNSAVED");
 }
-/* 2.0 N4: SONG opens from a HOME tap on STUDIO (the HOME toggle); GLOBAL white 4 still works. */
+/* 2.1 P1: SONG is a bb_nav page (BB_NAV_SONG; bank BB_NAV_SONG_ADD = the source chooser). Its keys, buttons and
+ * knobs are roles in bb_nav's one table, so their lights, the legend and HOME-hold help come from it; this file
+ * performs them. Opened by EDIT on STUDIO and GLOBAL white 4 (both lit). */
 static void bb_arr_open(void){
-    if(!bb_arr_ready||bb_arr_page)return;
-    bb_arr_page=1;bb_arr_source_page=0;bb_arr_remove=0;bb_dirty=1;
+    if(!bb_arr_ready){bb_say("LIBRARY NOT READY");return;}
+    if(bb_arr_page)return;
+    bb_arr_remove=0;bb_nav_force(BB_NAV_SONG);bb_dirty=1;
     bb_say(BB_TX(TX_SONG_HOME_BACK_TO_STUDIO));
 }
-static int bb_arr_input(uint32_t pressed,uint32_t notes){
+/* the facts its lights need (bb_nav_fill_facts) */
+static uint8_t bb_arr_nav_facts(void){
     if(!bb_arr_ready)return 0;
-    uint32_t keys=bb_nav_keys_logical(notes);
-    if(bb_record_input(pressed,keys))return 1;
-    if(!bb_arr_page){
-        if(bb_nav.page!=BB_NAV_GLOBAL||bb_midi_page||!(keys&(1u<<3)))return 0;
-        bb_arr_page=1;bb_arr_source_page=0;bb_arr_remove=0;bb_dirty=1;
-        bb_say(BB_TX(TX_ARRANGE_RAM_PROJECT));return 1;
-    }
-    if(pressed&((1u<<panel.btn[B_HOME])|(1u<<panel.btn[B_GLO]))){
-        if(bb_arr_source_page&&(pressed&(1u<<panel.btn[B_HOME]))){bb_arr_source_page=0;bb_dirty=1;return 1;}  /* HOME: one step back */
-        bb_arr_page=bb_arr_source_page=bb_arr_remove=0;bb_nav_force(BB_NAV_STUDIO);bb_dirty=1;return 1;
-    }
-    bb_arr_controller *c=&bb_arr_workspace.controller;bb_arrangement *m=&bb_arr_workspace.model;
+    const bb_arrangement *m=&bb_arr_workspace.model;
+    return (uint8_t)((m->row_count?BB_NAV_SONG_F_ROWS:0u)|(m->cursor?BB_NAV_SONG_F_UNDO:0u)|
+        (m->cursor<m->history_count?BB_NAV_SONG_F_REDO:0u)|(bb_arr_no_dillo?0u:BB_NAV_SONG_F_DILLO)|
+        (bb_arr_remove?BB_NAV_SONG_F_DELETE:0u));
+}
+/* left SONG (any way): a delete waiting for EDIT is cancelled */
+static void bb_arr_left(void){bb_arr_remove=0;}
+/* REC tap on SONG: a take into the selected row (2.0's REC press) */
+static void bb_arr_record(void){
 #if BB_WITH_LIVE_CAPTURE
-    if((pressed&(1u<<panel.btn[B_REC]))&&!bb_arr_source_page){
-        if(!m->row_count){bb_say(BB_TX(TX_ADD_A_SECTION_FIRST));return 1;}
-        if(!bb_arr_edit_allowed())return 1;
-        bb_record.section=m->rows[c->selected].section;bb_record.phase=BB_RECORD_SETUP;bb_record.target=(uint8_t)(bb_face.machine==1);
-        bb_record.countin=1;bb_record.accent=0;bb_record.error=NULL;bb_hint_until=0;bb_dirty=1;return 1;
-    }
+    bb_arr_controller *c=&bb_arr_workspace.controller;bb_arrangement *m=&bb_arr_workspace.model;
+    if(!bb_arr_ready||!bb_arr_page||bb_arr_source_page)return;
+    if(!m->row_count){bb_say(BB_TX(TX_ADD_A_SECTION_FIRST));return;}
+    if(!bb_arr_edit_allowed())return;
+    bb_record.section=m->rows[c->selected].section;bb_record.phase=BB_RECORD_SETUP;bb_record.target=(uint8_t)(bb_face.machine==1);
+    bb_record.countin=1;bb_record.accent=0;bb_record.error=NULL;bb_hint_until=0;bb_dirty=1;
 #endif
-    int knob[4];for(unsigned i=0;i<4;i++)knob[i]=bb_read_encoder(EN_K1+i);
-    int select=bb_read_encoder(EN_SELECT),banks=bb_read_encoder(EN_ALGO),parts=bb_read_encoder(EN_PRESET);
-    if(pressed&(1u<<panel.btn[B_PLAY])){(void)bb_arr_transport();return 1;}
-    if(pressed&(1u<<panel.btn[B_SAVE])){
-#if BB_WITH_PROJECT_FILES
-        bb_say(BB_TX(TX_PROJECT_FILES_HOST_TOOLS));
-#else
-        bb_say("RAM PROJECT / FILE SAVE NOT READY");
-#endif
-        return 1;}
-    (void)select;(void)parts;   /* drained: SONG's knobs are labelled K1-K4 */
-    if(bb_arr_source_page){
-        if(knob[0])bb_arr_source_target=(uint8_t)bb_limit((int)bb_arr_source_target+bb_limit(knob[0],-2,2),0,2);
-        if(knob[1]){
-            bb_browser *b=&bb_arr_workspace.browse[bb_arr_source_target];
-            int group=bb_limit((int)b->group+bb_limit(knob[1],-2,2),0,bb_arr_source_target==2?2:1);
-            (void)bb_browser_group(b,(unsigned)group);bb_dirty=1;
-        }
-        bb_arr_source_move(banks,bb_limit(knob[2],-4096,4096));   /* K3 PART only; ALGO keeps bank (as on PATTERN) */
-        if(knob[3]){bb_arr_ticks=(uint16_t)bb_limit((int)bb_arr_ticks+4*bb_limit(knob[3],-1023,1023),4,4096);bb_dirty=1;}   /* D4: one beat per detent */
-        if(keys&(1u<<2)){bb_arr_no_dillo^=1;bb_dirty=1;}
-        if(keys&1u){bb_arr_source_page=0;bb_dirty=1;return 1;}
-        if(pressed&(1u<<panel.btn[B_EDIT]))bb_arr_add();
-        return 1;
+}
+/* K1-K4 (rows: ROW REPEATS BARS LOOP; ADD: TARGET GROUP PART BARS) and ALGORITHM on ADD (the source's bank) */
+static void bb_arr_knob(unsigned role,int d){
+    if(!bb_arr_ready||!d)return;
+    bb_arr_controller *c=&bb_arr_workspace.controller;bb_arrangement *m=&bb_arr_workspace.model;
+    switch(role){
+    case BB_NAV_R_SONG_TARGET:bb_arr_source_target=(uint8_t)bb_limit((int)bb_arr_source_target+bb_limit(d,-2,2),0,2);bb_dirty=1;return;
+    case BB_NAV_R_SONG_GROUP:{
+        bb_browser *b=&bb_arr_workspace.browse[bb_arr_source_target];
+        int group=bb_limit((int)b->group+bb_limit(d,-2,2),0,bb_arr_source_target==2?2:1);
+        (void)bb_browser_group(b,(unsigned)group);bb_dirty=1;return;
     }
-    int move=bb_limit(knob[0],-64,64);   /* K1 ROW only: one control per job, as labelled (SELECT/PRESETS drained) */
-    if(move&&m->row_count){c->selected=(uint8_t)bb_limit((int)c->selected+move,0,m->row_count-1);bb_arr_remove=0;bb_dirty=1;}
-    if(knob[3]){int r=bb_arr_controller_set_loop(c,&bb_sound,knob[3]>0);if(r)bb_say(bb_arr_ctl_result(r));bb_dirty=1;}
-    if((knob[1]||knob[2])&&m->row_count&&bb_arr_edit_allowed()){
+    case BB_NAV_R_SONG_PART:bb_arr_source_move(0,bb_limit(d,-4096,4096));return;   /* K3 PART only; ALGO keeps bank (as on PATTERN) */
+    case BB_NAV_R_SONG_LENGTH:bb_arr_ticks=(uint16_t)bb_limit((int)bb_arr_ticks+4*bb_limit(d,-1023,1023),4,4096);bb_dirty=1;return;   /* D4: one beat per detent */
+    case BB_NAV_R_SONG_ROW:{
+        int move=bb_limit(d,-64,64);   /* K1 ROW only: one control per job, as labelled (SELECT/PRESETS drained) */
+        if(m->row_count){c->selected=(uint8_t)bb_limit((int)c->selected+move,0,m->row_count-1);bb_arr_remove=0;bb_dirty=1;}
+        return;
+    }
+    case BB_NAV_R_SONG_LOOP:{int r=bb_arr_controller_set_loop(c,&bb_sound,d>0);if(r)bb_say(bb_arr_ctl_result(r));bb_dirty=1;return;}
+    case BB_NAV_R_SONG_REPEATS:case BB_NAV_R_SONG_BARS:
+        if(!m->row_count||!bb_arr_edit_allowed())return;
         bb_arr_remove=0;
-        if(knob[1]){bb_arr_row row=m->rows[c->selected];row.repeats=(uint8_t)bb_limit((int)row.repeats+bb_limit(knob[1],-63,63),1,64);
+        if(role==BB_NAV_R_SONG_REPEATS){bb_arr_row row=m->rows[c->selected];row.repeats=(uint8_t)bb_limit((int)row.repeats+bb_limit(d,-63,63),1,64);
             int r=bb_arr_row_replace(m,c->selected,row);if(r)bb_say(bb_arr_result(r));}
-        if(knob[2]){bb_arr_section section=*bb_arr_find(m,m->rows[c->selected].section);
-            section.duration=(uint16_t)bb_limit((int)section.duration+bb_limit(knob[2],-4095,4095),1,4096);
+        else{bb_arr_section section=*bb_arr_find(m,m->rows[c->selected].section);
+            section.duration=(uint16_t)bb_limit((int)section.duration+bb_limit(d,-4095,4095),1,4096);
             int r=bb_arr_section_put(m,&section,NULL);if(r)bb_say(bb_arr_result(r));}
-        bb_dirty=1;
+        bb_dirty=1;return;
+    default:return;
     }
-    if(keys&1u){bb_arr_remove=0;bb_arr_source_page=1;bb_dirty=1;return 1;}
-    if(keys&(1u<<1)){bb_arr_remove=0;bb_arr_source_page=1;bb_dirty=1;bb_say(BB_TX(TX_SELECT_A_B_DILLO_EDIT_ADDS));return 1;}
-    if((keys&(1u<<2))&&m->row_count&&bb_arr_edit_allowed()){
-        int r=bb_arr_row_insert(m,c->selected+1,m->rows[c->selected]);if(r)bb_say(bb_arr_result(r));else{c->selected++;bb_say(BB_TX(TX_ROW_COPIED_SHARED_SECTION));}bb_dirty=1;
+}
+/* SONG keys (bb_nav roles): ADD (bb_nav opened the ADD bank), COPY, DELETE, UNDO, REDO, and DILLO on ADD */
+static void bb_arr_key(unsigned role,unsigned arg){
+    if(!bb_arr_ready)return;
+    bb_arr_controller *c=&bb_arr_workspace.controller;bb_arrangement *m=&bb_arr_workspace.model;
+    switch(role){
+    case BB_NAV_K_SONG_ADD:bb_arr_remove=0;(void)arg;bb_dirty=1;break;          /* white 2 also says SELECT A / B / DILLO */
+    case BB_NAV_K_BACK:bb_dirty=1;break;
+    case BB_NAV_K_SONG_DILLO:bb_arr_no_dillo^=1;bb_dirty=1;break;
+    case BB_NAV_K_SONG_COPY:
+        if(m->row_count&&bb_arr_edit_allowed()){
+            int r=bb_arr_row_insert(m,c->selected+1,m->rows[c->selected]);if(r)bb_say(bb_arr_result(r));else{c->selected++;bb_say(BB_TX(TX_ROW_COPIED_SHARED_SECTION));}bb_dirty=1;
+        }
+        break;
+    case BB_NAV_K_SONG_DELETE:
+        if(m->row_count&&bb_arr_edit_allowed()){
+            bb_arr_remove=1;bb_arr_remove_revision=m->revision;bb_dirty=1;
+            const bb_arr_section *s=bb_arr_find(m,m->rows[c->selected].section);unsigned n=0;
+            const char *word="DELETE ";while(*word)bb_arr_prompt[n++]=*word++;
+            word=s?s->name:"ROW";while(*word&&n+2<sizeof bb_arr_prompt)bb_arr_prompt[n++]=*word++;
+            bb_arr_prompt[n++]='?';bb_arr_prompt[n]=0;bb_say(bb_arr_prompt);
+        }
+        break;
+    case BB_NAV_K_SONG_UNDO:bb_arr_remove=0;if(bb_arr_edit_allowed()){int r=bb_arr_undo(m);bb_say(r?bb_arr_result(r):BB_TX(TX_UNDO_PROJECT_RESTORED));}break;
+    case BB_NAV_K_SONG_REDO:bb_arr_remove=0;if(bb_arr_edit_allowed()){int r=bb_arr_redo(m);bb_say(r?bb_arr_result(r):BB_TX(TX_REDO_PROJECT_RESTORED));}break;
+    default:break;
     }
-    if((keys&(1u<<3))&&m->row_count&&bb_arr_edit_allowed()){
-        bb_arr_remove=1;bb_arr_remove_revision=m->revision;bb_dirty=1;
-        const bb_arr_section *s=bb_arr_find(m,m->rows[c->selected].section);unsigned n=0;
-        const char *word="DELETE ";while(*word)bb_arr_prompt[n++]=*word++;
-        word=s?s->name:"ROW";while(*word&&n+2<sizeof bb_arr_prompt)bb_arr_prompt[n++]=*word++;
-        bb_arr_prompt[n++]='?';bb_arr_prompt[n]=0;bb_say(bb_arr_prompt);return 1;
-    }
-    if(keys&(1u<<16)){bb_arr_remove=0;if(bb_arr_edit_allowed()){int r=bb_arr_undo(m);bb_say(r?bb_arr_result(r):BB_TX(TX_UNDO_PROJECT_RESTORED));}}
-    if(keys&(1u<<17)){bb_arr_remove=0;if(bb_arr_edit_allowed()){int r=bb_arr_redo(m);bb_say(r?bb_arr_result(r):BB_TX(TX_REDO_PROJECT_RESTORED));}}
     if(c->selected>=m->row_count)c->selected=m->row_count?(uint8_t)(m->row_count-1):0;
-    if(pressed&(1u<<panel.btn[B_EDIT])){
-        if(bb_arr_remove){bb_arr_remove=0;if(m->revision!=bb_arr_remove_revision){bb_say(BB_TX(TX_ROW_CHANGED_CONFIRM_AGAIN));return 1;}if(bb_arr_edit_allowed()){int r=bb_arr_row_remove(m,c->selected);bb_say(r?bb_arr_result(r):BB_TX(TX_ROW_DELETED_UNDO_AVAILABLE));if(c->selected>=m->row_count)c->selected=m->row_count?(uint8_t)(m->row_count-1):0;bb_dirty=1;}}
-        else if(m->row_count){int r=c->view.running?bb_arr_controller_cue(c,&bb_sound,c->selected):bb_arr_controller_load(c,&bb_sound,c->selected);if(r)bb_say(bb_arr_ctl_result(r));else{bb_say(c->view.running?BB_TX(TX_NEXT_SECTION_QUEUED):BB_TX(TX_SECTION_LOAD_REQUESTED));
-            if(c->view.running){bb_arr_cue_fb.row=(uint8_t)(c->selected+1u);bb_arr_cue_fb.seen=c->seen_applied;}}}
+}
+/* EDIT on SONG: rows: confirm a waiting delete, else cue (playing) or load (stopped) the selected row; ADD: add */
+static void bb_arr_edit(void){
+    if(!bb_arr_ready)return;
+    bb_arr_controller *c=&bb_arr_workspace.controller;bb_arrangement *m=&bb_arr_workspace.model;
+    if(bb_arr_source_page){
+        bb_arr_add();
+        if(!bb_arr_source_page_wanted){bb_nav.bank=BB_NAV_SONG_ROWS;bb_nav_project();}   /* added: back to the rows */
+        return;
     }
-    return 1;
+    if(bb_arr_remove){bb_arr_remove=0;if(m->revision!=bb_arr_remove_revision){bb_say(BB_TX(TX_ROW_CHANGED_CONFIRM_AGAIN));return;}if(bb_arr_edit_allowed()){int r=bb_arr_row_remove(m,c->selected);bb_say(r?bb_arr_result(r):BB_TX(TX_ROW_DELETED_UNDO_AVAILABLE));if(c->selected>=m->row_count)c->selected=m->row_count?(uint8_t)(m->row_count-1):0;bb_dirty=1;}}
+    else if(m->row_count){int r=c->view.running?bb_arr_controller_cue(c,&bb_sound,c->selected):bb_arr_controller_load(c,&bb_sound,c->selected);if(r)bb_say(bb_arr_ctl_result(r));else{bb_say(c->view.running?BB_TX(TX_NEXT_SECTION_QUEUED):BB_TX(TX_SECTION_LOAD_REQUESTED));
+        if(c->view.running){bb_arr_cue_fb.row=(uint8_t)(c->selected+1u);bb_arr_cue_fb.seen=c->seen_applied;}}}
+}
+/* Only the recorder's take (count-in, live, review) is still modal ahead of bb_nav; SONG's own controls are bb_nav's. */
+static int bb_arr_input(uint32_t pressed,uint32_t notes){
+    bb_nav_p1_hook=bb_p1_ops;   /* 2.1 P1: installed from the input path, where 2.0 met these files' statics */
+    if(!bb_arr_ready)return 0;
+    return bb_record_input(pressed,bb_nav_keys_logical(notes));
 }

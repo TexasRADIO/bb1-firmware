@@ -23,7 +23,7 @@ static inline uint8_t bb_v3_route(const bb_nav_state *s, int service)
     if (service)
         return BB_UI_NO;                       /* update boot / diagnostics: service presentation */
     switch (s->page) {
-    case BB_NAV_STUDIO:  return BB_UI_STUDIO;  /* HOME: Big Beat + Dillo */
+    case BB_NAV_STUDIO:  return s->bank == BB_NAV_HOME_SONGS ? BB_UI_PATTERN : BB_UI_STUDIO;  /* HOME: SONGS list / the band */
     case BB_NAV_PLAY:
         if (bb_v3_nav_is_drum(s))
             return s->play_keys == BB_NAV_PLAY_STEPS ? BB_UI_STEPS : BB_UI_PLAY_DRUMS;
@@ -31,7 +31,11 @@ static inline uint8_t bb_v3_route(const bb_nav_state *s, int service)
     case BB_NAV_KIT:     return BB_UI_KIT;
     case BB_NAV_PATTERN: return BB_UI_PATTERN;
     case BB_NAV_FX:
+#if !defined(BB_UI_PLAY) || BB_UI_PLAY
+        return BB_UI_FX;                       /* 2.2: every tab shows what it does (bb_ui_play.c) */
+#else
         return s->bank == BB_V3_FX_SPRING || s->bank == BB_V3_FX_SENDS ? BB_UI_KNOBS : BB_UI_FX;
+#endif
     case BB_NAV_SOUND:
     case BB_NAV_SAVE:
     case BB_NAV_EVOLVE:

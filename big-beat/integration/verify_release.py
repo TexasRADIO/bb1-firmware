@@ -4,7 +4,7 @@ level sweep, from-source target build and fit, deterministic package with negati
 of hashes. Offline; never contacts an FM-1. Everything it proves is host or build evidence.
 
 usage: python3 -I verify_release.py SOURCE OUT [--expect-tree SHA] [--expect-app SHA] [--expect-package SHA]
-                                   [--host-only] [--recipe NAME]
+                                   [--host-only] [--recipe NAME] [--sound-library PATH]
   --recipe NAME  build/recipes/NAME (default candidate); a measurement recipe is recorded in summary.json
   SOURCE  firmware source tree (candidate-src checkout)
   OUT     new directory for logs, binaries and summary.json (must not exist)
@@ -22,6 +22,9 @@ def opt(name):
         i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
 expect_tree, expect_app, expect_pkg = opt('--expect-tree'), opt('--expect-app'), opt('--expect-package')
 recipe_name = opt('--recipe') or 'candidate'
+sound_library = opt('--sound-library')
+if ('--host-only' not in args or recipe_name == 'composition-21') and not sound_library:
+    raise SystemExit('--sound-library PATH is required for packaging or composition-21 verification')
 assert re.fullmatch(r'[\w.-]+', recipe_name) and (HERE / 'build/recipes' / recipe_name / 'recipe.json').is_file(), recipe_name
 host_only = '--host-only' in args
 if host_only: args.remove('--host-only')
@@ -42,7 +45,12 @@ def finish(ok):
     sys.exit(0 if ok else 1)
 
 def run(cmd, log, cwd=SRC, shell=False):
-    r = subprocess.run(cmd, cwd=cwd, env=ENV, capture_output=True, text=True, shell=shell)
+    # Some host fixtures intentionally exercise the firmware's single-byte LCD
+    # glyphs (for example the middle-dot separator).  Decode their diagnostic
+    # output losslessly enough to record a failure instead of letting Python's
+    # UTF-8 decoder hide the actual test result.
+    r = subprocess.run(cmd, cwd=cwd, env=ENV, capture_output=True, text=True,
+                       encoding='utf-8', errors='replace', shell=shell)
     (OUT / log).write_text((cmd if shell else ' '.join(map(str, cmd))) + '\n--- stdout\n' + r.stdout + '\n--- stderr\n' + r.stderr)
     return r
 
@@ -111,13 +119,20 @@ FRONT_D = [a for a in front if a.startswith('-D') and not a.startswith('-D__DATE
 flags = (T / 'host_flags.sh').read_text()
 HOST = {k: shlex.split(re.search(rf'^{k}="(.*)"$', flags, re.M).group(1)) for k in ('HOST_DEFS', 'HOST_INC', 'HOST_WARN')}
 SAN = ['-std=c11', '-O1', '-Wall', '-Wextra', '-fsanitize=address,undefined']
-# 2.0 kit builder: host tests and the oracle are compiled as the 2.0 recipe builds the firmware. Its feature -D
-# flags (BB_WITH_USER_KITS) and the bb_user_kit unit come from the recipe itself, one source of truth with the
-# native build (build/recipes/composition-20-lean/recipe.json).
-LEAN = json.loads((HERE / 'build/recipes/composition-20-lean/recipe.json').read_text())
-RECIPE_D = [f for f in LEAN.get('extra_flags', []) if f.startswith('-DBB_WITH_USER_KITS')]
-RECIPE_UNITS = [f'firmware/src/bb/{u}.c' for u in LEAN['link_order'] if u == 'bb_user_kit']
+# Mach-O does not accept the firmware's ELF section names. Keep the declarations
+# retained in host sanitizer binaries without changing target compilation.
+if sys.platform == 'darwin':
+    SAN += ['-Dsection(x)=used']
+# Use the selected release profile for the feature switches these host fixtures model.
+PROFILE = json.loads((HERE / 'build/recipes' / recipe_name / 'recipe.json').read_text())
+RECIPE_D = [f for f in PROFILE.get('extra_flags', [])
+            if f.startswith(('-DBB_WITH_USER_KITS=', '-DBB_WITH_SLOOP_KITS=', '-DBB_SLOOP_TARGET_BUILD='))]
+RECIPE_UNITS = [f'firmware/src/bb/{u}.c' for u in PROFILE['link_order'] if u == 'bb_user_kit']
 B = OUT / 'bin'; B.mkdir()
+# 2.1 RC2: the capture gate reads the real catalogue (every section name on the HOME lanes)
+CAPTURE_CAT = ['-I', 'firmware/src/bb', '-I', 'firmware/src/bb/x0x', '-I', 'firmware/hal']
+CAPTURE_UNITS = [f'firmware/src/bb/{u}.c' for u in ('bb_factory', 'bb_catalogue', 'bb_catalogue_page', 'bb_browser', 'bb_paged_records',
+                                                     'bb_paged_container', 'bb_crc32')]
 
 def compile_and_run(name, cc, runargs=(), expect=None, returncode=0):
     r = run(['clang', *cc, '-o', str(B / name)], f'{name}-compile.log')
@@ -130,11 +145,15 @@ def compile_and_run(name, cc, runargs=(), expect=None, returncode=0):
 
 def host_tests():
     res = {}
+    res['home_take'] = compile_and_run('home_take', [*SAN, '-Werror', *RECIPE_D, '-I', 'firmware/src',
+        str(T / 'home_take.c'), 'firmware/src/bb_nav.c'], expect=r'home all-three: \d+ checks, 0 failures')
     res['routes'] = compile_and_run('test_routes', [*SAN, '-Werror', *RECIPE_D, '-I', 'firmware/src', '-I', 'firmware/src/bb_ui_v3',
                                     str(T / 'test_routes.c'), 'firmware/src/bb_nav.c'], [str(OUT / 'route-matrix.csv')],
                                     r'legacy normal pages 0; \d+ checks, 0 failures')
+    res['top_modes'] = compile_and_run('top_mode', [*SAN, '-Werror', '-I', 'firmware/src', str(T / 'top_mode.c')],
+                                       expect=r'top modes: \d+ checks, 0 failures')
     res['captures'] = compile_and_run('capture', [*SAN, *RECIPE_D, '-Wno-unused-function', '-Wno-missing-field-initializers', '-Dsection(x)=used',
-                                      '-I', 'firmware/src', '-I', 'build/gen', str(T / 'capture.c'), 'firmware/src/bb_nav.c'],
+                                      '-I', 'firmware/src', '-I', 'build/gen', *CAPTURE_CAT, str(T / 'capture.c'), 'firmware/src/bb_nav.c', *CAPTURE_UNITS],
                                       [str(OUT / 'captures.raw')], r'0 lint/route failures')
     res['kit_intent'] = compile_and_run('test_kit_intent', [*SAN, '-Werror', '-Wno-unused-function', *FRONT_D, *HOST['HOST_INC'], str(T / 'test_kit_intent.c')])
     for t in ('test_sound_pending', 'test_sound_picker_outcomes'):
@@ -196,6 +215,22 @@ def host_tests():
     # 2.0 series: REC+EDIT is Undo on PLAY/STEPS (and REC+SEQ records, once that patch is in), on the real bb_nav.c
     res['nav_record_undo'] = compile_and_run('nav_record_undo', [*SAN, '-Werror', *RECIPE_D, '-I', 'firmware/src', str(T / 'nav_record_undo.c'),
                                              'firmware/src/bb_nav.c'], expect=r'checks, 0 failures')
+    if (T / 'nav_p1.c').exists():   # 2.1 Live Play P1: one table for roles, lights, legend and help (every page)
+        res['nav_p1'] = compile_and_run('nav_p1', [*SAN, '-Werror', *RECIPE_D, '-I', 'firmware/src', str(T / 'nav_p1.c'),
+            'firmware/src/bb_nav.c'], expect=r'checks, 0 failures')
+    if (T / 'half_pick.c').exists():   # 2.1 P1 measurement picker: inactive inside help / HOME held (Duke #64)
+        res['half_pick'] = compile_and_run('half_pick', [*SAN, '-Werror', *RECIPE_D, '-I', 'firmware/src', str(T / 'half_pick.c'),
+            'firmware/src/bb_nav.c'], expect=r'checks, 0 failures')
+    if (T / 'dillo_keep.c').exists():   # 2.1 RC1: KEEP owed through refusal / pending, on the real adapter (Duke #64 6592267384)
+        res['dillo_keep'] = compile_and_run('dillo_keep', [*SAN, '-Werror', *RECIPE_D, '-I', 'firmware/src', str(T / 'dillo_keep.c'),
+            'firmware/src/bb_nav.c'], expect=r'checks, 0 failures')
+    if (T / 'dillo_audition.c').exists():   # 2.1 Live Play P2: live Dillo patch audition (SPEC 3, 8.1.9-8.1.10)
+        res['dillo_audition'] = compile_and_run('dillo_audition', [*SAN, '-Werror', *RECIPE_D, '-I', 'firmware/src', str(T / 'dillo_audition.c'),
+            'firmware/src/bb_nav.c'], expect=r'checks, 0 failures')
+    if (T / 'identity_test.py').exists():   # 2.1 RC2: the release identity (json, app header, package rule, recipes)
+        r = run(['python3', '-I', str(T / 'identity_test.py'), str(SRC)], 'identity_test.log')
+        assert r.returncode == 0 and re.search(r'checks, 0 failures', r.stdout), 'identity: ' + r.stdout[-300:]
+        res['identity'] = r.stdout.strip().splitlines()[-1]
     # 2.0 kit builder: BUILD / SAVE AS on the real bb_nav_input, with the recipe's flags, and its route matrix
     if (T / 'nav_build.c').exists():
         res['nav_build'] = compile_and_run('nav_build', [*SAN, '-Werror', *RECIPE_D, '-I', 'firmware/src', str(T / 'nav_build.c'),
@@ -221,16 +256,37 @@ def host_tests():
             r'legacy normal pages 0; \d+ checks, 0 failures')
         assert (OUT / 'route-matrix-absent.csv').read_bytes() == (OUT / 'route-matrix.csv').read_bytes(), 'routes differ with no text block'
         res['help_flash_absent_captures'] = compile_and_run('capture_absent', [*SAN, '-DBB_TX_HOST_ABSENT', '-Wno-unused-function',
-            '-Wno-missing-field-initializers', '-Dsection(x)=used', '-I', 'firmware/src', '-I', 'build/gen', str(T / 'capture.c'),
-            'firmware/src/bb_nav.c'], [str(OUT / 'captures-absent.raw')], r'0 lint/route failures')
+            '-Wno-missing-field-initializers', '-Dsection(x)=used', '-I', 'firmware/src', '-I', 'build/gen', *CAPTURE_CAT, str(T / 'capture.c'),
+            'firmware/src/bb_nav.c', *CAPTURE_UNITS], [str(OUT / 'captures-absent.raw')], r'0 lint/route failures')
         res['help_flash_absent_nav_record_undo'] = compile_and_run('nav_record_undo_absent', [*SAN, '-Werror', '-DBB_TX_HOST_ABSENT',
             '-I', 'firmware/src', str(T / 'nav_record_undo.c'), 'firmware/src/bb_nav.c'], expect=r'checks, 0 failures')
     if (OUT / 'route-matrix.csv').read_bytes() != (HERE / 'route-matrix.csv').read_bytes():
         res['route_matrix'] = 'DIFFERS from the checked-in route-matrix.csv'
+        assert recipe_name != 'composition-21', '2.1 route matrix differs; review the navigation change before updating its baseline'
     else:
         res['route_matrix'] = 'identical to route-matrix.csv'
     return res
 step('host-tests', host_tests)
+
+# 2.1 performance controls are release requirements, not optional standalone checks.
+def performance_tests():
+    res = {}
+    for name in ('section-hold', 'conductor'):
+        directory = OUT / name
+        builder = SRC / 'big-beat/composition-20/tests' / ('build-' + name + '.py')
+        extra = RECIPE_D + [str(SRC / u) for u in RECIPE_UNITS]
+        if sys.platform == 'darwin': extra += ['-Dsection(x)=used']
+        r = run(['python3', str(builder), str(directory), *extra], name + '-build.log')
+        assert r.returncode == 0, name + ' build failed'
+        r = run([str(directory / ('test-' + name))], name + '.log')
+        assert r.returncode == 0 and re.search(r'PASS \d+ checks', r.stdout), name + ' proofs failed'
+        res[name] = r.stdout.strip().splitlines()[-1]
+    r = run(['python3', str(T / 'welcome_adapter.py'), str(OUT / 'welcome-adapter'),
+             *RECIPE_D, *[str(SRC / u) for u in RECIPE_UNITS]], 'welcome-adapter.log')
+    assert r.returncode == 0 and re.search(r'checks PASS', r.stdout), 'welcome adapter failed'
+    res['welcome'] = r.stdout.strip().splitlines()[-1]
+    return res
+step('performance-tests', performance_tests)
 
 # 4. worker vs serial oracle (Duke's integration-480, re-rooted) ---------------------------------------
 def oracle():
@@ -253,16 +309,22 @@ step('oracle', oracle)
 
 # 5. 480-section level sweep at the default gain ------------------------------------------------------
 def sweep():
-    r = run(['python3', '-I', str(T / 'sweep/build_sweep.py'), str(SRC), str(B / 'sweep')], 'sweep-compile.log')
+    library_path = inputs['files']['sound_library_readback']['path']
+    if sound_library:
+        sys.path.insert(0, str(SRC / 'tools'))
+        from bb_library_identity import verify_library
+        library_path = verify_library(sound_library, SRC)['path']
+    r = run(['python3', '-I', str(T / 'sweep/build_sweep.py'), str(SRC), str(B / 'sweep'),
+             *RECIPE_D, *[str(SRC / u) for u in RECIPE_UNITS]], 'sweep-compile.log')
     assert r.returncode == 0, 'sweep compile'
-    r = run([str(B / 'sweep'), inputs['files']['sound_library_readback']['path'], 'default', '800'], 'sweep.log', cwd=OUT)
+    r = run([str(B / 'sweep'), library_path, 'default', '800'], 'sweep.log', cwd=OUT)
     assert r.returncode == 0, f'sweep exit {r.returncode}'
     (OUT / 'sweep.csv').write_text(r.stdout)
     import csv, io
     rows = list(csv.DictReader(io.StringIO(r.stdout)))
     tot = {k: sum(float(x[k] or 0) for x in rows) for k in ('limited_frames', 'invalid_faults', 'refused', 'wrong_kit')}
     assert rows and not any(tot.values()), tot
-    return {'cases': len(rows), **tot, 'worst_peak_dbfs': max(float(x['peak_dbfs']) for x in rows)}
+    return {'library_sha256': sha(library_path), 'cases': len(rows), **tot, 'worst_peak_dbfs': max(float(x['peak_dbfs']) for x in rows)}
 step('sweep', sweep)
 
 if host_only:
@@ -284,7 +346,7 @@ step('target', target)
 
 # 7. deterministic package, eight negatives --------------------------------------------------------
 def package():
-    r = run(['python3', str(HERE / 'package/package_candidate.py'), str(OUT / 'build'), str(OUT / 'package'), 'candidate'], 'package.log')
+    r = run(['python3', str(HERE / 'package/package_candidate.py'), str(OUT / 'build'), str(OUT / 'package'), 'candidate', sound_library], 'package.log')
     assert r.returncode == 0, 'packaging failed (see package.log)'
     rep = json.loads((OUT / 'package/candidate-package-report.json').read_text())
     assert len(rep['negative_cases']) == 8 and rep['installed'] is False

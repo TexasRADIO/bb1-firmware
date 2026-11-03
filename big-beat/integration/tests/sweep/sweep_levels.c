@@ -77,7 +77,8 @@ static bb_audio audio;static gg_state groups[BB_MACHINES];
 static bb_phrase_index catalogue[MAXSEC];static unsigned nsec;
 static bb_factory_choice choices[MAXSEC]; /* r9.9: each section's catalogue entry, for its Dillo line */
 static bb_sample_resident store;static bb_aux_voices aux;
-static bb_sample_audio_binding current,entries[3],bbind;
+static bb_sample_audio_binding current,entries[8],bbind;
+static unsigned musical_count,has_aux;
 #ifndef BB_SAMPLE_OWNER_SLOTS
 #define BB_SAMPLE_OWNER_SLOTS 16u   /* before r9.14 step 4b */
 #endif
@@ -91,12 +92,12 @@ static void setup(unsigned s){
  assert(bb_audio_init(&audio,enter_fn,leave_fn,0));assert(bb_audio_groups_bind(&audio,groups,BB_MACHINES));
  /* sound library: as bb_sample_rebind_cold() */
  memset(store.slots,0,sizeof store.slots);bb_aux_voices_stop(&aux);
- for(unsigned i=0;i<3;i++){assert(bb_sample_resident_binding(&store,i,&entries[i]));if(GAIN>=0.0f)entries[i].gain=GAIN;}
+ for(unsigned i=0;i<musical_count;i++){assert(bb_sample_resident_binding(&store,i,&entries[i]));if(GAIN>=0.0f)entries[i].gain=GAIN;}
  current=entries[0];
- assert(bb_audio_sample_startup(&audio,&current,entries,3,BB_SAMPLE_808_ID));
+ assert(bb_audio_sample_startup(&audio,&current,entries,musical_count,BB_SAMPLE_808_ID));
  memset(bslots,0,sizeof bslots);bbind=entries[0];bbind.slots=bslots;
  assert(bb_audio_sample_bind_b(&audio,&bbind,BB_SAMPLE_808_ID));
- assert(bb_audio_aux_bind(&audio,&aux));
+ if(has_aux)assert(bb_audio_aux_bind(&audio,&aux));
  static const unsigned bpm[4]={120,96,174,140},swing[4]={50,63,75,58};
  assert(bb_set_tempo(&audio.core,bpm[s%4]));assert(bb_set_swing(&audio.core,swing[s%4]));
  for(unsigned m=0;m<2;m++){audio.core.drums[m].enabled=1;audio.core.drums[m].muted=0;audio.core.drums[m].level=127;}
@@ -145,11 +146,17 @@ static void run_case(unsigned kit_a,unsigned kit_b,unsigned calls,stat *st){
 }
 int main(int argc,char **argv){
  static uint8_t pack[1<<20];FILE *f=fopen(argv[1],"rb");assert(f);size_t bytes=fread(pack,1,sizeof pack,f);fclose(f);
- bytes=bb_fsmp_u32(pack+8);unsigned calls=argc>3?(unsigned)atoi(argv[3]):800u;
+ assert(bytes>=32);size_t declared=bb_fsmp_u32(pack+8);assert(declared<=bytes);bytes=declared;unsigned calls=argc>3?(unsigned)atoi(argv[3]):800u;
  /* "default": keep the binding's own gain (the shipped value) and report it */
  GAIN=strcmp(argv[2],"default")?(float)atof(argv[2]):-1.0f;
- assert(bb_sample_resident_prepare(&store,pack,bytes)&&store.count==4);
- assert(bb_aux_voices_bind(&aux,store.zones[3],BB_AUX_ZONES));
+ assert(bb_sample_resident_prepare(&store,pack,bytes)&&store.count>=3&&store.count<=8);
+ for(unsigned k=0;k<store.count;k++){
+  assert(store.names[k]);
+  if(!strcmp(store.names[k],"BB AUX")){assert(k==store.count-1u);has_aux=1;}
+ }
+ musical_count=store.count-has_aux;assert(musical_count>=3);
+ if(has_aux){assert(store.counts[store.count-1u]==BB_AUX_ZONES);assert(bb_aux_voices_bind(&aux,store.zones[store.count-1u],BB_AUX_ZONES));}
+ fprintf(stderr,"sampled kits %u, auxiliary layer %u\n",musical_count,has_aux);
  assert(bb_factory_init());unsigned sections=0;
  for(unsigned family=0;family<2;family++){
   bb_browser browser;assert(bb_browser_init(&browser,&bb_factory_catalogue));assert(bb_browser_group(&browser,family));
@@ -164,15 +171,17 @@ int main(int argc,char **argv){
  nsec=sections;fprintf(stderr,"sections %u\n",nsec);
  if(GAIN<0.0f){bb_sample_audio_binding probe;assert(bb_sample_resident_binding(&store,0,&probe));
   fprintf(stderr,"binding default gain %.3f\n",probe.gain);}
- static const char *const NAME[3]={"LinnDrum","DrumTraks","DMX"};
- struct {const char *label;unsigned a,b;} cases[]={
-  {"808 A only (reference)",BB_SAMPLE_808_ID,255u},{"808 A + 808 B (reference)",BB_SAMPLE_808_ID,BB_SAMPLE_808_ID},
-  {"LinnDrum A only",0,255u},{"DrumTraks A only",1,255u},{"DMX A only",2,255u},
-  {"LinnDrum A + 808 B",0,BB_SAMPLE_808_ID},{"DrumTraks A + 808 B",1,BB_SAMPLE_808_ID},{"DMX A + 808 B",2,BB_SAMPLE_808_ID},
-  {"LinnDrum A + DrumTraks B",0,1},{"DrumTraks A + DMX B",1,2},{"DMX A + LinnDrum B",2,0}};
- (void)NAME;
+ struct {char label[80];unsigned a,b;} cases[26]={
+  {"808 A only (reference)",BB_SAMPLE_808_ID,255u},{"808 A + 808 B (reference)",BB_SAMPLE_808_ID,BB_SAMPLE_808_ID}};
+ unsigned ncases=2;
+ for(unsigned k=0;k<musical_count;k++){
+  unsigned next=(k+1u)%musical_count;
+  snprintf(cases[ncases].label,80,"%s A only",store.names[k]);cases[ncases].a=k;cases[ncases++].b=255u;
+  snprintf(cases[ncases].label,80,"%s A + 808 B",store.names[k]);cases[ncases].a=k;cases[ncases++].b=BB_SAMPLE_808_ID;
+  snprintf(cases[ncases].label,80,"%s A + %s B",store.names[k],store.names[next]);cases[ncases].a=k;cases[ncases++].b=next;
+ }
  printf("gain,case,peak,peak_dbfs,rms_dbfs,sections_limited,limited_frames,invalid_faults,refused,wrong_kit,measured_frames\n");
- for(unsigned c=0;c<sizeof cases/sizeof cases[0];c++){
+ for(unsigned c=0;c<ncases;c++){
   stat st;run_case(cases[c].a,cases[c].b,calls,&st);
   printf("%s,%s,%.4f,%.1f,%.1f,%u,%lu,%lu,%u,%u,%lu\n",argv[2],cases[c].label,st.peak,20*log10(st.peak>0?st.peak:1e-9),
          20*log10(st.rms>0?st.rms:1e-9),st.sections_limited,st.limited,st.faults,st.refused,st.wrong_kit,st.frames);

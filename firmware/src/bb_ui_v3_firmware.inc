@@ -31,7 +31,7 @@
 #undef bb_ui_page_for
 
 static bb_ui bb_v3;
-static bb_ui_in bb_v3_in;                    /* static, not on the main-loop stack */
+static bb_ui_in bb_v3_in __attribute__((section(".pool")));   /* not on the stack; 2.1 P1: in the pool, not RAM */
 static uint8_t bb_v3_shown;                  /* a v3 page is on the screen */
 static uint32_t bb_v3_next, bb_v3_beat, bb_v3_step_seen, bb_v3_last_ms;
 static uint8_t bb_v3_kpos[4], bb_v3_gout[4], bb_v3_kpage = BB_UI_NO;
@@ -39,7 +39,42 @@ static const char *bb_v3_klab[4];
 static uint32_t bb_v3_ctx, bb_v3_ctx_t;     /* what the page shows (name, choice) and when it last changed */
 #define BB_V3_SETTLE_MS 400u                /* values that follow such a change are not turns */
 static char bb_v3_ktext[4][16], bb_v3_pname[24], bb_v3_title[48], bb_v3_sub[48];
-static char bb_v3_items[BB_UI_LIST][40], bb_v3_secs[BB_UI_SECTIONS][24], bb_v3_now[48], bb_v3_sec[24];
+static char bb_v3_items[5][40], bb_v3_secs[BB_UI_SECTIONS][24], bb_v3_now[48], bb_v3_sec[24];   /* RAM: 2.0's addresses */
+/* RC2: the chooser's rows 6-10 and footer, in the pool (RAM keeps every 2.0 address: timing identity) */
+static struct {                             /* one object: no new merged global (the RAM groups keep their names) */
+    char items2[BB_UI_LIST - 5][40], foot[64];
+    char secs2[16 - BB_UI_SECTIONS][24];    /* PERFORM's section names 12-16 (1-11: bb_v3_secs, RAM) */
+    uint16_t first[2];                      /* the list window: KIT, PATTERN */
+} bb_v3_rc2 __attribute__((section(".pool")));
+#define bb_v3_items2 bb_v3_rc2.items2
+#define bb_v3_foot bb_v3_rc2.foot
+#define bb_v3_first bb_v3_rc2.first
+static inline __attribute__((always_inline)) char *bb_v3_sec_name(unsigned k)
+{ return k < BB_UI_SECTIONS ? bb_v3_secs[k] : bb_v3_rc2.secs2[k - BB_UI_SECTIONS]; }
+static inline __attribute__((always_inline)) char *bb_v3_item(unsigned i) { return i < 5u ? bb_v3_items[i] : bb_v3_items2[i - 5u]; }
+/* the list window that keeps the cursor in view (scrolls a row at a time) */
+static unsigned bb_v3_window(unsigned which, unsigned cur, unsigned count)
+{
+    unsigned f = bb_v3_first[which];
+    if (cur < f) f = cur;
+    else if (cur >= f + BB_UI_LIST) f = cur + 1u - BB_UI_LIST;
+    if (count > BB_UI_LIST && f > count - BB_UI_LIST) f = count - BB_UI_LIST;
+    if (count <= BB_UI_LIST) f = 0;
+    bb_v3_first[which] = (uint16_t)f;
+    return f;
+}
+/* "SONGS 3 of 71 \xB7 " + tail */
+static void bb_v3_footer(const char *what, unsigned n, unsigned count, const char *tail)
+{
+    char *o = bb_v3_foot; unsigned k = 0, d;
+    while (*what && k < 20u) o[k++] = *what++;
+    o[k++] = ' ';
+    for (d = 100u; d; d /= 10u) if (n / d || d == 1u) o[k++] = (char)('0' + n / d % 10u);
+    o[k++] = '/';
+    for (d = 100u; d; d /= 10u) if (count / d || d == 1u) o[k++] = (char)('0' + count / d % 10u);
+    if (tail) { o[k++] = ' '; o[k++] = '\xB7'; o[k++] = ' '; while (*tail && k + 1u < sizeof bb_v3_foot) o[k++] = *tail++; }
+    o[k] = 0;
+}
 static char bb_v3_nextname[24];
 /* 2.0 D4: the key legend (bb_nav_legend; 61 characters at most) and what shows it, in the pool, not ordinary RAM */
 static char bb_v3_legend[64] __attribute__((section(".pool")));
@@ -94,31 +129,159 @@ static uint8_t bb_v3_page(void)
     return bb_v3_route(&bb_nav, ui.uboot || bb_diag_page);
 }
 
+/* 2.1 P1: HELP rows from bb_nav_help (navigation's role tables): one page of them, as text the v3 module draws. A
+ * key run reads "1-11" / "B1-4"; K1-K4 carry their labels; the control pressed while HOME is held is picked. REC held
+ * alone shows the REC rows and turns its pages by itself (REC help is not modal: OCT would be a chord). */
+/* In .bss, padded to the 464 bytes bb_v3_in had there in 2.0 (bb_v3_in moved to the pool): RAM data keeps every 2.0
+ * address, including CPU1's stack and trace (timing identity), at no RAM cost against 2.0. */
+static union {
+    struct {
+        bb_nav_help_row nav[BB_UI_HELP_ROWS];
+        bb_ui_help_row row[BB_UI_HELP_ROWS];
+        char keys[BB_UI_HELP_ROWS][8];
+        char knobs[40], note[48];
+    } h;
+    uint32_t slot[116];
+} bb_v3_help_slot;
+#define bb_v3_help bb_v3_help_slot.h
+_Static_assert(sizeof(bb_v3_help_slot) == 464, "the 2.0 bb_v3_in slot");
+static const uint8_t bb_v3_kc_button[BB_NAV_BUTTONS] = {
+    KC_FX, KC_SCL, KC_ENV, KC_LFO, KC_EDIT, KC_GLO, KC_HOME, KC_SAVE, KC_ARP, KC_SEQ, KC_PLAY, KC_REC, KC_OCTDN, KC_OCTUP
+};
+static const uint8_t bb_v3_kc_enc[3] = {KC_SELECT, KC_ALGO, KC_PRESETS};
+static void bb_v3_keyname(char *o, unsigned a, unsigned b)   /* "1-11", "B1-4", "B6" */
+{
+    unsigned n = 0, base = a < 16u ? 0u : 16u;
+    if (base) o[n++] = 'B';
+    n += nav_leg_num(o + n, a - base + 1u);
+    if (b > a) { o[n++] = '-'; n += nav_leg_num(o + n, b - base + 1u); }
+    o[n] = 0;
+}
+static void bb_v3_cat2(char *o, unsigned cap, const char *a, const char *b)
+{
+    unsigned n = 0;
+    while (a && *a && n + 1u < cap) o[n++] = *a++;
+    while (b && *b && n + 1u < cap) o[n++] = *b++;
+    o[n] = 0;
+}
+static void bb_v3_help_fill(bb_ui_in *in)
+{
+    const int rec = !bb_nav.help && bb_nav.rec_help;
+    unsigned total, page = bb_nav.help_page, i, k;
+    int found = -1;
+    total = bb_nav_help(&bb_nav, &bb_nav_f, rec, 0, 0, 0, bb_nav.explain, &found);
+    in->help_pages = (uint8_t)((total + BB_UI_HELP_ROWS - 1u) / BB_UI_HELP_ROWS);
+    if (rec && in->help_pages > 1u)                              /* REC help: a page every 2.5 s */
+        page = (fm1_ms - bb_nav.rec_since) / 2500u % in->help_pages;
+    if (page >= in->help_pages) page = 0;
+    in->help_page = (uint8_t)page;
+    (void)bb_nav_help(&bb_nav, &bb_nav_f, rec, bb_v3_help.nav, page * BB_UI_HELP_ROWS, BB_UI_HELP_ROWS, 0, 0);
+    k = total - page * BB_UI_HELP_ROWS;                          /* rows on this page (the call returns the total) */
+    in->help_rows = (uint8_t)(k > BB_UI_HELP_ROWS ? BB_UI_HELP_ROWS : k);
+    {   /* K1-K4's labels, once */
+        uint8_t roles[4]; const char *lab[4]; unsigned n = 0;
+        bb_nav_knobs(&bb_nav, roles, lab);
+        for (k = 0; k < 4u; k++) if (lab[k][0]) {
+            if (n && n + 2u < sizeof bb_v3_help.knobs) bb_v3_help.knobs[n++] = ' ';
+            for (const char *c = lab[k]; *c && n + 1u < sizeof bb_v3_help.knobs; c++) bb_v3_help.knobs[n++] = *c;
+        }
+        bb_v3_help.knobs[n] = 0;
+    }
+    for (i = 0; i < in->help_rows; i++) {
+        const bb_nav_help_row *r = &bb_v3_help.nav[i];
+        bb_ui_help_row *u = &bb_v3_help.row[i];
+        u->kc = u->kc2 = BB_UI_NO; u->rec = r->rec; u->keys = 0;
+        u->text = bb_nav_help_text(r->text);
+        const char *welcome=bb_cd.welcome?bb_nav_welcome_help(r->kind,r->a,rec):0;
+        if(welcome)u->text=welcome;
+        switch (r->kind) {
+        case BB_NAV_HR_KEYS: bb_v3_keyname(bb_v3_help.keys[i], r->a, r->b); u->keys = bb_v3_help.keys[i]; break;
+        case BB_NAV_HR_HELD_K4: u->kc = KC_HOLD; u->kc2 = KC_K4; break;
+        case BB_NAV_HR_BUTTON:
+            u->kc = r->a < BB_NAV_BUTTONS ? bb_v3_kc_button[r->a] : BB_UI_NO;
+            if (r->a == BB_NAV_B_OCTDN) u->kc = KC_OCTPM;
+            if (r->a == BB_NAV_B_REC) u->rec = 0;
+            break;
+        case BB_NAV_HR_KNOBS: u->kc = KC_K14; u->keys = bb_v3_help.knobs; break;
+        default: u->kc = r->a < 3u ? bb_v3_kc_enc[r->a] : BB_UI_NO; break;
+        }
+    }
+    in->help_row = bb_v3_help.row;
+    in->help_sel = BB_UI_NO;
+    in->help_note = 0;
+    in->help_word = bb_nav_help_word(&bb_nav);                  /* RC1: SONGS / PATCH / BUILD / SAVE AS */
+    if (bb_nav.explain) {                                         /* the control pressed while HOME is held */
+        const uint8_t ex = bb_nav.explain;
+        const char *what = "", *says = "";
+        char name[8];
+        name[0] = 0;
+        if (found >= 0 && (unsigned)found / BB_UI_HELP_ROWS == page) in->help_sel = (uint8_t)((unsigned)found % BB_UI_HELP_ROWS);
+        if (ex & BB_NAV_EX_ENCODER) {
+            unsigned e = ex & 7u;
+            static const char *const enc[BB_NAV_ENCODERS] = {"SELECT", "ALGO", "PRESETS", "K1", "K2", "K3", "K4"};
+            uint8_t roles[4]; const char *lab[4];
+            what = enc[e < BB_NAV_ENCODERS ? e : 0];
+            if (e >= BB_NAV_E_K1) { bb_nav_knobs(&bb_nav, roles, lab); says = lab[e - BB_NAV_E_K1]; }
+        } else if (ex & BB_NAV_EX_BUTTON) {
+            static const char *const btn[BB_NAV_BUTTONS] = {"FX", "SCL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP",
+                                                            "SEQ", "PLAY", "REC", "OCT-", "OCT+"};
+            uint8_t b = ex & 15u;
+            what = b < BB_NAV_BUTTONS ? btn[b] : "";
+            says = bb_nav_help_text(bb_nav_button_help(bb_nav_button_role(&bb_nav, &bb_nav_f, b, 0)));
+        } else if (ex & BB_NAV_EX_KEY) {
+            uint8_t key = ex & 31u, a, role = bb_nav_key_role(&bb_nav, key, 0, &a);
+            bb_v3_keyname(name, key, key); what = name;
+            if (bb_nav_key_led(&bb_nav, &bb_nav_f, key, 0) != BB_NAV_LED_DARK) says = bb_nav_help_text(bb_nav_key_help(role, a));
+        }
+        if(bb_cd.welcome) {
+            uint8_t kind=ex&BB_NAV_EX_ENCODER?BB_NAV_HR_ENCODER:ex&BB_NAV_EX_BUTTON?BB_NAV_HR_BUTTON:BB_NAV_HR_KEYS;
+            uint8_t control=ex&(ex&BB_NAV_EX_ENCODER?7u:ex&BB_NAV_EX_BUTTON?15u:31u);
+            const char *welcome=bb_nav_welcome_help(kind,control,rec);
+            if(welcome)says=welcome;
+        }
+        if (!says || !says[0]) says = "nothing here";
+        bb_v3_cat2(bb_v3_help.note, sizeof bb_v3_help.note, what, ": ");
+        k = (unsigned)str_len(bb_v3_help.note);
+        bb_v3_cat2(bb_v3_help.note + k, sizeof bb_v3_help.note - k, says, 0);
+        in->help_note = bb_v3_help.note;
+    }
+}
+/* 2.1 P1: tabs on screen, from bb_nav (FX: its five tabs on white 1-5; EVOLVE: the three modes, LFO steps them) */
+static const char *bb_v3_tabs[5] __attribute__((section(".pool")));
+static void bb_v3_tabs_fill(bb_ui_in *in)
+{
+    unsigned i;
+    if (bb_nav.page == BB_NAV_FX) {
+        bb_nav_state t = bb_nav;
+        for (i = 0; i < 5u; i++) { t.bank = (uint8_t)i; bb_v3_tabs[i] = bb_nav_bank_name(&t); }
+        in->tab = bb_v3_tabs; in->tabs = 5; in->tab_cur = bb_nav.bank;
+        in->tab_note = bb_nav.bank == 1u ? "ECHO ONLY \xB7 DRY DRIVE: SOUND" : 0;
+    } else if (bb_nav.page == BB_NAV_EVOLVE) {
+        for (i = 0; i < BB_NAV_MODES; i++) bb_v3_tabs[i] = bb_nav_mode_name((uint8_t)i);
+        in->tab = bb_v3_tabs; in->tabs = BB_NAV_MODES; in->tab_cur = bb_nav_f.gen_mode;
+        in->tab_note = "LFO OR B3";
+    }
+}
+
 /* the part every page shares: status, knobs (labels and values from navigation v2.1), key LEDs */
 static void bb_v3_common(bb_ui_in *in, uint8_t page)
 {
-    unsigned k, n = 0;
-    const char *b = bb_nav_bank_name(&bb_nav);
-    /* N1: name the opening control unless a bank name needs the room ("FX  ECHO", "SOUND  COLOUR"). */
-    const char *s = b && b[0] ? bb_nav_page_name(&bb_nav) : bb_nav_page_label(&bb_nav);
+    unsigned k;
+    /* N1: name the opening control unless a bank name needs the room ("FX  ECHO", "SOUND  COLOUR"); bb_nav composes
+     * it (the capture gate draws the same text) and the status bar fits it beside the instrument (bb_ui.c). */
+    (void)bb_nav_status_name(&bb_nav, bb_v3_pname, sizeof bb_v3_pname);
     in->now_ms = fm1_ms;
     in->page = page;
     in->instr = bb_nav_row < 2u ? bb_nav_row : (uint8_t)BB_UI_INST_DILLO;
     in->instr_name = bb_nav_row == 0u ? "KIT A" : bb_nav_row == 1u ? "KIT B" :
                      bb_nav_synth() ? "LEAD" : BB_WITH_TELEGRAM ? "BASS" : "DILLO";
-    while (*s && n + 1u < sizeof bb_v3_pname) bb_v3_pname[n++] = *s++;
-    if (b && b[0] && n + 3u < sizeof bb_v3_pname) {
-        bb_v3_pname[n++] = ' '; bb_v3_pname[n++] = ' ';
-        while (*b && n + 1u < sizeof bb_v3_pname) bb_v3_pname[n++] = *b++;
-    }
-    bb_v3_pname[n] = 0;
     in->page_name = bb_v3_pname;
     in->running = bb_face.requested.running;
     in->ticks = bb_ticks;
     in->beat = (uint8_t)(bb_ticks ? (bb_ticks - 1u) / 4u % 4u : 0u);
     in->bpm_x10 = (uint16_t)(bb_face.requested.bpm * 10u);
     in->accent = bb_face.accent;
-    in->queued = bb_nav_f.queued;                             /* BB_NAV_Q_* = BB_UI_Q_* */
+    in->queued = bb_nav_f20.b[offsetof(bb_nav_facts, queued)];   /* BB_NAV_Q_* = BB_UI_Q_* (the 2.0 facts copy) */
     {
         uint32_t pk = bb_visual_peak / 64u;
         in->level = (uint8_t)(pk > 255u ? 255u : pk);
@@ -126,6 +289,8 @@ static void bb_v3_common(bb_ui_in *in, uint8_t page)
     in->fault = (uint8_t)!!bb_sound_pick_audio_failed();
     in->fault_text = "Audio fault: load blocked";
     in->help = (uint8_t)!!bb_help_visible;
+    if (in->help) bb_v3_help_fill(in);
+    bb_v3_tabs_fill(in);
     /* the firmware's current message (bb_say: BUSY, REFUSED, CANCELLED BY STOP, TIMED OUT ...) */
     in->notice = bb_hint_until && bb_hint && bb_hint[0] && (int32_t)(fm1_ms - bb_hint_until) < 0 ? bb_hint : 0;
     in->events = 0;
@@ -160,35 +325,24 @@ static void bb_v3_common(bb_ui_in *in, uint8_t page)
     in->legend = bb_v3_legend;
 }
 
-/* KIT: the picker's list, the highlighted kit / sound as the title, the loaded one marked */
+/* KIT: the picker's list (RC2: ten rows, scrolling; white keys 1-16 pick a drum kit; Dillo's keys stay notes), the
+ * loaded one marked, the footer: what, which of how many, what the controls do (or why it cannot load) */
 static void bb_v3_kit(bb_ui_in *in)
 {
     bb_sound_picker_view view;
-    unsigned count = bb_sound_picker_items(&bb_sound_pick), first = (bb_sound_pick.cursor / BB_UI_LIST) * BB_UI_LIST, i;
+    unsigned count = bb_sound_picker_items(&bb_sound_pick), first = bb_v3_window(0, bb_sound_pick.cursor, count), i;
+    unsigned drum = bb_sound_pick.page == BB_DRUMS;
     int valid = !in->fault && bb_sound_picker_observe(&bb_sound_pick, &bb_sound, &view);
-    bb_v3_copy(bb_v3_title, sizeof bb_v3_title, bb_sound_picker_item_name(&bb_sound_pick, bb_sound_pick.cursor));
-    in->title = bb_v3_title;
-    {
-        const char *loaded = valid && view.active_index >= 0 ?
-            bb_sound_picker_item_name(&bb_sound_pick, (unsigned)view.active_index) : 0;
-        unsigned n = 0;
-        const char *p = !valid ? BB_TX(TX_STATE_UNAVAILABLE) : !view.enabled ? "LAYER OFF" : view.muted ? "MUTED" :
-                        bb_sound_pick.page == BB_DRUMS ? "LOADED " : "SOUND ";
-        while (*p && n + 1u < sizeof bb_v3_sub) bb_v3_sub[n++] = *p++;
-        if (valid && view.enabled && !view.muted) {
-            p = loaded ? loaded : "CUSTOM";
-            while (*p && n + 1u < sizeof bb_v3_sub) bb_v3_sub[n++] = *p++;
-            if (view.edited) { p = " (EDITED)"; while (*p && n + 1u < sizeof bb_v3_sub) bb_v3_sub[n++] = *p++; }
-        }
-        bb_v3_sub[n] = 0;
-    }
-    in->subtitle = bb_v3_sub;
-    /* N2/N3: the highlighted kit is not the loaded one, so EDIT will load or queue it. */
+    const char *tail = !valid ? BB_TX(TX_STATE_UNAVAILABLE) : !view.enabled ? "LAYER OFF" : view.muted ? "MUTED" :
+                       bb_sound_pick.pending ? "LOADING" : drum ? "keys 1-16 \xB7 EDIT choose" : "PRESETS \xB7 EDIT keep";
+    bb_v3_footer(drum ? "KITS" : "SOUNDS", bb_sound_pick.cursor + 1u, count, tail);
+    in->footer = bb_v3_foot;
     in->browser_state = valid && view.active_index != (int)bb_sound_pick.cursor ? BB_UI_BROWSER_BROWSE : BB_UI_BROWSER_NONE;
     in->items = 0;
     for (i = 0; i < BB_UI_LIST && first + i < count; i++) {
-        bb_v3_copy(bb_v3_items[i], sizeof bb_v3_items[i], bb_sound_picker_item_name(&bb_sound_pick, first + i));
-        in->item[i] = bb_v3_items[i];
+        bb_v3_copy(bb_v3_item(i), 40, bb_sound_picker_item_name(&bb_sound_pick, first + i));
+        in->item[i] = bb_v3_item(i);
+        in->item_key[i] = (uint8_t)(drum && first + i < 16u ? first + i + 1u : 0u);
         in->items++;
     }
     in->cursor = (uint8_t)(bb_sound_pick.cursor - first);
@@ -224,18 +378,17 @@ static BB_UK_SMALL int bb_uk_v3_kit(bb_ui_in *in)
     in->playing_item = (uint8_t)(bb_uk.origin < BB_UK_SLOTS ? bb_uk.origin : BB_UI_NO);
     in->queued_item = (uint8_t)BB_UI_NO;
     if (build) {
-        in->title = bb_uk_name();
-        in->subtitle = bb_uk.miss ? BB_TX(TX_KIT_NOT_INSTALLED_808_STANDS_IN) : bb_uk.edits ? BB_TX(TX_EDITED_EDIT_SAVE_AS) : BB_TX(TX_EDIT_SAVE_AS);
-        count = BB_UK_VOICES; cur = bb_uk.lane; first = cur < 2u ? 0u : cur > 14u ? 12u : cur - 2u;
+        in->footer = bb_uk.miss ? BB_TX(TX_KIT_NOT_INSTALLED_808_STANDS_IN) : bb_uk.edits ? BB_TX(TX_EDITED_EDIT_SAVE_AS) : BB_TX(TX_EDIT_SAVE_AS);
+        count = BB_UK_VOICES; cur = bb_uk.lane; first = bb_v3_window(0, cur, count);
         in->playing_item = (uint8_t)BB_UI_NO;
     } else {
-        in->title = "SAVE AS";
-        in->subtitle = BB_TX(TX_KEYS_1_4_SLOT_EDIT_STORE_STOPPED);
+        in->footer = BB_TX(TX_KEYS_1_4_SLOT_EDIT_STORE_STOPPED);
     }
     for (i = 0; i < BB_UI_LIST && first + i < count; i++) {
-        if (build) bb_uk_v3_lane(bb_v3_items[i], first + i);
-        else bb_v3_copy(bb_v3_items[i], sizeof bb_v3_items[i], bb_sound_picker_user_name(first + i));
-        in->item[i] = bb_v3_items[i];
+        if (build) bb_uk_v3_lane(bb_v3_item(i), first + i);
+        else bb_v3_copy(bb_v3_item(i), 40, bb_sound_picker_user_name(first + i));
+        in->item[i] = bb_v3_item(i);
+        in->item_key[i] = (uint8_t)(build ? 0u : i + 1u);
     }
     in->items = (uint8_t)i;
     in->cursor = (uint8_t)(cur - first);
@@ -280,52 +433,56 @@ static const char *bb_v3_substitutions(const void *p) { (void)p; return 0; }
 
 #if BB_WITH_BROWSER
 /* PATTERN: the browser's bank page as the list, the highlighted pattern as the title, its sections */
+static void bb_v3_pattern_of(bb_ui_in *in, const bb_player *p);
 static void bb_v3_pattern(bb_ui_in *in)
 {
-    bb_player *p = bb_library_current();
-    bb_factory_choice choice;
-    unsigned first, k, n = 0, count = (unsigned)bb_browser_part_count(&p->view), pend = bb_player_pending(p);
-    unsigned count_banks = (unsigned)bb_browser_bank_count(&p->view), cur;
-    in->title = in->subtitle = 0;
-    bb_v3_title[0] = bb_v3_sub[0] = 0;
-    if (bb_browser_current(&p->view, &choice)) {
-        bb_v3_bank_title(&choice, bb_v3_title, sizeof bb_v3_title);
-        /* A moved cursor is not a launch. Only the matching owner's request
-         * may say REQUESTED/QUEUED; a different queued choice stays marked in
-         * the list/status bar without mislabelling this highlighted title. */
-        int kit_intent = p->is_drum && p->target < BB_MACHINES && bb_kit_intent[p->target].valid;
-        int request_here = p->request.ticket && choice.group == p->request.choice.group &&
-                           choice.bank == p->request.choice.bank && choice.part == p->request.choice.part;
-        int playing_here = p->playing.ticket && choice.group == p->playing.choice.group &&
-                           choice.bank == p->playing.choice.bank && choice.part == p->playing.choice.part;
-        in->browser_state = pend && request_here ? (pend == 2u ? BB_UI_BROWSER_QUEUED : BB_UI_BROWSER_REQUESTED) :
-                            !kit_intent && playing_here ? (in->running ? BB_UI_BROWSER_PLAYING : BB_UI_BROWSER_LOADED) :
-                            BB_UI_BROWSER_BROWSE;
-        if (p->is_drum && p->target < BB_MACHINES && bb_kit_intent[p->target].valid) {
-            const char *g = "NEXT KIT: ";
-            const char *kit = bb_library_kit_name(bb_kit_intent[p->target].id);
-            while (*g && n + 1u < sizeof bb_v3_sub) bb_v3_sub[n++] = *g++;
-            while (*kit && n + 1u < sizeof bb_v3_sub) bb_v3_sub[n++] = *kit++;
-            bb_v3_sub[n] = 0;
-        } else {
-            const char *g = p->view.group == BB_BROWSER_ACID ? "ACID \xB7 " : p->view.group ? "SONG \xB7 " : "ERA \xB7 ";
-            while (*g) bb_v3_sub[n++] = *g++;
-            bb_v3_cat(bb_catalogue_find(&bb_factory_catalogue, choice.part, "name"), bb_v3_sub + n, sizeof bb_v3_sub - n);
+    if (bb_nav.page == BB_NAV_STUDIO) {                       /* 2.1 P3b HOME/SONGS: the conductor's list (RC2: views) */
+        static const char *const coll[3] = {"SONGS", "ERAS", "PRESETS"};
+        const bb_player *p = bb_cd_player(bb_cd_focus());
+        unsigned count = bb_cd_count(), cur = bb_cd_view(bb_cd.list.bank_index), first = bb_cd.welcome ? (cur ? cur - 1u : 0u) : bb_v3_window(1, cur, count), k;
+        bb_v3_footer(coll[bb_cd.coll % 3u], cur + 1u, count, "PLAY LOADS ALL 3");
+        in->footer = bb_v3_foot;
+        in->tab = coll; in->tabs = 3; in->tab_cur = bb_cd.coll;   /* the collections as tabs in the header (B5-B7) */
+        in->items = 0;
+        for (k = 0; k < (bb_cd.welcome ? 3u : BB_UI_LIST) && first + k < count; k++) {
+            bb_browser b = bb_cd.list; unsigned bank = bb_cd_bank(first + k);
+            b.bank_page = (uint16_t)(bank / BB_BROWSER_BANK_KEYS);
+            bb_v3_cat(bb_catalogue_find(&bb_factory_catalogue, bb_browser_bank_cell(&b, bank % BB_BROWSER_BANK_KEYS),
+                      bb_cd.list.group ? "song" : "name"), bb_v3_item(k), 40);
+            in->item[k] = bb_v3_item(k);
+            in->item_key[k] = (uint8_t)((first + k) / 16u == bb_cd.vpage ? (first + k) % 16u + 1u : 0u);
+            in->items++;
         }
-    }
-    {   /* the kit's voice substitutions for this pattern, appended so the change is never silent */
-        const char *sub = bb_v3_substitutions(p);
-        if (sub) {
-            unsigned m = 0; while (bb_v3_sub[m]) m++;
-            if (m + 3u < sizeof bb_v3_sub) { bb_v3_sub[m++] = ' '; bb_v3_sub[m++] = ' '; }
-            while (*sub && m + 1u < sizeof bb_v3_sub) bb_v3_sub[m++] = *sub++;
-            bb_v3_sub[m] = 0;
+        in->welcome = bb_cd.welcome;
+        if(in->welcome) {
+            in->page_name="CONDUCTOR";
+            in->sections=(uint8_t)bb_browser_part_count(&bb_cd.list);
         }
-    }
-    in->title = bb_v3_title;
-    in->subtitle = bb_v3_sub;
-    /* the list: five of the page's sixteen around the highlighted bank (keys 1-16 still select) */
-    first = p->view.bank_index - p->view.bank_index % BB_UI_LIST;
+        in->cursor = (uint8_t)(cur - first);
+        in->playing_item = in->queued_item = BB_UI_NO;
+        if (p->playing.ticket && bb_cd_in_view(bb_cd.coll, p->playing.choice.group, p->playing.choice.bank_index) &&
+            (k = bb_cd_view(p->playing.choice.bank_index) - first) < BB_UI_LIST) in->playing_item = (uint8_t)k;
+    } else
+        bb_v3_pattern_of(in, bb_library_current());
+}
+static void bb_v3_pattern_of(bb_ui_in *in, const bb_player *p)
+{
+    /* RC2: the whole list (ten rows, scrolling), the white key of each row on the 16-key page in view, the footer:
+     * which of how many, then what is waiting (NEXT KIT, a voice substitution, QUEUED) or what the controls do */
+    unsigned first, k, pend = bb_player_pending(p), count_banks = (unsigned)bb_browser_bank_count(&p->view);
+    const char *tail = "keys 1-16 \xB7 EDIT choose", *sub = bb_v3_substitutions(p);
+    unsigned n = 0;
+    if (p->is_drum && p->target < BB_MACHINES && bb_kit_intent[p->target].valid) {   /* never silent: the next kit */
+        const char *g = "NEXT KIT: ", *kit = bb_library_kit_name(bb_kit_intent[p->target].id);
+        while (*g && n + 1u < sizeof bb_v3_sub) bb_v3_sub[n++] = *g++;
+        while (*kit && n + 1u < sizeof bb_v3_sub) bb_v3_sub[n++] = *kit++;
+        bb_v3_sub[n] = 0; tail = bb_v3_sub;
+    } else if (sub) tail = sub;                                   /* the kit's voice substitution for this pattern */
+    else if (pend && p->request.choice.group == p->view.group) tail = pend == 2u ? "QUEUED \xB7 NEXT BAR" : "REQUESTED";
+    bb_v3_footer(p->view.group == BB_BROWSER_ACID ? "ACID" : p->view.group ? "SONGS" : "ERAS", p->view.bank_index + 1u,
+                 count_banks, tail);
+    in->footer = bb_v3_foot;
+    first = bb_v3_window(1, p->view.bank_index, count_banks);
     in->items = 0;
     for (k = 0; k < BB_UI_LIST; k++) {
         unsigned idx = first + k;
@@ -335,9 +492,9 @@ static void bb_v3_pattern(bb_ui_in *in)
         bank = idx < count_banks ? bb_browser_bank_cell(&page, idx % BB_BROWSER_BANK_KEYS) : BB_CATALOGUE_NONE;
         if (bank == BB_CATALOGUE_NONE)
             break;
-        bb_v3_cat(bb_catalogue_find(&bb_factory_catalogue, bank, p->view.group ? "song" : "name"), bb_v3_items[k],
-                  sizeof bb_v3_items[k]);
-        in->item[k] = bb_v3_items[k];
+        bb_v3_cat(bb_catalogue_find(&bb_factory_catalogue, bank, p->view.group ? "song" : "name"), bb_v3_item(k), 40);
+        in->item[k] = bb_v3_item(k);
+        in->item_key[k] = (uint8_t)(idx / BB_BROWSER_BANK_KEYS == p->view.bank_page ? idx % BB_BROWSER_BANK_KEYS + 1u : 0u);
         in->items++;
     }
     in->cursor = (uint8_t)(p->view.bank_index - first);
@@ -348,29 +505,6 @@ static void bb_v3_pattern(bb_ui_in *in)
                       p->request.choice.bank_index < first + BB_UI_LIST ?
                       (uint8_t)(p->request.choice.bank_index - first) : (uint8_t)BB_UI_NO;
     in->progress = (uint8_t)(bb_ticks ? ((bb_ticks - 1u) % 16u) * 16u : 0u);
-    /* the highlighted pattern's sections (up to eight from the section page in use) */
-    first = bb_nav_section_page(&bb_nav) * BB_NAV_SECTION_KEYS;
-    in->sections = 0;
-    if (bb_browser_current(&p->view, &choice)) {
-        bb_catalogue_id parts = bb_catalogue_find(&bb_factory_catalogue, choice.bank, "parts");
-        for (k = 0; k < BB_UI_SECTIONS && first + k < count; k++) {
-            bb_v3_cat(bb_catalogue_find(&bb_factory_catalogue, bb_catalogue_at(&bb_factory_catalogue, parts, first + k), "name"),
-                      bb_v3_secs[k], sizeof bb_v3_secs[k]);
-            in->sec_name[k] = bb_v3_secs[k];
-            in->sec_bars[k] = 1;
-            in->sections++;
-        }
-    }
-    cur = bb_nav_section_playing(p);                          /* the playing section; the cursor only when browsing */
-    if (cur == BB_NAV_NONE_IDX)
-        cur = p->view.part_index;
-    in->sec_cur = cur >= first && cur < first + in->sections ? (uint8_t)(cur - first) : (uint8_t)BB_UI_NO;
-    in->sec_next = (bb_nav_f.queued & BB_NAV_Q_SECTION) && bb_nav_f.section_queued != BB_NAV_NONE_IDX &&
-                   bb_nav_f.section_queued >= first && bb_nav_f.section_queued < first + in->sections ?
-                   (uint8_t)(bb_nav_f.section_queued - first) : (uint8_t)BB_UI_NO;
-    in->sec_pos = 0;
-    in->fill = bb_nav_f.fill_on;
-    in->fill_beats = 0;
 }
 #endif
 
@@ -455,7 +589,9 @@ static void bb_v3_play_drums(bb_ui_in *in)
     in->bars = (uint8_t)(length > 16u ? (length + 15u) / 16u : 0u);
     if (!in->bars)
         in->bar = 0;
+#if !BB_UI_PLAY                                              /* 2.2: PADS has no lanes, OUT or DSP */
     bb_v3_lanes(in, pos / 16u);
+#endif
     /* group levels and mutes as the K1-K4 route has them; live level: each group's hit at its
      * level, falling over ~120 ms (the firmware publishes no per-group peak; README §6) */
     if (bb_group_input(&bb_sound.commands, bb_sound.groups, machine, BB_GROUP_READ, 0, 0, &view) != BB_GROUP_REFUSED) {
@@ -472,6 +608,7 @@ static void bb_v3_play_drums(bb_ui_in *in)
         in->group_out[g] = (uint8_t)v;
     }
     bb_v3_step_seen = pos;
+#if !BB_UI_PLAY
     {
         uint32_t pk = bb_visual_peak / 128u * 2u;            /* one published peak: L = R (README §6) */
         in->out_peak[0] = in->out_peak[1] = (uint8_t)(pk > 255u ? 255u : pk);
@@ -489,6 +626,7 @@ static void bb_v3_play_drums(bb_ui_in *in)
 #else
     in->dsp = (uint8_t)(BB_METER_CPU_Q8 > 255u ? 255u : BB_METER_CPU_Q8);
 #endif
+#endif
 }
 
 /* The focused Dillo side's sound name (Duo: 0 BASS, 1 LEAD). */
@@ -505,12 +643,17 @@ static const char *bb_v3_patch_name(unsigned sy)
 static void bb_v3_play_dillo(bb_ui_in *in)
 {
     const unsigned sy = bb_nav_synth();
+#if !BB_UI_PLAY
     const bb_sequence *seq = &bb_face.requested.synths[sy];
     unsigned k, lo = 255, len = seq->length ? seq->length : 16u, lim0, lim1, v;
+#else
+    unsigned lim0, lim1, v;
+#endif
     in->patch = bb_v3_patch_name(sy);
     in->scale = bb_nav_scale_hint();
     if (!in->scale)
         in->scale = bb_patch_edited[sy] ? "EDITED" : "";
+#if !BB_UI_PLAY                                              /* 2.2: the sheet reads its bank (bb_ui_play_firmware.inc) */
     for (k = 0; k < 16u && k < len; k++)
         if (seq->notes[k].gate && seq->notes[k].note < lo)
             lo = seq->notes[k].note;
@@ -523,34 +666,33 @@ static void bb_v3_play_dillo(bb_ui_in *in)
         if (n->slide) in->note_slide |= (uint16_t)(1u << k);
     }
     in->step = (uint8_t)(bb_synth_playhead[sy] % 16u);
+#endif
     v = bb_synth_parameter_get(&bb_face.requested, sy, BB_PARAM_CUTOFF);
     if (bb_synth_parameter_limits(sy, BB_PARAM_CUTOFF, &lim0, &lim1) && lim1 > lim0)
         in->cutoff = (uint8_t)((v < lim0 ? 0u : v > lim1 ? lim1 - lim0 : v - lim0) * 255u / (lim1 - lim0));
     v = bb_synth_parameter_get(&bb_face.requested, sy, BB_PARAM_RESONANCE);
     if (bb_synth_parameter_limits(sy, BB_PARAM_RESONANCE, &lim0, &lim1) && lim1 > lim0)
         in->reso = (uint8_t)((v < lim0 ? 0u : v > lim1 ? lim1 - lim0 : v - lim0) * 255u / (lim1 - lim0));
+#if !BB_UI_PLAY
     in->octave = bb_nav.key_octave;
+#endif
 }
 
 static char bb_v3_home_pattern[3][48], bb_v3_home_next[3][48], bb_v3_home_section[3][24];
 static bb_catalogue_id bb_v3_home_bank[3], bb_v3_home_part[3], bb_v3_home_pending[3], bb_v3_home_pending_part[3];
 static uint8_t bb_v3_home_group[3], bb_v3_home_pending_group[3];
+/* RC2 PERFORM (HOME/CONDUCT, Joe 10:17-10:36): the focused part's song, each part's section and MUTED,
+ * the section buttons of the page in view (white keys 1-16) from the same facts that light those keys (bb_nav_f: playing,
+ * queued, how many), the conductor's state in words and the legend. The RAM buffers are 2.0's (timing identity). */
 static void bb_v3_home(bb_ui_in *in)
 {
-    unsigned r;
-    /* N7: no pattern loaded on any lane and stopped: show the first moves instead of the key legend. */
-    in->quick_start = (uint8_t)(!in->running && !bb_drum_library[0].playing.ticket && !bb_drum_library[1].playing.ticket &&
-                                !bb_library[0].playing.ticket);
+    unsigned r, k, f = bb_nav_row < 2u ? bb_nav_row : 2u, pg = bb_nav_section_page(&bb_nav);
+    const bb_factory_choice *ref = bb_cd_ref(f);
     for (r = 0; r < 3u; r++) {
         const unsigned sy = r < 2u ? 0u : bb_nav_synth();   /* lane 3: Dillo, the focused side */
         bb_player *p = r < 2u ? &bb_drum_library[r] : &bb_library[sy];
         bb_ui_lane *l = &in->lane[r];
-        bb_catalogue_id bank = p->playing.ticket ? p->playing.choice.bank : BB_CATALOGUE_NONE;
         bb_catalogue_id part = p->playing.ticket ? p->playing.choice.part : BB_CATALOGUE_NONE;
-        bb_catalogue_id pending = bb_player_pending(p) ? p->request.choice.bank : BB_CATALOGUE_NONE;
-        bb_catalogue_id pending_part = pending != BB_CATALOGUE_NONE ? p->request.choice.part : BB_CATALOGUE_NONE;
-        uint8_t group = bank != BB_CATALOGUE_NONE ? p->playing.choice.group : 0u;
-        uint8_t pending_group = pending != BB_CATALOGUE_NONE ? p->request.choice.group : 0u;
         if (bb_v3_home_part[r] != part || (part != BB_CATALOGUE_NONE && !bb_v3_home_section[r][0])) {
             if (part != BB_CATALOGUE_NONE)
                 bb_v3_cat(bb_catalogue_find(&bb_factory_catalogue, part, "name"),
@@ -560,36 +702,59 @@ static void bb_v3_home(bb_ui_in *in)
             bb_v3_home_part[r] = part;
         }
         l->name = bb_v3_home_section[r];
-        l->flags = (uint8_t)((r == bb_nav_row || (r == 2u && bb_nav_row == 3u) ? BB_UI_LN_FOCUS : 0u) |
-                            (r < 2u ? (!bb_face.requested.drums[r].enabled ? BB_UI_LN_OFF : 0u) |
-                                      (bb_face.requested.drums[r].muted ? BB_UI_LN_MUTED : 0u) :
+        l->part = r < 2u ? (p->playing.ticket ? bb_library_kit_name(p->playing.kit) : "NO KIT") : bb_v3_patch_name(sy);
+        l->flags = (uint8_t)((r == f ? BB_UI_LN_FOCUS : 0u) |
+                            (bb_cd.ticket && ((bb_cd.moved >> r) & 1u) ? BB_UI_LN_NEXT : 0u) |
+                            (r < 2u ? (bb_face.requested.drums[r].muted || !bb_face.requested.drums[r].enabled ? BB_UI_LN_MUTED : 0u) :
                                       (bb_face.requested.synths[sy].muted ? BB_UI_LN_MUTED : 0u)));
-        l->part = r < 2u ? bb_ui_kit_name(r) : bb_v3_patch_name(sy);
-        if (bb_v3_home_bank[r] != bank || bb_v3_home_group[r] != group || !bb_v3_home_pattern[r][0]) {
-            if (bank != BB_CATALOGUE_NONE)
-                bb_v3_bank_title(&p->playing.choice, bb_v3_home_pattern[r], sizeof bb_v3_home_pattern[r]);
-            else
-                bb_v3_copy(bb_v3_home_pattern[r], sizeof bb_v3_home_pattern[r], BB_TX(TX_CHOOSE_PATTERN));
-            bb_v3_home_bank[r] = bank;
-            bb_v3_home_group[r] = group;
-        }
-        if (bb_v3_home_pending[r] != pending || bb_v3_home_pending_part[r] != pending_part ||
-            bb_v3_home_pending_group[r] != pending_group) {
-            if (pending != BB_CATALOGUE_NONE) {
-                if (pending == bank)
-                    bb_v3_cat(bb_catalogue_find(&bb_factory_catalogue, pending_part, "name"),
-                              bb_v3_home_next[r], sizeof bb_v3_home_next[r]);
-                else
-                    bb_v3_bank_title(&p->request.choice, bb_v3_home_next[r], sizeof bb_v3_home_next[r]);
-            } else
-                bb_v3_home_next[r][0] = 0;
-            bb_v3_home_pending[r] = pending;
-            bb_v3_home_pending_part[r] = pending_part;
-            bb_v3_home_pending_group[r] = pending_group;
-        }
-        l->pattern = bb_v3_home_pattern[r];
-        l->next = bb_v3_home_next[r][0] ? bb_v3_home_next[r] : 0;
     }
+    /* the song: the focused part's (what it plays, or is about to) */
+    if (!ref) bb_v3_copy(bb_v3_home_pattern[0], sizeof bb_v3_home_pattern[0], BB_TX(TX_CHOOSE_PATTERN));
+    else if (bb_v3_home_bank[f] != ref->bank || bb_v3_home_group[f] != ref->group)   /* cached per focused part */
+        bb_v3_bank_title(ref, bb_v3_home_pattern[0], sizeof bb_v3_home_pattern[0]);
+    for (k = 0; k < 3u; k++) bb_v3_home_bank[k] = BB_CATALOGUE_NONE;                  /* (one title buffer) */
+    bb_v3_home_bank[f] = ref ? ref->bank : BB_CATALOGUE_NONE; bb_v3_home_group[f] = ref ? ref->group : 0u;
+    /* Make SELECT visibly change PERFORM: the selected machine or Dillo patch
+     * leads the song title, rather than leaving the same section grid as the
+     * only large text on all three players. */
+    {
+        char *o = bb_v3_home_pattern[1]; unsigned n = 0;
+        const char *w = in->lane[f].part && in->lane[f].part[0] ? in->lane[f].part : (f < 2u ? "DRUM KIT" : "DILLO");
+        while (*w && n + 1u < sizeof bb_v3_home_pattern[1]) o[n++] = *w++;
+        w = " / "; while (*w && n + 1u < sizeof bb_v3_home_pattern[1]) o[n++] = *w++;
+        w = bb_v3_home_pattern[0]; while (*w && n + 1u < sizeof bb_v3_home_pattern[1]) o[n++] = *w++;
+        o[n] = 0;
+        in->perf_song = o;
+    }
+    /* the buttons: white keys 1-16 on the section page in view (names read once per song and page: the pending keys
+     * are the cache's) */
+    in->tile_page = (uint8_t)pg;
+    {
+        bb_catalogue_id bank = ref ? ref->bank : BB_CATALOGUE_NONE;
+        if (bb_v3_home_pending[f] != bank || bb_v3_home_pending_part[f] != (bb_catalogue_id)pg ||
+            bb_v3_home_pending_group[f] != (uint8_t)(ref ? ref->group : 0u)) {
+            bb_catalogue_id parts = ref ? bb_catalogue_find(&bb_factory_catalogue, ref->bank, "parts") : BB_CATALOGUE_NONE;
+            for (k = 0; k < 16u; k++)
+                bb_v3_cat(parts == BB_CATALOGUE_NONE ? BB_CATALOGUE_NONE : bb_catalogue_find(&bb_factory_catalogue,
+                          bb_catalogue_at(&bb_factory_catalogue, parts, pg * 16u + k), "name"), bb_v3_sec_name(k), 24);
+            for (k = 0; k < 3u; k++) bb_v3_home_pending[k] = BB_CATALOGUE_NONE;     /* (one name buffer) */
+            bb_v3_home_pending[f] = bank; bb_v3_home_pending_part[f] = (bb_catalogue_id)pg;
+            bb_v3_home_pending_group[f] = (uint8_t)(ref ? ref->group : 0u);
+        }
+    }
+    for (k = 0; k < 16u; k++) {
+        unsigned s = pg * 16u + k;
+        in->tile[k] = 0; in->tile_state[k] = BB_UI_TILE_NONE;
+        if (!ref || s >= bb_nav_f.section_count || !bb_v3_sec_name(k)[0]) continue;
+        in->tile[k] = bb_v3_sec_name(k);
+        in->tile_state[k] = s == bb_nav_f.section || ((bb_nav_f.sec_lit >> s) & 1u) ? BB_UI_TILE_PLAYING :   /* RC3: combinations */
+                            (bb_nav_f.queued & BB_NAV_Q_SECTION) && (s == bb_nav_f.section_queued || ((bb_nav_f.sec_queued >> s) & 1u)) ?
+                            BB_UI_TILE_QUEUED : BB_UI_TILE_HALF;
+    }
+    /* the conductor in words, from these buttons and lanes (RC2 r2: one source, so it names what is lit) */
+    bb_ui_perform_status(&bb_v3_home_next[0][0], sizeof bb_v3_home_next, in);
+    in->perf_status = &bb_v3_home_next[0][0];
+    in->footer = "ARP PLAY \xB7 SEQ STEPS \xB7 EDIT SONGS";
 }
 
 /* STEPS (drums): every lane x 16 steps of the shown bank, the selected voice big. Rich phrases
@@ -653,6 +818,7 @@ static unsigned bb_v3_fx_scaled(unsigned p)
     bb_fx_parameter_limits(p, &lo, &hi);
     return hi > lo ? (v < lo ? 0u : v > hi ? 255u : (v - lo) * 255u / (hi - lo)) : 0u;
 }
+#if !BB_UI_PLAY
 static void bb_v3_fx(bb_ui_in *in)
 {
     in->echo_ms = (uint16_t)bb_fx_parameter_get(&bb_face.requested, BB_FX_ECHO_MS);
@@ -662,6 +828,9 @@ static void bb_v3_fx(bb_ui_in *in)
     in->bank_fx = bb_nav.bank;
 }
 #endif
+#endif
+
+#include "bb_ui_play_firmware.inc"          /* 2.2 playability: PADS, STEPS, Dillo KEYS / STEPS, FX */
 
 /* SOUND, SAVE, EVOLVE, GLOBAL, SPRING, SENDS: what is being set as the title, what EDIT does as the
  * grey line, the four values as meters over their own knobs (labels and values: navigation v2.1) */
@@ -689,7 +858,7 @@ static void bb_v3_knobs(bb_ui_in *in)
         break;
     }
 #endif
-    case BB_NAV_EVOLVE: t = bb_nav_row == 0u ? BB_TX(TX_EVOLVE_DRUM_A) : bb_nav_row == 1u ? BB_TX(TX_EVOLVE_DRUM_B) : BB_TX(TX_EVOLVE_DILLO);
+    case BB_NAV_EVOLVE: t = bb_nav_mode_name(bb_nav_f.gen_mode);   /* 2.1 P1: the mode is the title; EDIT: CAPTURE / APPLY */
 #if BB_WITH_EVOLVE && BB_WITH_RICH_DRUM_RENDER
         /* 2.0 D4: EUCLID / RANDOM (black 3) turn the generator's own values (bb_gen_knob), not EVOLVE's: name and
          * show those, so the knob bar and the turned-knob pop-up say what the knob really changes */
@@ -701,7 +870,6 @@ static void bb_v3_knobs(bb_ui_in *in)
             if (e) { v[0] = bb_gen_state.hits; v[1] = bb_gen_state.steps; v[2] = bb_gen_state.rotation; v[3] = bb_gen_state.accents; }
             else { v[0] = bb_gen_state.density; v[1] = bb_gen_state.accent; v[3] = bb_gen_state.seed;
                    v[2] = bb_face.requested.page == BB_DRUMS ? bb_gen_state.anchor : bb_gen_state.slide; }
-            t = e ? "EUCLID" : "RANDOM";
             for (k = 0; k < 4u; k++) {
                 bb_ui_knob *kn = &in->knob[k];
                 kn->label = e ? eu[k] : k == 2u && bb_face.requested.page != BB_DRUMS ? "SLIDE" : ra[k];
@@ -714,11 +882,12 @@ static void bb_v3_knobs(bb_ui_in *in)
 #endif
         break;
     case BB_NAV_GLOBAL: t = "GLOBAL"; break;
-    default: t = bb_nav_bank_name(&bb_nav); break;                  /* FX: SPRING / SENDS */
+    default: t = 0; break;                                        /* FX SPRING / SENDS: 2.1 P1: the tabs name them */
     }
     if (!n) bb_v3_copy(bb_v3_title, sizeof bb_v3_title, t ? t : "");
-    in->title = bb_v3_title;
-    bb_v3_copy(bb_v3_sub, sizeof bb_v3_sub, edit && edit[0] ? edit : "");
+    in->title = bb_v3_title[0] ? bb_v3_title : 0;
+    if (bb_nav.page == BB_NAV_EVOLVE && edit && edit[0]) bb_v3_cat2(bb_v3_sub, sizeof bb_v3_sub, "EDIT: ", edit);
+    else bb_v3_copy(bb_v3_sub, sizeof bb_v3_sub, edit && edit[0] ? edit : "");
     in->subtitle = bb_v3_sub[0] ? bb_v3_sub : 0;
 }
 
@@ -778,22 +947,23 @@ static int bb_v3_draw(void)
         if (bb_sound_pick_visible() && bb_uk_v3_kit(in)) break;
 #endif
         if (bb_sound_pick_visible()) bb_v3_kit(in);
-        else { bb_v3_copy(bb_v3_title, sizeof bb_v3_title, BB_TX(TX_SOUND_LIST_NOT_READY)); in->title = bb_v3_title; }
+        else in->footer = BB_TX(TX_SOUND_LIST_NOT_READY);
         break;
 #if BB_WITH_BROWSER
     case BB_UI_PATTERN:
-        if (bb_library_page && bb_library_current()->ready) bb_v3_pattern(in);
-        else { bb_v3_copy(bb_v3_title, sizeof bb_v3_title, BB_TX(TX_PATTERNS_NOT_READY)); in->title = bb_v3_title; }
+        if ((bb_library_page || bb_nav.page == BB_NAV_STUDIO) && bb_library_current()->ready) bb_v3_pattern(in);
+        else in->footer = BB_TX(TX_PATTERNS_NOT_READY);
         break;
 #endif
     case BB_UI_PLAY_DRUMS: bb_v3_play_drums(in); break;
     case BB_UI_STEPS: bb_v3_steps(in); break;
-#if BB_WITH_EFFECTS
+#if BB_WITH_EFFECTS && !BB_UI_PLAY
     case BB_UI_FX: bb_v3_fx(in); break;
 #endif
     case BB_UI_KNOBS: bb_v3_knobs(in); break;
     default: bb_v3_play_dillo(in); break;
     }
+    bb_pl_fill(in, page);                                     /* 2.2: the playing pages' own state */
     in->events |= bb_v3_legend_event(page);
     bb_v3_turns(in, page);
     bb_v3_last_ms = fm1_ms;

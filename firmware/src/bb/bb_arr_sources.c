@@ -223,7 +223,7 @@ int bb_arr_prepare_section(const bb_arrangement *a,const bb_arr_sources *s,uint3
     if(section->part[2].id){r=bb_arr_source_dillo(s,section->part[2],&out->dillo);if(r)return r;}
     else{memset(&out->dillo,0,sizeof out->dillo);out->dillo.length=16;}
     out->section=section->id;out->revision=section->revision;out->project_revision=a->revision;
-    out->at_tick=0;out->target_tick=0;out->restart=0;out->wait_ticks=0;out->duration_ticks=(uint32_t)section->duration*repeats;return BB_SOURCE_OK;
+    out->at_tick=0;out->keep=0;out->target_tick=0;out->restart=0;out->wait_ticks=0;out->duration_ticks=(uint32_t)section->duration*repeats;return BB_SOURCE_OK;
 }
 
 /* D2 immutable SONG edit, sharing the recorder's journal-first admission tail. */

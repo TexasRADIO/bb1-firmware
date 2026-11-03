@@ -138,7 +138,7 @@ int bb_project_owner_commit(void){
  }
  bb_project_loaded_edits=bb_sound.commands.project_edits;bb_project_has_file=1;
  bb_ticks=0;bb_visual_peak=0;memset(bb_playhead,0,sizeof bb_playhead);memset(bb_synth_playhead,0,sizeof bb_synth_playhead);
- bb_nav_row=0;bb_nav_force(BB_NAV_GLOBAL);bb_arr_page=1;bb_arr_source_page=0;bb_dirty=1;
+ bb_nav_row=0;bb_nav_force(BB_NAV_SONG);bb_arr_page=1;bb_arr_source_page=0;bb_dirty=1;   /* (the mirrors, as set) */
  bb_project_owner_release();bb_say(BB_TX(TX_PROJECT_LOADED_FRESH_UNDO));return 0;
 }
 #endif

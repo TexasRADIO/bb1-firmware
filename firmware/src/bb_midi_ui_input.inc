@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * GLOBAL > MIDI: main-loop producer. Four channel knobs or clock controls.
  * The existing transport/navigation retain HOME/PLAY; no audio-state writes. */
+/* 2.1 P1: MIDI CHANNELS and MIDI CLOCK are GLOBAL's banks in bb_nav (one page variable): bb_midi_page (1 channels,
+ * 2 clock) is a read-only mirror written by bb_nav_project() only */
 static uint8_t bb_midi_page,bb_midi_save_wait;
 static unsigned bb_midi_next_channel(const bb_midi_compat_settings *c,unsigned index,int delta){
  unsigned ch=index<2?c->drum_channel[index]:c->synth_channel[index-2];
@@ -39,23 +41,13 @@ static void bb_midi_ui_save(void){
  bb_midi_save_wait=1;settings_save();bb_say(BB_TX(TX_GLOBAL_SETTINGS_SAVE_QUEUED));
 #endif
 }
+/* 2.1 P1: the MIDI banks' keys, buttons and knobs are bb_nav roles (white 1 / 2 the banks, black 1 back, K1-K4,
+ * EDIT or SAVE: save, HOME and GLO: back); this keeps only the save's progress notice. Never intercepts input. */
 static int bb_midi_ui_input(uint32_t pressed,uint32_t notes){
+ (void)pressed;(void)notes;
 #if FELUCCA_FLASH
  if(bb_midi_save_wait&&!persist_pending){bb_midi_save_wait=0;bb_say("GLOBAL SETTINGS SAVED");}
  else if(bb_midi_save_wait&&persist_pending==2)bb_say(BB_TX(TX_GLOBAL_SAVE_RETRY_WAIT));
 #endif
- if(bb_nav.page!=BB_NAV_GLOBAL){bb_midi_page=0;return 0;}
- uint32_t keys=bb_nav_keys_logical(notes);
- if(!bb_midi_page){if(!(keys&1u))return 0;bb_midi_page=1;bb_dirty=1;}
- if(pressed&(1u<<panel.btn[B_HOME])){bb_midi_page=0;bb_dirty=1;return 1;}   /* HOME: one step back, to GLOBAL */
- if(pressed&(1u<<panel.btn[B_GLO])){bb_midi_page=0;bb_dirty=1;return 0;}
- if(keys&1u){bb_midi_page=1;bb_dirty=1;}
- if(keys&2u){bb_midi_page=2;bb_dirty=1;}
- if(keys&(1u<<16)){bb_midi_page=0;bb_dirty=1;return 1;}
- for(unsigned k=0;k<4;k++){int d=bb_read_encoder(EN_K1+k);if(d)bb_midi_ui_knob(k,d);}
- if(pressed&((1u<<panel.btn[B_EDIT])|(1u<<panel.btn[B_SAVE])))bb_midi_ui_save();
- if((pressed&(1u<<panel.btn[B_PLAY]))&&!bb_arr_transport())bb_send(BB_CMD_TRANSPORT,!bb_face.requested.running);
- /* Big encoders have no MIDI-page job; avoid a hidden instrument/kit edit. */
- (void)bb_read_encoder(EN_SELECT);(void)bb_read_encoder(EN_ALGO);(void)bb_read_encoder(EN_PRESET);
- return 1;
+ return 0;
 }

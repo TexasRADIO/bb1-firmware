@@ -11,6 +11,8 @@ typedef struct {
     bb_pattern_data dillo; /* absent Dillo resolves to an explicit all-rest part */
     uint32_t section, revision, project_revision;
     uint8_t at_tick; /* absolute target when1; rejects an already missed target */
+    uint8_t keep; /* HOLD mask, bit0 A, bit1 B, bit2 Dillo: that part keeps playing untouched; SONG=0;
+                   * refused with restart!=0 (a restart is a whole-transport Start) */
     uint32_t target_tick;
     uint8_t restart; /* single qualified section + existing Start side effects */
     uint32_t duration_ticks; /* 0=manual; otherwise exact bounded end after <=262144 ticks */
@@ -36,7 +38,7 @@ typedef struct {
     bb_phrase ratchet_expected; /* WRITING/QUEUED immutable payload, not status */
     uint8_t ratchet_restore_counts[sizeof(((bb_phrase *)0)->ratchets)];
     uint32_t ticket, due_tick, cancel_serial,next_duration,duration_ticks;
-    uint8_t end_armed,restart,restart_guard;
+    uint8_t end_armed,restart,restart_guard,keep;
     uint32_t generation[2], epoch[2], synth_applied;
     uint8_t rich_slot[2], synth_slot;
     volatile uint8_t phase;

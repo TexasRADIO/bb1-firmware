@@ -1,0 +1,665 @@
+<meta charset="utf-8">
+<title>Big Beat Studio BB1 · Browser player</title>
+<meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>
+/* Layout: one device body, screen and encoders on top, the button bank, then the 27-key keyboard; notes underneath. Single dark look: it is a black instrument. */
+:root {
+  --room: #121315;         /* page */
+  --body: #1d1f22;         /* device shell */
+  --body-edge: #2c2f33;
+  --cap: #34383d;          /* button caps */
+  --cap-down: #ffb547;
+  --ink: #e9e6df;          /* printed legends */
+  --ink-dim: #8e918f;
+  --amber: #ffb547;        /* Big Beat accent (matches the firmware's ember) */
+  --white-key: #e8e5dc;
+  --black-key: #16171a;
+  --display: "Archivo Narrow", "Arial Narrow", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { background: var(--room); color: var(--ink); }
+body { margin: 0; font-family: var(--display); padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 980px; min-width: 0; margin: 0 auto; display: grid; gap: 18px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 20px; }
+h1 { font-size: 1.6rem; letter-spacing: .02em; margin: 0; font-weight: 700; text-wrap: balance; }
+h1 span { color: var(--amber); }
+.build { font-family: var(--mono); font-size: .72rem; color: var(--ink-dim); }
+.device { background: var(--body); border: 1px solid var(--body-edge); border-radius: 18px; padding: 18px; display: grid; gap: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04); }
+.top { display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: start; }
+.screen-wrap { position: relative; background: #000; border-radius: 6px; padding: 8px; border: 1px solid #000; box-shadow: inset 0 0 0 2px #26292d; }
+canvas#screen { display: block; width: 360px; height: 360px; max-width: 100%; image-rendering: auto; }
+.power { position: static; min-height: 48px; padding: 12px 18px; display: grid; place-items: center; background: #34383d; border: 0; color: #fff; font: 700 1.05rem var(--display); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.power[hidden] { display: none; }
+.power small { display: block; font: 400 .72rem var(--mono); letter-spacing: 0; text-transform: none; color: #ddd; margin-top: 6px; }
+.power:focus-visible { outline: 2px solid var(--amber); outline-offset: -4px; }
+.controls { display: grid; gap: 16px; min-width: 0; }
+.encoders { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 10px; }
+.enc:nth-child(4) { grid-column: 1; }
+.enc { display: grid; justify-items: center; gap: 6px; user-select: none; touch-action: none; }
+.knob { width: 54px; height: 54px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #4a4f55, #24272b 70%); border: 1px solid #0c0d0e; position: relative; cursor: ns-resize; }
+.knob::after { content: ""; position: absolute; left: 50%; top: 5px; width: 3px; height: 14px; margin-left: -1.5px; background: var(--ink); border-radius: 2px; transform-origin: 50% 22px; transform: rotate(var(--a, 0deg)); }
+.knob:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+.enc label { font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); }
+.nudge { display: flex; gap: 4px; }
+.nudge button { width: 26px; height: 20px; border-radius: 4px; border: 1px solid #0c0d0e; background: var(--cap); color: var(--ink); font: 600 .8rem var(--mono); line-height: 1; cursor: pointer; padding: 0; }
+.buttons { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px 8px; }
+.btn { display: grid; justify-items: center; gap: 5px; }
+.btn button { width: 100%; max-width: 64px; height: 30px; border-radius: 6px; border: 1px solid #0c0d0e; background: var(--cap); color: var(--ink); font: 700 .74rem var(--display); letter-spacing: .08em; cursor: pointer; touch-action: none; box-shadow: 0 2px 0 #0c0d0e; }
+.btn button.down { background: var(--cap-down); color: #1b1408; transform: translateY(1px); box-shadow: 0 1px 0 #0c0d0e; }
+.btn button.latched { outline: 2px dashed var(--amber); outline-offset: 2px; }
+.btn button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.btn kbd { font: 400 .62rem var(--mono); color: var(--ink-dim); }
+.keyboard { position: relative; height: 150px; touch-action: none; user-select: none; overflow-x: auto; }
+.keys { position: relative; height: 100%; min-width: 560px; }
+.wk, .bk { position: absolute; top: 0; border: 1px solid #0c0d0e; cursor: pointer; }
+.wk { background: var(--white-key); height: 100%; border-radius: 0 0 6px 6px; }
+.bk { background: var(--black-key); height: 60%; border-radius: 0 0 4px 4px; z-index: 2; box-shadow: inset 0 -4px 0 #2a2c30; }
+.wk.down { background: var(--amber); } .bk.down { background: #a8701f; }
+.wk span, .bk span { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; font: 400 .6rem var(--mono); color: #6c6a64; }
+.bk span { color: #7b7e83; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px 28px; font-size: .92rem; line-height: 1.5; color: var(--ink-dim); }
+.notes h2 { font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); margin: 0 0 6px; }
+.notes p, .notes ul { margin: 0; max-width: 62ch; }
+.notes ul { padding-left: 1.1em; }
+.notes code { font-family: var(--mono); font-size: .8rem; color: var(--ink); }
+.status { font-family: var(--mono); font-size: .75rem; color: var(--ink-dim); display: flex; gap: 16px; flex-wrap: wrap; }
+.status b { color: var(--amber); font-weight: 600; }
+@media (max-width: 760px) {
+  .top { grid-template-columns: 1fr; justify-items: center; }
+  canvas#screen { width: min(360px, calc(100vw - 80px)); height: auto; aspect-ratio: 1; }
+  .controls { width: 100%; }
+  .buttons { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px 5px; }
+  .btn button { font-size: .6rem; letter-spacing: .02em; height: 34px; }
+  .device { padding: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* Controls view: a Logic-style list editor (one row per encoder) as an alternative to the knobs, for phones */
+.view-toggle { display: inline-flex; border: 1px solid #0c0d0e; border-radius: 8px; overflow: hidden; justify-self: start; }
+.view-toggle button { font: 700 .72rem var(--display); letter-spacing: .1em; text-transform: uppercase; padding: 8px 14px; min-height: 36px; background: var(--cap); color: var(--ink-dim); border: 0; cursor: pointer; }
+.view-toggle button[aria-pressed="true"] { background: var(--amber); color: #1b1408; }
+.view-toggle button:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+.ctl-list { display: grid; gap: 8px; }
+.ctl-list[hidden], .encoders[hidden] { display: none; }
+.ctl { display: grid; grid-template-columns: 88px 1fr auto; align-items: center; gap: 8px; background: #17191c; border: 1px solid #0c0d0e; border-radius: 8px; padding: 6px 8px; }
+.ctl .name { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); }
+.ctl .name small { display: block; font: 400 .62rem var(--mono); letter-spacing: 0; text-transform: none; color: var(--ink-dim); }
+.ctl .strip { position: relative; height: 40px; border-radius: 6px; background: repeating-linear-gradient(90deg, #26292d 0 1px, #1f2125 1px 14px); border: 1px solid #0c0d0e; touch-action: none; cursor: ew-resize; overflow: hidden; }
+.ctl .strip i { position: absolute; top: 4px; bottom: 4px; width: 4px; margin-left: -2px; left: var(--p, 50%); background: var(--amber); border-radius: 2px; transition: left .08s; }
+.ctl .strip:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.ctl .steps { display: flex; gap: 4px; }
+.ctl .steps button { min-width: 40px; height: 40px; border-radius: 6px; border: 1px solid #0c0d0e; background: var(--cap); color: var(--ink); font: 600 .8rem var(--mono); cursor: pointer; padding: 0 4px; }
+.ctl .steps button:active { background: var(--cap-down); color: #1b1408; }
+@media (max-width: 760px) { .ctl { grid-template-columns: 1fr auto; } .ctl .strip { grid-column: 1 / -1; grid-row: 2; height: 44px; } .ctl .steps button { min-width: 44px; height: 44px; } }
+
+/* ===== Guide look (Joe, 28 Oct 21:07): the player's-guide cover. Light paper, FM-1 wordmark, flat FM-1 panel drawn from
+   the guide's measured control boxes (Felucca gen_panel_diagram CTRL), live firmware screen in its window. ===== */
+:root {
+  --paper:#e9eae8; --sheet:#f6f6f4; --pink:#1b1c1b; --mute:#6b6e69; --line:#c9cbc6;
+  --pbody:#45474a; --face:#3a3c3f; --well:#2c2d30; --pbtn:#55585c; --btnink:#c7c9cc; --keyw:#4a4b4f; --keyb:#35363a; --knob:#8d8f92;
+  --lit:#ffae41; --litink:#1b1c1b;
+  --f-disp:"Archivo","Helvetica Neue",Arial,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme: light;
+  /* the earlier dark tokens, re-pointed at the paper look (the reviewer panel reads these) */
+  --room: var(--paper); --ink: #1b1c1b; --ink-dim: #6b6e69; --amber: #ffae41;
+  --rv-line-page: #c9cbc6; --rv-card-page: #f6f6f4; --rv-field: #ffffff;
+}
+html, body { background: var(--paper); color: var(--pink); }
+body { font-family: var(--f-disp); }
+.wrap { max-width: 1080px; gap: 22px; }
+.cover { display: grid; grid-template-columns: 1fr 1fr; gap: 26px 28px; align-items: start; padding: 8px 0 6px; }
+.cover .model { font: 400 clamp(64px, 11vw, 112px)/.9 "BB Rodeo", var(--f-disp); letter-spacing: .01em; color: var(--pink); }
+.cover .sub { font: 500 clamp(26px, 3.6vw, 40px)/1.15 var(--f-mono); text-transform: lowercase; color: var(--pink); }
+.cover .doc { font: 500 clamp(24px, 3.3vw, 38px)/1.3 var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--pink); }
+.cover .ver { font: 500 clamp(24px, 3.3vw, 38px)/1.3 var(--f-mono); color: var(--mute); }
+.cover .doc small { display: block; font-size: .42em; letter-spacing: .1em; color: var(--mute); margin-top: 8px; }
+section.device { background: transparent; border: 0; box-shadow: none; padding: 0; gap: 14px; }
+.stage { position: relative; width: 100%; aspect-ratio: 1750 / 1020; user-select: none; -webkit-user-select: none; touch-action: none; }
+.stage svg.panel { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.stage .screen-wrap { position: absolute; left: 26.857%; top: 6.863%; width: 20.571%; height: 35.294%; padding: 0; border: 0; border-radius: 0; background: #000; box-shadow: none; }
+.stage canvas#screen { width: 100%; height: 100%; max-width: none; }
+.stage .power { inset: 0; font-size: clamp(.6rem, 1.3vw, 1rem); }
+.panel text { font-family: var(--f-mono); text-transform: uppercase; pointer-events: none; }
+.panel .hit { cursor: pointer; }
+.panel .knobg { cursor: ns-resize; }
+.panel .down rect.cap, .panel .down circle.cap, .panel .lit rect.cap { fill: var(--lit); }
+.panel .down text, .panel .fw-full text, .panel .lit text { fill: var(--litink); }
+/* Semantic illumination: CSS contrast is not a physical LED brightness calibration. */
+.panel .fw-full rect.cap, .panel .fw-full circle.cap { fill: var(--lit); }
+.panel .fw-mid rect.cap { fill: #ad7938; }
+.panel .fw-dim rect.cap { fill: #6f573b; }
+.panel .fw-breath rect.cap { animation: bb-led-breathe 1.8s ease-in-out infinite alternate; }
+@keyframes bb-led-breathe { from { fill: #6f573b; } to { fill: var(--lit); } }
+@media (prefers-reduced-motion: reduce) { .panel .fw-breath rect.cap { animation: none; fill: #ad7938; } }
+.panel .down rect.cap { fill: var(--lit); }
+.panel .knobg:focus-visible circle.cap, .panel .hit:focus-visible rect.cap { stroke: var(--lit); stroke-width: 6; }
+.panel g:focus { outline: none; }
+.big-screen { display: none; }
+.encoders { display: none !important; }
+.buttons { display: none !important; }
+.keyboard { display: none !important; }
+.view-toggle { justify-self: center; }
+.view-toggle button { background: var(--sheet); color: var(--mute); border: 0; }
+.view-toggle { border: 1px solid var(--pink); border-radius: 3px; }
+.view-toggle button[aria-pressed="true"] { background: var(--pink); color: var(--paper); }
+.ctl { background: var(--sheet); border: 1px solid var(--line); }
+.ctl .name { color: var(--pink); } .ctl .name small { color: var(--mute); }
+.ctl .strip { background: repeating-linear-gradient(90deg, #d7d9d4 0 1px, #eceeea 1px 14px); border-color: var(--line); }
+.ctl .strip i { background: var(--pink); }
+.ctl .steps button { background: var(--pbtn); color: #fff; border-color: #2c2d30; }
+.status { color: var(--mute); justify-content: center; } .status b { color: #b86a00; }
+.notes { color: var(--mute); border-top: 1px solid var(--pink); padding-top: 18px; }
+.notes h2 { color: var(--pink); } .notes code { color: var(--pink); }
+.controls-row { display: grid; gap: 12px; }
+@media (max-width: 760px) {
+  .cover { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px 16px; }
+  .cover > * { min-width: 0; overflow-wrap: anywhere; }
+  .cover .doc small, .cover .doc small span { overflow-wrap: anywhere; word-break: break-word; }
+  .big-screen { display: block; position: relative; box-sizing: border-box; width: min(100%, 360px); aspect-ratio: 1; margin: 0 auto; background: #000; border-radius: 10px; padding: 8px; }
+  .big-screen .power { inset: 8px; font-size: 1rem; }
+  .cover .model { font-size: 64px; } .cover .sub { font-size: 22px; } .cover .doc, .cover .ver { font-size: 17px; }
+  .big-screen canvas { display: block; width: 100%; height: 100%; }
+}
+</style>
+<style id="bb1-20-project-layout">
+.project-tools { grid-template-columns:1fr; }
+.project-tools button { min-height:44px; padding:8px 14px; margin:4px 4px 4px 0; border:1px solid currentColor; background:transparent; color:inherit; font:inherit; cursor:pointer; }
+@media(max-width:760px) { .cover .model { font-size:clamp(40px,12vw,56px); white-space:nowrap; } }
+
+.phone-master { display:none; }
+@media(max-width:760px) {
+  .device { display:flex; flex-direction:column; gap:14px; }
+  .big-screen { order:0; }
+  .stage { display:none; }
+  .power { order:1; }
+  .phone-master { display:flex; align-items:center; gap:12px; order:2; color:var(--pink); font:700 .8rem var(--mono); }
+  .phone-master input { flex:1; min-width:0; height:44px; }
+  .controls-row { display:contents; }
+  .buttons { display:grid !important; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; order:3; }
+  .btn button { max-width:none; height:48px; font-size:.78rem; color:#fff; }
+  .btn kbd { display:none; }
+  .keyboard { display:block !important; height:auto; overflow:visible; order:4; }
+  .keys { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; min-width:0; height:auto; }
+  .keys .wk,.keys .bk { position:relative; left:auto !important; width:auto !important; height:48px; border-radius:5px; box-sizing:border-box; }
+  .keys span { position:static; display:grid; place-items:center; height:100%; font:700 .8rem var(--mono); }
+  .keys .bk span { color:#fff; }
+  .btn button.fw-full,.keys .fw-full { background:var(--lit); color:var(--litink); }
+  .btn button.fw-mid,.keys .fw-mid { background:#ad7938; }
+  .btn button.fw-dim,.keys .fw-dim { background:#6f573b; }
+  .btn button.fw-breath,.keys .fw-breath { background:#ad7938; outline:2px solid var(--lit); }
+  .keys .fw-full span,.keys .fw-mid span,.keys .fw-dim span { color:#111; }
+  .btn button.down,.keys .down { background:var(--lit); color:var(--litink); }
+  .keys [role=button]:focus-visible { outline:3px solid #b86a00; outline-offset:2px; }
+  .view-toggle { display:none; }
+  .ctl-list { display:grid !important; order:5; }
+  .status { order:6; }
+}
+</style>
+
+<div class="wrap">
+  <header class="cover">
+    <div class="model">FM-1</div>
+    <div class="sub">Big Beat<br>Studio BB1</div>
+    <div class="doc">browser<br>player<small>the real BB1 firmware, running here <span id="buildstamp">@DISPLAY_HTML@ · @PRODUCT_HTML@ · @WASM_SHORT@</span></small></div>
+    <div class="ver">two beats<br>one little box</div>
+  </header>
+
+  <section class="device" aria-label="FM-1 front panel">
+    <div class="big-screen"><canvas id="screen-big" width="240" height="240"></canvas></div>
+    <div class="stage" id="stage">
+      <svg class="panel" id="panel" viewBox="0 0 1750 1020" role="group" aria-label="FM-1 controls"></svg>
+      <div class="screen-wrap">
+        <canvas id="screen" width="240" height="240" aria-label="FM-1 display"></canvas>
+      </div>
+    </div>
+    <button class="power" id="power" type="button">Enable sound<small>Or press PLAY to start the selected song.</small></button>
+    <label class="phone-master">VOLUME <input id="phone-volume" type="range" min="0" max="100" value="0" aria-label="Volume"></label>
+    <div class="controls-row">
+      <div class="view-toggle" role="group" aria-label="Encoder view"><button type="button" id="view-knobs" aria-pressed="true">Knobs</button><button type="button" id="view-controls" aria-pressed="false">Controls</button></div>
+      <div class="encoders" id="encoders"></div>
+      <div class="ctl-list" id="ctl-list" hidden></div>
+      <div class="buttons" id="buttons"></div>
+    </div>
+    <div class="keyboard"><div class="keys" id="keys"></div></div>
+    <div class="status" id="status"><span>loading firmware…</span></div>
+  </section>
+
+  <section class="notes project-tools" aria-label="Project files"><div><h2>BB1 projects</h2><p>Arrange named sections and edit your parts. Download a snapshot to keep your work outside this browser session.</p><p>Stop playback before opening or downloading a project snapshot.</p><button id="project-download" type="button">Download snapshot</button> <button id="project-open" type="button">Open project…</button><input id="project-input" type="file" accept=".bbp2" hidden><p id="project-state" role="status" aria-live="polite">Loading…</p><p id="project-notice" role="status" aria-live="polite">Opening a snapshot replaces the RAM project and starts fresh Undo. Check your downloaded file before closing.</p></div></section>
+  <section class="notes">
+    <div>
+      <h2>How to play it</h2>
+      <ul>
+        <li>Press PLAY on the welcome screen to start the selected song. Turn SELECT on the landing screen to move directly between Rhythm Conductor, Big Beat and Dillo. Hold HOME for help with the current screen.</li>
+        <li>Knobs: drag up or down on a knob, or scroll over it. MASTER is the volume. On a phone, switch to <b>Controls</b>: one row per encoder; drag sideways along the strip, or tap −5 −1 +1 +5. The screen shows what each knob is set to.</li>
+        <li>Buttons work while held. Shift-click a button to latch it down (for REC + key or HOME-hold), click again to release. On a phone, hold two buttons with two fingers. On iPhone, turn off silent mode to hear it.</li>
+        <li>Computer keys: <code>Space</code> PLAY, <code>Enter</code> EDIT, <code>H</code> HOME, <code>R</code> REC, <code>A</code> ARP, <code>[</code> <code>]</code> OCT− / OCT+, arrows turn ALGORITHM (↑↓) and PRESETS (←→). <code>Z</code>…<code>,</code> and <code>Q</code>…<code>I</code> play the keyboard.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>What this is</h2>
+      <p>This is the BB1 firmware itself, running in your browser: the same screen and the same sound engine as on the FM-1. Only the panel around it is drawn for the web.</p>
+    </div>
+    <div>
+      <h2>Good to know</h2>
+      <ul>
+        <li id="kitnote">Loading the sound library…</li>
+        <li>The panel is drawn for the browser. Available controls glow; active controls shine brighter. The browser illustrates the firmware’s light states; it does not calibrate physical LED brightness.</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+const WASM_GZ_B64 = "@WASM_GZ_B64@";
+const B = ["FX","SCL","ENV","LFO","EDIT","GLO","HOME","SAVE","ARP","SEQ","PLAY","REC","OCT-","OCT+"];
+const KEYMAP = {" ":10,"Enter":4,"h":6,"r":11,"a":8,"[":12,"]":13};
+const ENC = ["SELECT","ALGORITHM","PRESETS","KNOB 1","KNOB 2","KNOB 3","KNOB 4"];
+const statusEl = document.getElementById("status");
+let x = null, audio = null, nextT = 0, lastFrame = 0, frames = 0, masterGain = null, masterLevel = @MASTER@;
+const pendingTurns = new Array(7).fill(0);
+
+async function loadWasm() {
+  const bin = Uint8Array.from(atob(WASM_GZ_B64), c => c.charCodeAt(0));
+  const ds = new Blob([bin]).stream().pipeThrough(new DecompressionStream("gzip"));
+  const buf = await new Response(ds).arrayBuffer();
+  const { instance } = await WebAssembly.instantiate(buf, { env: { drum909_nparams: () => 0, drum909_param: () => 0 } });
+  return instance.exports;
+}
+
+/* ---- screen */
+const cv = document.getElementById("screen"), cx = cv.getContext("2d"), img = cx.createImageData(240, 240);
+const bigCv = document.getElementById("screen-big"), bigCx = bigCv && bigCv.getContext("2d");
+function draw() {
+  const fb = new Uint16Array(x.memory.buffer, x.emu_fb(), 240 * 240), d = img.data;
+  for (let i = 0, j = 0; i < 57600; i++, j += 4) {
+    const v = fb[i], r = v >> 11 & 31, g = v >> 5 & 63, b = v & 31;
+    d[j] = r << 3 | r >> 2; d[j + 1] = g << 2 | g >> 4; d[j + 2] = b << 3 | b >> 2; d[j + 3] = 255;
+  }
+  cx.putImageData(img, 0, 0);
+  if (bigCx && bigCv.offsetParent) bigCx.drawImage(cv, 0, 0);
+}
+
+/* ---- one firmware frame (16 ms), with its audio */
+function step() {
+  for (let e = 0; e < 7; e++) if (pendingTurns[e]) { const s = Math.sign(pendingTurns[e]); x.emu_turn(e, s); pendingTurns[e] -= s; }
+  x.emu_frame(); frames++;
+  const n = x.emu_audio_take();
+  if (audio && audio.state === "running" && n) {
+    const src = new Float32Array(x.memory.buffer, x.emu_audio_ptr(), n * 2);
+    const ab = audio.createBuffer(2, n, 44100), L = ab.getChannelData(0), R = ab.getChannelData(1);
+    for (let i = 0; i < n; i++) { L[i] = src[2 * i] * 256; R[i] = src[2 * i + 1] * 256; }
+    const s = audio.createBufferSource(); s.buffer = ab; s.connect(masterGain || audio.destination);
+    if (nextT < audio.currentTime + 0.03) nextT = audio.currentTime + 0.06;
+    s.start(nextT); nextT += ab.duration;
+  }
+}
+function loop(t) {
+  if (audio && audio.state === "running") {     /* audio clock: keep ~120 ms queued */
+    let guard = 0;
+    while (nextT < audio.currentTime + 0.12 && guard++ < 12) step();
+  } else {                                     /* no sound yet: the page clock, 16 ms a frame */
+    if (!lastFrame) lastFrame = t;
+    let guard = 0;
+    while (t - lastFrame >= 16 && guard++ < 6) { step(); lastFrame += 16; }
+    if (t - lastFrame > 200) lastFrame = t;
+  }
+  draw();
+  drawLights();
+  requestAnimationFrame(loop);
+}
+
+function drawLights() {
+  for (let i = 0; i < 41; i++) {
+    const targets = i < 14 ? [document.querySelector('g[aria-label="' + B[i] + '"]'), document.getElementById('btn-' + B[i])] : keyViews[i - 14];
+    const state = x.emu_led_state(i);
+    const level = state & 1 ? 'full' : state & 4 ? 'mid' : state & 8 ? 'breath' : state & 2 ? 'dim' : 'off';
+    for (const el of targets) {
+      if (!el || el.dataset.led === level) continue;
+      el.dataset.led = level;
+      for (const name of ['full','mid','dim','breath']) el.classList.toggle('fw-' + name, name === level);
+    }
+  }
+}
+
+/* ---- panel */
+function makeButtons() {
+  const host = document.getElementById("buttons");
+  const order = [10,6,0,4,9,8,11,5,1,2,3,7,12,13];
+  const keyHint = {10:"space",4:"enter",6:"H",11:"R",8:"A",12:"[",13:"]"};
+  for (const b of order) {
+    const wrap = document.createElement("div"); wrap.className = "btn";
+    const el = document.createElement("button"); el.type = "button"; el.id = "btn-" + B[b]; el.textContent = B[b];
+    let latched = false;
+    const press = (down) => { sendButton(b, down); el.classList.toggle("down", down); };
+    el.addEventListener("pointerdown", ev => {
+      ev.preventDefault();
+      if (ev.shiftKey) { latched = !latched; el.classList.toggle("latched", latched); press(latched); return; }
+      if (latched) { latched = false; el.classList.remove("latched"); press(false); return; }
+      el.setPointerCapture(ev.pointerId); press(true);
+    });
+    const up = () => { if (!latched && el.classList.contains("down")) press(false); };
+    el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+    el.addEventListener("keydown", ev => { if ((ev.key === " " || ev.key === "Enter") && !ev.repeat) { ev.preventDefault(); ev.stopPropagation(); press(true); } });
+    el.addEventListener("keyup", ev => { if (ev.key === " " || ev.key === "Enter") { ev.preventDefault(); ev.stopPropagation(); press(false); } });
+    wrap.append(el);
+    const k = document.createElement("kbd"); k.textContent = keyHint[b] || " "; wrap.append(k);
+    host.append(wrap);
+  }
+}
+function makeEncoders() {
+  const host = document.getElementById("encoders");
+  ENC.forEach((name, e) => {
+    const wrap = document.createElement("div"); wrap.className = "enc";
+    const knob = document.createElement("div"); knob.className = "knob"; knob.tabIndex = 0; knob.id = "enc-" + e;
+    knob.setAttribute("role", "slider"); knob.setAttribute("aria-label", name);
+    let angle = 0;
+    const turn = (n) => { pendingTurns[e] += n; angle += n * 18; knob.style.setProperty("--a", angle + "deg"); };
+    let y0 = null, acc = 0;
+    knob.addEventListener("pointerdown", ev => { y0 = ev.clientY; acc = 0; knob.setPointerCapture(ev.pointerId); });
+    knob.addEventListener("pointermove", ev => { if (y0 === null) return; acc += (y0 - ev.clientY); y0 = ev.clientY; while (Math.abs(acc) >= 14) { const s = Math.sign(acc); turn(s); acc -= 14 * s; } });
+    knob.addEventListener("pointerup", () => { y0 = null; });
+    knob.addEventListener("wheel", ev => { ev.preventDefault(); turn(ev.deltaY < 0 ? 1 : -1); }, { passive: false });
+    knob.addEventListener("keydown", ev => {
+      if (ev.key === "ArrowUp" || ev.key === "ArrowRight") { ev.preventDefault(); ev.stopPropagation(); turn(1); }
+      if (ev.key === "ArrowDown" || ev.key === "ArrowLeft") { ev.preventDefault(); ev.stopPropagation(); turn(-1); }
+    });
+    const nudge = document.createElement("div"); nudge.className = "nudge";
+    for (const [t, n] of [["−", -1], ["+", 1]]) { const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.setAttribute("aria-label", name + (n > 0 ? " up" : " down")); b.addEventListener("click", () => turn(n)); nudge.append(b); }
+    const lab = document.createElement("label"); lab.textContent = name; lab.htmlFor = knob.id;
+    wrap.append(knob, lab, nudge); host.append(wrap);
+    window["turn" + e] = turn;
+  });
+}
+/* 16 white keys (logical 0-15) and 11 black keys (logical 16-26) in piano order from C */
+const keyEls = {};
+const keyViews = Array.from({length:27}, () => []);
+function makeKeys() {
+  const host = document.getElementById("keys");
+  const W = 100 / 16; let black = 0;
+  const pc = ["C","D","E","F","G","A","B"];
+  for (let w = 0; w < 16; w++) {
+    const el = document.createElement("div"); el.className = "wk"; el.style.left = (w * W) + "%"; el.style.width = W + "%";
+    el.innerHTML = "<span>W" + (w + 1) + "</span>"; bindKey(el, w); host.append(el); keyEls[w] = el;
+    const name = pc[w % 7];
+    if (w < 15 && name !== "E" && name !== "B" && black < 11) {
+      const b = document.createElement("div"); b.className = "bk"; b.style.left = ((w + 1) * W - W * 0.32) + "%"; b.style.width = (W * 0.64) + "%";
+      b.innerHTML = "<span>B" + (black + 1) + "</span>"; bindKey(b, 16 + black); host.append(b); keyEls[16 + black] = b; black++;
+    }
+  }
+}
+function setKey(k, down) { if (down && x) void enableSound(); if (x) x.emu_key(k, down ? 1 : 0); for (const el of keyViews[k]) el.classList.toggle("down", down); }
+function bindKey(el, k) {
+  keyViews[k].push(el);
+  el.setAttribute('role','button'); el.setAttribute('tabindex','0');
+  el.setAttribute('aria-label',(k < 16 ? 'White key ' + (k+1) : 'Black key ' + (k-15)));
+  el.addEventListener('keydown', ev => { if ((ev.key === ' ' || ev.key === 'Enter') && !ev.repeat) { ev.preventDefault(); ev.stopPropagation(); setKey(k,true); } });
+  el.addEventListener('keyup', ev => { if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); setKey(k,false); } });
+  el.addEventListener("pointerdown", ev => { ev.preventDefault(); el.setPointerCapture(ev.pointerId); setKey(k, true); });
+  const up = () => setKey(k, false);
+  el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+}
+/* computer keyboard: Z row = white 1-10, S D G H J L ; = black; Q row continues */
+const PIANO = { z:0,x:1,c:2,v:3,b:4,n:5,m:6,",":7, q:7,w:8,e:9,t:10,y:11,u:12,i:13,o:14,p:15,
+                s:16,d:17,g:18,j:20,"2":21,"3":22,"5":23,"6":24,"7":25,"9":26 };
+const held = new Set();
+window.addEventListener("keydown", ev => {
+  if (ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  const k = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key;
+  if (k in KEYMAP) { ev.preventDefault(); const b = KEYMAP[k]; sendButton(b, true); document.getElementById("btn-" + B[b]).classList.add("down"); held.add("b" + b); return; }
+  if (k === "ArrowUp") { ev.preventDefault(); window.turn1(1); return; }
+  if (k === "ArrowDown") { ev.preventDefault(); window.turn1(-1); return; }
+  if (k === "ArrowLeft") { ev.preventDefault(); window.turn2(-1); return; }
+  if (k === "ArrowRight") { ev.preventDefault(); window.turn2(1); return; }
+  if (k in PIANO) { ev.preventDefault(); setKey(PIANO[k], true); }
+});
+window.addEventListener("keyup", ev => {
+  const k = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key;
+  if (k in KEYMAP) { const b = KEYMAP[k]; sendButton(b, false); document.getElementById("btn-" + B[b]).classList.remove("down"); return; }
+  if (k in PIANO) setKey(PIANO[k], false);
+});
+
+let soundStarting = null;
+function sendButton(button, down) {
+  if (!x) return;
+  if (button === 10 && down) void enableSound();
+  x.emu_button(button, down ? 1 : 0);
+}
+function enableSound() {
+  if (soundStarting) return soundStarting;
+  if (audio && audio.state === "running") return Promise.resolve();
+  const btn = document.getElementById("power");
+  soundStarting = (async () => {
+    try {
+      if (!audio || audio.state === "closed") {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        try { audio = new AC({ sampleRate: 44100 }); } catch (_) { audio = new AC(); }
+        masterGain = audio.createGain(); masterGain.gain.value = masterLevel; masterGain.connect(audio.destination);
+      }
+      await audio.resume();
+      if (audio.state !== "running") throw Error("Sound is suspended");
+      nextT = audio.currentTime + 0.06; btn.hidden = true;
+      if (x) statusEl.textContent = "Firmware running · sound enabled · 44.1 kHz stereo";
+    } catch (_) {
+      btn.hidden = false;
+      statusEl.textContent = "Sound could not start. Press Enable sound to retry; the screen and controls still work.";
+    }
+  })();
+  soundStarting.finally(() => { soundStarting = null; });
+  return soundStarting;
+}
+document.getElementById("power").addEventListener("click", () => { void enableSound(); });
+
+
+/* Controls view: the same seven encoders as rows (Logic-style), sending the same turns as the knobs. */
+function makeControls() {
+  const host = document.getElementById("ctl-list");
+  const SUB = { 0: "move / choose", 1: "pattern", 2: "kit", 3: "see screen", 4: "see screen", 5: "see screen", 6: "see screen" };
+  ENC.forEach((name, e) => {
+    const row = document.createElement("div"); row.className = "ctl";
+    const nm = document.createElement("div"); nm.className = "name"; nm.innerHTML = name + "<small>" + SUB[e] + "</small>";
+    const strip = document.createElement("div"); strip.className = "strip"; strip.tabIndex = 0;
+    strip.setAttribute("role", "slider"); strip.setAttribute("aria-label", name + " (drag sideways)");
+    const mark = document.createElement("i"); strip.append(mark);
+    let pos = 50;
+    let settle = 0;
+    const turn = (n) => { window["turn" + e](n); pos = Math.max(4, Math.min(96, pos + n * 4)); mark.style.setProperty("--p", pos + "%"); clearTimeout(settle); settle = setTimeout(() => { if (x0 === null) { pos = 50; mark.style.setProperty("--p", "50%"); } }, 450); };
+    let x0 = null, acc = 0;
+    strip.addEventListener("pointerdown", ev => { x0 = ev.clientX; acc = 0; strip.setPointerCapture(ev.pointerId); });
+    strip.addEventListener("pointermove", ev => { if (x0 === null) return; acc += ev.clientX - x0; x0 = ev.clientX; while (Math.abs(acc) >= 12) { const s = Math.sign(acc); turn(s); acc -= 12 * s; } });
+    const end = () => { x0 = null; pos = 50; mark.style.setProperty("--p", "50%"); };
+    strip.addEventListener("pointerup", end); strip.addEventListener("pointercancel", end);
+    strip.addEventListener("keydown", ev => {
+      if (ev.key === "ArrowUp" || ev.key === "ArrowRight") { ev.preventDefault(); ev.stopPropagation(); turn(1); }
+      if (ev.key === "ArrowDown" || ev.key === "ArrowLeft") { ev.preventDefault(); ev.stopPropagation(); turn(-1); }
+    });
+    const steps = document.createElement("div"); steps.className = "steps";
+    for (const n of [-5, -1, 1, 5]) {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = (n > 0 ? "+" : "−") + Math.abs(n);
+      b.setAttribute("aria-label", name + " " + (n > 0 ? "up " : "down ") + Math.abs(n));
+      b.addEventListener("click", () => { for (let i = 0; i < Math.abs(n); i++) turn(Math.sign(n)); });
+      steps.append(b);
+    }
+    row.append(nm, strip, steps); host.append(row);
+  });
+  const kb = document.getElementById("view-knobs"), cb = document.getElementById("view-controls");
+  const set = (v) => {
+    const ctl = v === "controls";
+    document.getElementById("encoders").hidden = ctl; host.hidden = !ctl;
+    kb.setAttribute("aria-pressed", String(!ctl)); cb.setAttribute("aria-pressed", String(ctl));
+    try { localStorage.setItem("fm1-encoder-view", v); } catch (_) {}
+  };
+  kb.addEventListener("click", () => set("knobs")); cb.addEventListener("click", () => set("controls"));
+  let saved = null; try { saved = localStorage.getItem("fm1-encoder-view"); } catch (_) {}
+  set(saved || (window.matchMedia && matchMedia("(max-width: 760px)").matches ? "controls" : "knobs"));
+}
+
+/* ---- the FM-1 panel, drawn as in the player's guide (control boxes measured on the 1750 x 1050 panel photo,
+   Felucca tools/gen_panel_diagram.py CTRL), wired to the same firmware inputs as the hidden controls above */
+function makePanel() {
+  const NS = "http://www.w3.org/2000/svg", svg = document.getElementById("panel");
+  const P = {'MASTER':[124,117,219,237],'SELECT':[299,117,394,240],'PRESETS':[114,287,217,410],'ALGORITHM':[286,286,394,413],
+             'KNOB 1':[919,113,1019,238],'KNOB 2':[1108,115,1203,238],'KNOB 3':[1294,112,1389,238],'KNOB 4':[1477,113,1577,236]};
+  const BTN = {'FX':[962,319,1037,394],'SCL':[1066,318,1141,393],'ENV':[1170,318,1245,393],'LFO':[1274,318,1349,393],'EDIT':[1378,317,1452,392],'GLO':[1482,317,1557,392],
+               'HOME':[963,421,1038,497],'SAVE':[1068,420,1143,496],'ARP':[1172,420,1247,496],'SEQ':[1276,420,1351,495],'PLAY':[1380,419,1455,495],'REC':[1483,419,1559,495],
+               'OCT-':[154,461,241,509],'OCT+':[284,461,371,508]};
+  const KEYS = [91,585,1652,951], SCREEN = [470,70,830,430];
+  const el = (n, a, p) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+  el('rect', {x:0, y:0, width:1750, height:1020, rx:46, fill:'var(--pbody)'}, svg);
+  el('rect', {x:24, y:24, width:1702, height:972, rx:32, fill:'var(--face)'}, svg);
+  el('rect', {x:SCREEN[0]-34, y:SCREEN[1]-28, width:SCREEN[2]-SCREEN[0]+68, height:SCREEN[3]-SCREEN[1]+56, rx:26, fill:'#0c0c0d'}, svg);
+  el('rect', {x:938, y:296, width:644, height:222, rx:20, fill:'var(--well)'}, svg);
+  el('rect', {x:136, y:446, width:252, height:78, rx:16, fill:'var(--well)'}, svg);
+  const label = (t, x, y) => { const s = el('text', {x, y, 'text-anchor':'middle', 'font-size':20, fill:'var(--btnink)', 'letter-spacing':2}, svg); s.textContent = t; };
+  /* encoders: MASTER is the page volume; the others turn the firmware encoders (same turnN as the Controls view) */
+  const encIndex = {'SELECT':0,'ALGORITHM':1,'PRESETS':2,'KNOB 1':3,'KNOB 2':4,'KNOB 3':5,'KNOB 4':6};
+  Object.keys(P).forEach(k => {
+    const b = P[k], cx = (b[0]+b[2])/2, cy = (b[1]+b[3])/2 + 10, r = 44;
+    const g = el('g', {class:'knobg', tabindex:0, role:'slider', 'aria-label':k === 'MASTER' ? 'MASTER (volume)' : k}, svg);
+    el('circle', {cx, cy, r:r+8, fill:'var(--well)'}, g);
+    el('circle', {class:'cap', cx, cy, r, fill:'var(--knob)'}, g);
+    const tick = el('rect', {x:cx-3, y:cy-r+6, width:6, height:22, rx:3, fill:'var(--well)'}, g);
+    label(k.replace('KNOB ','K'), cx, b[1]-6);
+    let angle = k === 'MASTER' ? (masterLevel * 270 - 135) : 0;
+    const show = () => tick.setAttribute('transform', `rotate(${angle} ${cx} ${cy})`); show();
+    const turn = (n) => {
+      if (k === 'MASTER') { masterLevel = Math.max(0, Math.min(1, masterLevel + n * 0.04)); angle = masterLevel * 270 - 135; if (masterGain) masterGain.gain.value = masterLevel; }
+      else { window["turn" + encIndex[k]](n); angle += n * 18; }
+      show();
+    };
+    let y0 = null, acc = 0;
+    g.addEventListener('pointerdown', ev => { ev.preventDefault(); y0 = ev.clientY; acc = 0; g.setPointerCapture(ev.pointerId); g.classList.add('lit'); });
+    g.addEventListener('pointermove', ev => { if (y0 === null) return; acc += (y0 - ev.clientY); y0 = ev.clientY; while (Math.abs(acc) >= 10) { const s = Math.sign(acc); turn(s); acc -= 10 * s; } });
+    const end = () => { y0 = null; g.classList.remove('lit'); };
+    g.addEventListener('pointerup', end); g.addEventListener('pointercancel', end);
+    g.addEventListener('wheel', ev => { ev.preventDefault(); turn(ev.deltaY < 0 ? 1 : -1); }, { passive: false });
+    g.addEventListener('keydown', ev => {
+      if (ev.key === 'ArrowUp' || ev.key === 'ArrowRight') { ev.preventDefault(); ev.stopPropagation(); turn(1); }
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowLeft') { ev.preventDefault(); ev.stopPropagation(); turn(-1); }
+    });
+  });
+  /* buttons: the same press as the hidden HTML buttons (keeps latch and keyboard shortcuts in one place) */
+  Object.keys(BTN).forEach(k => {
+    const b = BTN[k], idx = B.indexOf(k);
+    const g = el('g', {class:'hit', tabindex:0, role:'button', 'aria-label':k}, svg);
+    el('rect', {class:'cap', x:b[0], y:b[1], width:b[2]-b[0], height:b[3]-b[1], rx:14, fill:'var(--pbtn)'}, g);
+    const t = el('text', {x:(b[0]+b[2])/2, y:(b[1]+b[3])/2+7, 'text-anchor':'middle', 'font-size':19, fill:'var(--btnink)'}, g); t.textContent = k.replace('-', '−');
+    const html = document.getElementById('btn-' + k);
+    const fwd = (type, ev) => html.dispatchEvent(new PointerEvent(type, { pointerId: ev.pointerId, shiftKey: ev.shiftKey, bubbles: true }));
+    g.addEventListener('pointerdown', ev => { ev.preventDefault(); try { g.setPointerCapture(ev.pointerId); } catch (_) {} fwd('pointerdown', ev); });
+    g.addEventListener('pointerup', ev => fwd('pointerup', ev)); g.addEventListener('pointercancel', ev => fwd('pointercancel', ev));
+    g.addEventListener('keydown', ev => { if ((ev.key === ' ' || ev.key === 'Enter') && !ev.repeat) { ev.preventDefault(); ev.stopPropagation(); sendButton(idx, true); html.classList.add('down'); } });
+    g.addEventListener('keyup', ev => { if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); sendButton(idx, false); html.classList.remove('down'); } });
+    new MutationObserver(() => { g.classList.toggle('down', html.classList.contains('down') || html.classList.contains('latched')); }).observe(html, { attributes: true, attributeFilter: ['class'] });
+  });
+  /* keys: 11 black above, 16 white below (logical 0-15 white, 16-26 black, as the firmware numbers them) */
+  el('rect', {x:KEYS[0], y:KEYS[1], width:KEYS[2]-KEYS[0], height:KEYS[3]-KEYS[1], rx:30, fill:'var(--well)'}, svg);
+  const wx = KEYS[0]+14, ww = (KEYS[2]-KEYS[0]-28)/16;
+  for (let i = 0; i < 16; i++) {
+    const g = el('g', {class:'hit', 'aria-label':'key ' + (i + 1)}, svg);
+    el('rect', {class:'cap', x:wx+i*ww+6, y:KEYS[1]+188, width:ww-12, height:150, rx:22, fill:'var(--keyw)'}, g);
+    bindKey(g, i); keyEls[i] = g;
+  }
+  [0.5,1.5,2.5, 4.5,5.5, 7.5,8.5,9.5, 11.5,12.5, 14.5].forEach((p, j) => {
+    const g = el('g', {class:'hit', 'aria-label':'key ' + (17 + j)}, svg);
+    el('rect', {class:'cap', x:wx+(p+0.5)*ww-ww*0.34, y:KEYS[1]+30, width:ww*0.68, height:132, rx:20, fill:'var(--keyb)'}, g);
+    bindKey(g, 16 + j); keyEls[16 + j] = g;
+  });
+}
+makeEncoders(); makeControls(); makeButtons(); makeKeys(); makePanel();
+const phoneVolume = document.getElementById('phone-volume');
+phoneVolume.value = String(masterLevel * 100);
+phoneVolume.addEventListener('input', () => { masterLevel = Number(phoneVolume.value) / 100; if (masterGain) masterGain.gain.value = masterLevel; });
+
+/* The FM-1's own sound library (the file the installer writes), placed where the firmware reads it before start-up.
+ * The firmware validates it itself (magic, length, whole-pack CRC); a mismatch leaves the 808 only. */
+const SOUND_FILES = ["./@LIBRARY_NAME@"];
+const SOUND_SHA256 = "@LIBRARY_SHA@";
+async function loadSounds(ex) {
+  for (const url of SOUND_FILES) {
+    try {
+      const r = await fetch(url, { cache: "force-cache" });
+      if (!r.ok) continue;
+      const b = new Uint8Array(await r.arrayBuffer());
+      if (b.length !== 245760) continue;
+      const h = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", b)), v => v.toString(16).padStart(2, "0")).join("");
+      if (h !== SOUND_SHA256) continue;
+      new Uint8Array(ex.memory.buffer, ex.emu_sound_window(), b.length).set(b);
+      return true;
+    } catch (_) { /* try the next copy */ }
+  }
+  return false;
+}
+loadWasm().then(async ex => {
+  x = ex;
+  const readIdentity = pointer => {
+    const bytes = new Uint8Array(ex.memory.buffer); let end = pointer;
+    while (end < bytes.length && end - pointer < 80 && bytes[end]) end++;
+    if (end >= bytes.length || end - pointer >= 80) throw Error("Invalid firmware identity");
+    return new TextDecoder().decode(bytes.subarray(pointer, end));
+  };
+  if (readIdentity(ex.emu_product_id()) !== @PRODUCT_JSON@ || readIdentity(ex.emu_display_name()) !== @DISPLAY_JSON@) throw Error("Wrong firmware identity");
+  if (!await loadSounds(ex)) throw Error("The required matching BB1 sound library did not load");
+  if (typeof x.emu_led_state !== "function") throw Error("Player requires firmware LED-state support");
+  x.emu_init();
+  const kits = x.emu_sound_kits ? x.emu_sound_kits() : 0, note = document.getElementById("kitnote");
+  if (note) note.textContent = kits === 7
+    ? "The 808, seven sampled kits and BUILD. SLOOP is removed in 2.1. The matching sound library is loaded."
+    : "The sampled-library directory could not be read. Reload the player before continuing.";
+
+  for (let i = 0; i < 8; i++) x.emu_frame();
+  x.emu_audio_take();
+  draw();
+  statusEl.innerHTML = "<span>firmware <b>running</b></span><span>44.1 kHz stereo</span><span>16 ms per main-loop pass</span>";
+  requestAnimationFrame(loop);
+}).catch(e => { statusEl.innerHTML = "<span>The firmware did not load: " + String(e.message || e) + ". A current Chrome, Safari or Firefox is needed.</span>"; });
+/* Project file adapter. Downloads are snapshots, not disk-save acknowledgements. */
+const projectNotice = document.getElementById('project-notice');
+const projectDownload = document.getElementById('project-download');
+const projectOpen = document.getElementById('project-open');
+const projectInput = document.getElementById('project-input');
+let projectFileBusy = false;
+const projectErrors = {1:'Invalid project file.',2:'Project exceeds capacity.',3:'Unsupported project version.',4:'Project checksum failed.',5:'This project needs another catalogue.',6:'This project needs another sound library.',7:'Sound snapshot cannot be restored.',8:'A project part cannot play with its saved kit.',9:'Project storage overlaps live state.',10:'Project operation timed out.',11:'Project changed during the operation.',64:'Stop playback and finish any pending edit first.',66:'Audio reset failed. Reload this preview before continuing.'};
+function projectMessage(s){projectNotice.textContent=s;}
+async function projectHeld(action){
+ if(!x)throw Error('Firmware is still loading.');
+ const start=performance.now();let result=x.emu_project_begin();
+ try {
+  while(result===65){if(performance.now()-start>1500)throw Error('Audio pause timed out; project unchanged.');await new Promise(r=>setTimeout(r,16));result=x.emu_project_state();}
+  if(result)throw Error(projectErrors[result]||`Project operation refused (${result}).`);
+  return action();
+ } finally {x.emu_project_cancel();}
+}
+async function projectJob(action){
+ if(projectFileBusy)return;projectFileBusy=true;projectDownload.disabled=projectOpen.disabled=true;
+ try{await action();}catch(e){projectMessage(e.message);}finally{projectFileBusy=false;projectDownload.disabled=projectOpen.disabled=false;projectInput.value='';}
+}
+projectDownload.addEventListener('click',()=>projectJob(async()=>{
+ const wire=await projectHeld(()=>{const n=x.emu_project_export();if(!n)throw Error(projectErrors[x.emu_project_error()]||'Snapshot could not be captured.');return new Uint8Array(x.memory.buffer,x.emu_project_ptr(),n).slice();});
+ const url=URL.createObjectURL(new Blob([wire],{type:'application/octet-stream'}));const a=document.createElement('a');a.href=url;a.download='BB1-project.bbp2';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+ projectMessage('Snapshot download requested. Check your downloaded file before closing; this does not mark the RAM project saved.');
+}));
+projectOpen.addEventListener('click',()=>{if(!x)return projectMessage('Firmware is still loading.');if(x.emu_running())return projectMessage(projectErrors[64]);projectInput.click();});
+projectInput.addEventListener('change',()=>projectJob(async()=>{
+ const file=projectInput.files[0];if(!file)return;
+ if(file.size<64||file.size>x.emu_project_capacity())throw Error('Choose a BBP2 project file between 64 and 32768 bytes.');
+ const wire=new Uint8Array(await file.arrayBuffer());
+ if(!window.confirm(`Open “${file.name}” and replace the current RAM arrangement, working parts and sounds? Current unsaved edits will be discarded. Undo will start fresh.`)){projectMessage('Open cancelled; current project retained.');return;}
+ await projectHeld(()=>{
+  new Uint8Array(x.memory.buffer,x.emu_project_ptr(),wire.length).set(wire);
+  const result=x.emu_project_import(wire.length);if(result)throw Error(projectErrors[result]||`Project import refused (${result}).`);
+ });
+ projectMessage(`Opened “${file.name}”. Arrangement and sounds restored; playback stopped; Undo starts fresh.`);
+}));
+
+const projectState=document.getElementById('project-state');
+setInterval(()=>{
+ if(!x)return;
+ projectState.textContent=x.emu_project_dirty()?
+  (x.emu_project_has_file()?'RAM edits since file load':'RAM project · download to keep'):
+  'Loaded snapshot · no new edits';
+},120);
+
+
+</script>
+<p class="notes"><a href="/fm1/emulator/">Earlier BB-1 1.5 player and its review form</a></p>

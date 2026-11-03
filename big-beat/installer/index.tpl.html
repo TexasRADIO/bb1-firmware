@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Install Big Beat Studio BB1</title>
+<meta name="description" content="Install Big Beat Studio BB1 on your FM-1 from desktop Chrome, over USB.">
+<link rel="stylesheet" href="/fm1/brand.css">
+<style>
+:root{
+  --paper:#e9eae8; --sheet:#f6f6f4; --ink:#1b1c1b; --mute:#6b6e69; --line:#c9cbc6; --bar:#1b1c1b; --bartext:#f6f6f4;
+  --lit:#ffae41; --red:#d8392a; --ok:#1f8a4c;
+  --f-disp:"Archivo","Helvetica Neue",Arial,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#121312; --sheet:#1a1b1a; --ink:#e6e7e3; --mute:#9a9d97; --line:#30322f; --bar:#e6e7e3; --bartext:#121312; --red:#ff5a47; --ok:#4fd18b; color-scheme:dark}}
+:root[data-theme="dark"]{--paper:#121312; --sheet:#1a1b1a; --ink:#e6e7e3; --mute:#9a9d97; --line:#30322f; --bar:#e6e7e3; --bartext:#121312; --red:#ff5a47; --ok:#4fd18b; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink)}
+body{font:400 15px/1.55 var(--f-disp);-webkit-font-smoothing:antialiased;overflow-wrap:anywhere}
+a{color:inherit}
+[hidden]{display:none!important}
+.wrap{max-width:640px;margin:0 auto;padding:28px max(16px,env(safe-area-inset-left,0px)) 80px}
+.cover{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:20px;align-items:start;padding-bottom:18px;border-bottom:2px solid var(--ink)}
+.cover .model{font:500 34px/1 var(--f-disp);font-stretch:125%;letter-spacing:.02em}
+.cover .sub,.cover .doc{font:500 12px/1.25 var(--f-mono);text-transform:uppercase;letter-spacing:.06em}
+.cover .doc{text-align:right}
+h1{font:400 clamp(40px,11vw,64px)/.95 "BB Rodeo",var(--f-disp);margin:28px 0 12px;letter-spacing:.01em;text-transform:uppercase}
+.lede{font-size:17px;margin:0 0 20px}
+.need{display:grid;gap:6px;margin:0 0 28px;padding:0;list-style:none;font:500 12.5px/1.4 var(--f-mono);text-transform:uppercase;letter-spacing:.04em}
+.need li::before{content:"■ ";color:var(--lit)}
+.step{background:var(--sheet);border:1px solid var(--line);margin:0 0 16px}
+.step header{display:flex;gap:12px;align-items:baseline;background:var(--bar);color:var(--bartext);padding:8px 14px;font:500 12px/1.2 var(--f-mono);text-transform:uppercase;letter-spacing:.08em}
+.step header b{font:400 20px/1 "BB Rodeo",var(--f-disp);letter-spacing:.02em}
+.step .body{padding:16px 14px}
+.step p{margin:0 0 12px}
+.step.done header::after{content:"✓ done";margin-left:auto;color:var(--lit)}
+.step[aria-disabled="true"] .body{opacity:.55}
+button.go{font:500 14px/1 var(--f-mono);text-transform:uppercase;letter-spacing:.08em;background:var(--ink);color:var(--paper);border:0;padding:14px 22px;cursor:pointer;min-height:44px}
+button.go:hover:not(:disabled){background:var(--lit);color:#1b1c1b}
+button.go:disabled{opacity:.3;cursor:default}
+.small{color:var(--mute);font-size:13px}
+.meter{height:6px;background:var(--line);margin:14px 0 6px;overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:var(--lit);transition:width .2s linear}
+.status{min-height:1.5em;font:500 13px/1.45 var(--f-mono);margin:6px 0 0}
+.status[data-state="error"]{color:var(--red)}
+.status[data-state="ok"]{color:var(--ok)}
+.warn{border-left:4px solid var(--lit);padding:8px 12px;background:var(--sheet);margin:0 0 20px;font-size:14px}
+label.check{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin:0 0 12px}
+label.check input{margin-top:3px}
+input[type=file]{max-width:100%}
+details{border-top:1px solid var(--line);padding:14px 0;margin-top:8px}
+summary{cursor:pointer;font:500 12.5px/1.4 var(--f-mono);text-transform:uppercase;letter-spacing:.06em}
+details .body{padding-top:12px}
+pre#log{color:var(--mute);font:11.5px/1.4 var(--f-mono);white-space:pre-wrap;max-height:220px;overflow:auto;margin:0}
+footer{margin-top:36px;padding-top:14px;border-top:2px solid var(--ink);font:500 11.5px/1.5 var(--f-mono);text-transform:uppercase;letter-spacing:.04em;color:var(--mute)}
+footer a{color:var(--ink)}
+.finish{display:none;background:var(--ink);color:var(--paper);padding:18px 16px;margin:0 0 16px}
+.finish.show{display:block}
+.finish b{font:400 28px/1 "BB Rodeo",var(--f-disp);display:block;margin-bottom:6px;text-transform:uppercase}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="cover">
+    <div class="model">FM-1</div>
+    <div class="sub">bb1<br>big beat</div>
+    <div class="doc">install<br><span id="version"></span></div>
+  </header>
+
+  <h1>Install Big Beat Studio BB1</h1>
+  <p class="lede">One click, about five minutes. Your FM-1 shows up as <b>Big Beat</b> once BB1 is on it.</p>
+  <nav aria-label="Installer tasks"><p><a href="#step1">Install BB1</a> · <a href="#return-official">Remove BB1 / return to official V15</a> · <a href="#troubleshooting">Installation help</a></p></nav>
+  <p class="small"><b>BB1 does not lock the FM-1.</b> To remove it later, use <a href="#return-official">Remove BB1 / return to official V15</a> on this page.</p>
+  <ul class="need">
+    <li>desktop Chrome on a computer</li>
+    <li>A USB data cable, plugged straight into the computer</li>
+    <li>Playback stopped, MASTER turned fully down</li>
+    <li>Other music apps closed</li>
+  </ul>
+  <p class="warn" id="browser-warn" hidden>This browser can't talk to the FM-1. Open this page in desktop Chrome on a computer.</p>
+  <p><b>Start from corrected-ID BB1 1.5 (FM-1_92200105).</b> This 2.1 installer also accepts BB1 2.0 (FM-1_92200200) and BB1 2.1 (FM-1_92200201). Stock V15, older BB1 and other firmware must first use the <a href="/fm1/install/1.5/">retained BB1 1.5 installer</a>. The runtime ID is checked before the update starts.</p>
+  <p class="small">Chrome is the release browser target. Brave has a MIDI/SysEx site-permission setting, but has not been qualified for this installer. Other browsers are not release-qualified. <a href="/fm1/install/compatibility.html">Browser checks and loader help</a>.</p>
+  <p class="warn"><b>Don't unplug or power off while writing.</b> An interrupted MIDI updater and ROM recovery are different states. Read the troubleshooting steps below before retrying.</p>
+
+  <div class="finish" id="finish" role="status"><b>BB1 is ready.</b>Turn MASTER up, press HOME, then PLAY. <a href="/fm1/guide/" style="color:inherit">Open the guide →</a></div>
+
+  <section class="step" id="step1" aria-labelledby="s1">
+    <header><b id="s1">1</b> One click</header>
+    <div class="body">
+      <p>Installs BB1 2.1 and its matching sound library 2.1, including the sampled machines and on-device help. The USER kit builder is included. SLOOP kits have been removed; older projects that depend on them are unsupported. Keep a backup of your music before changing firmware; other firmware may replace data that BB1 needs. Read <a href="/fm1/install/backup.html">what to save and which flash regions overlap</a> first.</p>
+      <label class="check"><input type="checkbox" id="backup" checked> <span>Try the legacy archive backup if this firmware supports it (not a full BB1 project backup)</span></label>
+      <button class="go" id="go" disabled>Install BB1</button>
+      <div class="meter" aria-hidden="true"><i id="bar1"></i></div>
+      <p class="status" id="status1" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <details id="return-official" open>
+    <summary>Remove BB1 / return to official V15</summary>
+    <p class="warn">Keep a backup made with the firmware you plan to return to. Older BB1 releases may refuse scenes created with newer features; the official firmware cannot open BB1 projects.</p>
+    <div class="body">
+      <p>Download the official FM-1 V15 from <a href="https://www.m-vave.com/download" target="_blank" rel="noopener">M-VAVE</a> and choose the unchanged <b>FM-1.fwsc</b> here. It's checked in this browser and never uploaded.</p>
+      <p class="small">Choosing the file only checks it. Nothing is written until you press Return to official V15 and confirm.</p>
+      <p><input id="stock-file" type="file" accept=".fwsc" aria-label="Official FM-1.fwsc"></p>
+      <p class="small">The official firmware can't open BB1 music. Use the project-file export to keep the current project where available, and keep separate copies of every scene and USER kit you need. A project file is not a full device or sample-bank backup. See the <a href="/fm1/install/backup.html">backup checklist</a>.</p>
+      <label class="check"><input id="stock-nobackup" type="checkbox"> <span>I have saved the projects, scenes and USER-kit information I need, and understand this return does not make a full BB1 backup.</span></label>
+      <label class="check"><input id="stock-recovery" type="checkbox"> <span>An earlier attempt was cut off, and I already saved a backup</span></label>
+      <button class="go" id="stock-go" disabled>Return to official V15</button>
+      <div class="meter" aria-hidden="true"><i id="bar3"></i></div>
+      <p class="status" id="status3" aria-live="polite"></p>
+    </div>
+  </details>
+
+  <details id="troubleshooting" open>
+    <summary>Installation help</summary>
+    <div class="body">
+      <p><b>FM-1 not found.</b> Try another USB cable (some only charge), plug straight into the computer, and close other apps that use MIDI.</p>
+      <p><b>Loader not appearing.</b> Allow MIDI access including SysEx in this site's browser permissions, close every other MIDI app or installer tab, and use a direct USB data cable. Wait for this attempt to finish or show an error before reconnecting. If the MIDI update loader is then visible, retry this same package. <b>WL80UBOOT / ROM mode is not the MIDI loader;</b> stop browser retries in that state and use a separately verified recovery procedure. <a href="/fm1/install/compatibility.html">Full steps and browser status</a>.</p>
+      <p><b>The browser asked about MIDI devices.</b> Allow it: that's how this page talks to the FM-1. Nothing is sent anywhere else.</p>
+      <p><b>The FM-1 won't start at all.</b> See <a href="https://github.com/kurogedelic/FM-1-transporter" target="_blank" rel="noopener">FM-1 Transporter</a> for a hardware-assisted recovery route. A blank screen or ROM USB mode may need additional hardware; browser retry is not a proven recovery route for that state.</p>
+      <pre id="log"></pre>
+    </div>
+  </details>
+
+  <footer>
+    <p>BB1 is free software under the GNU GPL v3, with no warranty. You install it at your own risk. M-VAVE and FM-1 are trademarks of their owners; BB1 is not affiliated with or endorsed by them.</p>
+    <p><a href="/fm1/">BB1</a> · <a href="/fm1/guide/">Guide</a> · <a href="files/__SOURCE_FILE__">Source code</a> · Texas Radio &amp; The Big Beat</p>
+  </footer>
+</main>
+<script type="module">
+import { Updater } from "./fm1ota.js";
+import { productOf, logicalImage, sha256hex, validateStockPackage, STOCK_V15_SIZE } from "./fm1pkg.js";
+import { captureBackup, BackupConnection } from "./fm1backup.js";
+import { installSounds, MidiConsole, SOUND_BYTES } from "./bb1sounds.js";
+const $ = (id) => document.getElementById(id);
+const meta = /*META*/;
+const MSG = {
+  start: "Starting…", verify: "Checking the FM-1…", loader: "Switching to update mode…", write: "Writing BB1…",
+  reboot: "Restarting…", done: "BB1 is installed. Adding the sounds…",
+  denied: "MIDI access wasn't allowed. Allow MIDI for this site (in the address bar) and press Install again.",
+  notfound: "FM-1 not found. Check the USB cable, close other music apps, and press Install again.",
+  model: "That device isn't an FM-1.",
+  baseline: "Starting firmware refused. Use corrected-ID BB1 1.5 first (see the link above). Found: ",
+  lost: "The USB connection dropped. Plug it back in and press the button again.",
+  stopped: "It stopped partway. Plug the FM-1 back in and press the button again.",
+  noloader: "The MIDI loader did not appear. Check MIDI/SysEx permission and close other MIDI apps. Read Loader not appearing below before retrying; ROM mode is not supported by this page.",
+  noreturn: "The FM-1 didn't come back. Turn it off and on again.",
+  mismatch: "Written, but the FM-1 reports something else: ",
+  badpkg: "The install file is damaged. Reload the page.",
+  unavailable: "BB1 isn't available to install from this page yet.",
+  filesReady: "Installer files checked. Nothing has been written yet. Connect the FM-1, stop playback, turn MASTER fully down, then press Install BB1.",
+  backup: "Saving a backup of your music… ",
+  // sounds
+  connect: "Connecting to Big Beat…", check: "Checking the sounds… ", already: "The sounds are already installed. You're all set.",
+  swrite: "Writing the sounds… ", alldone: "BB1 and its sounds are installed.", restart: "Restarting…", sdone: "The sounds are installed.",
+  sunconfirmed: "The sounds are installed and checked. If the FM-1 didn't restart by itself, turn it off and on to load them.",
+  restartrefused: "The sounds are installed and checked, but the FM-1 didn't restart. Turn it off and on to load them.",
+  playing: "Stop playback on the FM-1, then try again.", master: "Turn MASTER fully down, then try again.",
+  refused: "The FM-1 couldn't pause for the update. Stop playback, turn MASTER down, close any app using the FM-1's audio, and try again.",
+  writefail: "Writing the sounds stopped. Press the button again to start over.",
+  timeout: "The FM-1 didn't answer. Unplug it, plug it back in, and try again.",
+  badread: "The check read failed. Press the button again.",
+  // official firmware
+  stockValid: "Official V15 checked.", stockError: "That isn't the unchanged official FM-1.fwsc.",
+  stockConfirmNoBackup: "Go back to official V15 now? This operation will not make a full BB1 backup, and V15 cannot open BB1 projects.",
+  stockNoBackup: "A complete device archive is unavailable. Read the backup checklist and confirm what you have saved before returning to V15.",
+  stockNeedBackup: "The FM-1 is in update mode, so it can't save a backup now. Tick the box only if you already saved one.",
+  stockConfirm: "Is the backup file saved on this computer? Continue to go back to the official V15. It can't open BB1 music.",
+  leave: "The FM-1 is being written. Don't close this page.",
+};
+const say = (n, key, arg = "", state = "") => { const el = $("status" + n); el.textContent = (MSG[key] ?? key) + arg; el.dataset.state = state; };
+const log = (t) => { $("log").textContent += t + "\n"; };
+const bar = (n, f) => { const el = $("bar" + n); if (el) el.style.width = Math.max(0, Math.min(100, f * 100)) + "%"; };
+$("version").textContent = meta.version;
+
+let image = null, sounds = null, writing = false, stock = null, stockEpoch = 0, wake = null;
+const lock = (on) => {
+  writing = on;
+  $("go").disabled = on || !image || !sounds;
+  $("stock-go").disabled = on || !stock; $("stock-file").disabled = on; $("stock-recovery").disabled = on;
+};
+async function awake(on) {
+  try { if (on && navigator.wakeLock && !wake) wake = await navigator.wakeLock.request("screen"); if (!on && wake) { await wake.release(); wake = null; } } catch (_) {}
+}
+window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault(); e.returnValue = MSG.leave; } });
+
+async function fetchPinned(url, bytes, sha) {
+  const r = await fetch(url, { cache: "no-cache" });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const b = new Uint8Array(await r.arrayBuffer());
+  if (b.length !== bytes || await sha256hex(b) !== sha) throw Object.assign(new Error("checksum"), { code: "badpkg" });
+  return b;
+}
+
+(async () => {
+  if (!navigator.requestMIDIAccess) { $("browser-warn").hidden = false; }
+  if (!navigator.requestMIDIAccess) { say(1, "unavailable"); return; }
+  try {
+    const pkg = await fetchPinned(meta.pkg, meta.pkgBytes, meta.pkgSha256);
+    if (productOf(pkg) !== meta.product) { say(1, "badpkg", "", "error"); return; }
+    image = logicalImage(pkg);
+    say(1, "filesReady");
+  } catch (e) { say(1, e.code === "badpkg" ? "badpkg" : "unavailable", "", "error"); log(String(e)); }
+  try {
+    sounds = await fetchPinned(meta.sounds, SOUND_BYTES, meta.soundsSha256);
+  } catch (e) { say(1, "unavailable", "", "error"); log("sounds: " + e); }
+  lock(false);
+})();
+
+function saveArchive(archive) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(archive)], { type: "application/json" }));
+  const a = document.createElement("a"); a.href = url; a.download = `BB1-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function archiveInfo(a) {
+  let pos = a.indexOf(0); if (pos < 0) throw new Error("Invalid INFO");
+  const version = String.fromCharCode(...a.slice(0, pos)); pos++;
+  const engines = a[pos]; pos += 5;
+  for (let i = 0; i < engines; i++) { const end = a.indexOf(0, pos); if (end < 0) throw new Error("Invalid INFO"); pos = end + 1; }
+  const ext = a.slice(pos + 1);
+  // the editor protocol's own name for this firmware family (BB1 and Felucca report "FELUCCA vX.Y")
+  const supported = /^FELUCCA /i.test(version) && ext[0] === 16 && ext[1] === 0x55 && ext[2] === 1 &&
+    ext[4] === 0x4d && ext[5] === 1 && ext[8] === 0x42 && ext[9] === 1 && (ext[10] & 1);
+  return { version, supported };
+}
+// A backup of the running firmware's music, when it supports one (BB1, Felucca). Official V15 does not.
+async function backupIfPossible(up, n) {
+  const device = await up.find((id) => id.model === "FM-1");
+  if (!device) return false;
+  const input = device.link.input, output = device.link.output; device.link.close();
+  const link = new BackupConnection(input, output);
+  try {
+    let info;
+    try { info = archiveInfo(await link.request([1, []])); } catch (_) { return false; }
+    if (!info.supported) return false;
+    const archive = await captureBackup((r, o) => link.request(r, o), info.version,
+      (done, total) => say(n, "backup", `${Math.round(done / Math.max(1, total) * 100)}%`));
+    saveArchive(archive); log("backup saved: " + info.version);
+    return true;
+  } finally { link.close(); }
+}
+const steps = (n, total = 74 + 1167) => (k, a) => {
+  log(`${k} ${a ?? ""}`);
+  const span = n === 1 ? 0.7 : 1;                   // the one-click install: firmware 70 % of the bar, the sounds the rest
+  if (k === "verify") bar(n, span * a / total);
+  if (k === "write") bar(n, span * (74 + a) / total);
+  if (k === "done") bar(n, span);
+  if (["start", "verify", "loader", "write", "reboot"].includes(k)) say(n, k);
+};
+function sayError(n, e) {
+  if (e && e.code && MSG[e.code]) say(n, e.code, e.detail || "", "error"); else say(n, "Error: " + (e && e.message), "", "error");
+  log(String(e && e.stack || e));
+}
+
+$("go").addEventListener("click", async () => {
+  if (writing || !image || !sounds) return;
+  $("finish").classList.remove("show"); $("step1").classList.remove("done");
+  lock(true); await awake(true);
+  let midi;
+  try { midi = await navigator.requestMIDIAccess({ sysex: true }); }
+  catch (e) { say(1, "denied", "", "error"); lock(false); await awake(false); return; }
+  try {
+    const up = new Updater(midi, log);
+    const step = steps(1);
+    // 1. the firmware (Felucca's two-stage update; resumes a write that was cut off)
+    const ota = await up.find((id) => /^ota-/i.test(id.model));
+    if (ota) {
+      ota.link.close();
+      if (!(await up.resume(image, step, meta.product))) { say(1, "stopped", "", "error"); return; }
+    } else {
+      if ($("backup").checked) { try { await backupIfPossible(up, 1); } catch (e) { log("backup: " + e); } }
+      await up.install(image, meta.product, step, meta.startingProducts ?? []);
+    }
+    say(1, "done");
+    // 2. the sounds, over the same USB-MIDI connection, to the firmware that was just installed
+    const dev = await up.waitFor((id) => id.model === "FM-1", 20000);
+    if (!dev) throw Object.assign(new Error("noreturn"), { code: "noreturn" });
+    if (dev.id.text !== meta.product) {
+      dev.link.close();
+      throw Object.assign(new Error(`Expected ${meta.product}; found ${dev.id.text}`), { code: "mismatch" });
+    }
+    const input = dev.link.input, output = dev.link.output; dev.link.close();
+    // ?rewrite-sounds rewrites the same library even when it is already there (hardware acceptance of the write path)
+    const force = new URLSearchParams(location.search).has("rewrite-sounds");
+    const r = await installSounds({ con: new MidiConsole(input, output), sounds, sha256: meta.soundsSha256, force, onStep: (k, f) => {
+      log(`sounds ${k} ${f ?? ""}`);
+      if (k === "check") { say(1, "check", `${Math.round(f * 100)}%`); bar(1, 0.7 + 0.3 * f); }
+      if (k === "write") { say(1, "swrite", `${Math.round(f * 100)}%`); bar(1, 0.7 + 0.3 * f); }
+      if (k === "restart") say(1, "restart");
+    } });
+    if (r.written && r.restart !== "confirmed") {
+      say(1, "sunconfirmed", "", "warn");
+      return;
+    }
+    if (r.written) {
+      const back = await up.waitFor((id) => id.model === "FM-1", 20000);
+      if (!back) throw Object.assign(new Error("noreturn"), { code: "noreturn" });
+      const returnedProduct = back.id.text; back.link.close();
+      if (returnedProduct !== meta.product) {
+        throw Object.assign(new Error(`Expected ${meta.product}; found ${returnedProduct}`), { code: "mismatch" });
+      }
+    }
+    bar(1, 1);
+    say(1, "alldone", "", "ok");
+    $("step1").classList.add("done"); $("finish").classList.add("show");
+  } catch (e) { sayError(1, e); }
+  finally { lock(false); await awake(false); }
+});
+
+$("stock-file").addEventListener("change", async () => {
+  const epoch = ++stockEpoch, file = $("stock-file").files[0]; stock = null; lock(false);
+  if (!file) return;
+  try {
+    if (file.size !== STOCK_V15_SIZE) throw new Error("size");
+    const v = await validateStockPackage(new Uint8Array(await file.arrayBuffer()));
+    if (epoch !== stockEpoch) return;
+    stock = v; say(3, "stockValid", "", "ok"); lock(false);
+  } catch (e) { if (epoch === stockEpoch) say(3, "stockError", "", "error"); }
+});
+$("stock-go").addEventListener("click", async () => {
+  if (!stock || writing) return;
+  const selected = stock; lock(true); await awake(true);
+  try {
+    let midi;
+    try { midi = await navigator.requestMIDIAccess({ sysex: true }); } catch (e) { say(3, "denied", "", "error"); return; }
+    const up = new Updater(midi, log);
+    const step = steps(3);
+    const loader = await up.find((id) => id.model === "ota-FM-1");
+    if (loader) {
+      loader.link.close();
+      if (!$("stock-recovery").checked) { say(3, "stockNeedBackup", "", "error"); return; }
+      if (!confirm(MSG.stockConfirm)) return;
+      say(3, (await up.resume(selected.image, step, selected.product)) ? "Done: the FM-1 is back on V15." : "stopped");
+    } else {
+      // Felucca-family firmware with the editor service saves a backup first. BB1 runs no editor service, so it
+      // can't; the player must confirm that explicitly. Nothing is skipped silently.
+      const saved = await backupIfPossible(up, 3);
+      if (!saved && !$("stock-nobackup").checked) { say(3, "stockNoBackup", "", "error"); return; }
+      if (!confirm(saved ? MSG.stockConfirm : MSG.stockConfirmNoBackup)) return;
+      await up.install(selected.image, selected.product, step);
+      say(3, "Done: the FM-1 is back on V15.", "", "ok");
+    }
+  } catch (e) { sayError(3, e); }
+  finally { lock(false); await awake(false); }
+});
+</script>
+</body>
+</html>

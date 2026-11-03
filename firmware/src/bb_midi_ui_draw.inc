@@ -10,12 +10,12 @@ static int bb_midi_ui_draw(void){
  if(!bb_v3_shown){bb_v3_init(&bb_v3,fm1_ms,bb_face.requested.running);bb_v3_invalidate(&bb_v3);}
  memset(in,0,sizeof *in);bb_v3_common(in,BB_UI_KNOBS);
  if(!bb_midi_page){
-  bb_v3_knobs(in);in->subtitle=BB_TX(TX_WHITE_1_MIDI_WHITE_4_ARRANGE);
+  bb_v3_knobs(in);in->subtitle=bb_v3_legend;   /* 2.1 P1: GLOBAL's keys from bb_nav's legend (the lights' table) */
  }else{
   static const char *const channel[]={"KIT A CH","KIT B CH","BASS CH","LEAD CH"};
   static const char *const clock[]={"CLOCK IN","FOLLOW","TRANSPORT","CLOCK OUT"};
   in->page_name=BB_TX(TX_GLOBAL_MIDI);in->title=bb_midi_page==1?BB_TX(TX_MIDI_CHANNELS):"MIDI CLOCK";
-  in->subtitle=bb_midi_page==1?BB_TX(TX_WHITE_2_CLOCK_EDIT_SAVE):bb_midi_compat_config.clock_out&&bb_midi_compat_config.clock_source==BB_MIDI_CLOCK_USB?"USB REALTIME IN OFF / OUT ON":"USB OUT / STOP TO EDIT / SAVE";
+  in->subtitle=bb_midi_page==1?bb_v3_legend:bb_midi_compat_config.clock_out&&bb_midi_compat_config.clock_source==BB_MIDI_CLOCK_USB?"USB REALTIME IN OFF / OUT ON":"USB OUT / STOP TO EDIT / SAVE";
   for(unsigned k=0;k<4;k++){
    unsigned value=0;
    if(bb_midi_page==1){

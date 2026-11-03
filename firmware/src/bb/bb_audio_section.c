@@ -37,14 +37,15 @@ static int outside(bb_audio *a,const void *p,size_t n){
 }
 static int identities_ok(const bb_audio *a){
     const bb_section_handoff *s=&a->section;
-    for(unsigned m=0;m<2;m++)if(a->drum_patterns.family[m]||
+    for(unsigned m=0;m<2;m++)if(!(s->keep&(1u<<m))&&(a->drum_patterns.family[m]||
        a->drum_patterns.family_epoch[m]!=s->epoch[m]||
-       a->rich.player[m].generation!=s->generation[m])return 0;
-    return a->patterns.status[0].applied==s->synth_applied;
+       a->rich.player[m].generation!=s->generation[m]))return 0;
+    return (s->keep&4u)||a->patterns.status[0].applied==s->synth_applied;
 }
 static int engines_ok(const bb_audio *a){
     const bb_section_handoff *s=&a->section;
     for(unsigned m=0;m<2;m++){
+        if(s->keep&(1u<<m))continue;
         if(s->rich_slot[m]>=BB_PATTERN_SLOTS)return 0;
         const bb_rich_slot *p=&a->rich.inbox[s->rich_slot[m]];
         const bb_delayed *q=&a->rich.player[m].queue;
@@ -54,6 +55,7 @@ static int engines_ok(const bb_audio *a){
            a->rich.player[m].generation==UINT32_MAX||q->count>BB_DELAYED_CAPACITY||
            q->active>1||q->generation>a->rich.player[m].generation)return 0;
     }
+    if(s->keep&4u)return 1;
     if(s->synth_slot>=BB_PATTERN_SLOTS)return 0;
     const bb_pattern_slot *p=&a->patterns.inbox[s->synth_slot];
     return p->state==BB_SECTION_SLOT&&p->ticket==s->ticket&&!p->synth;
@@ -61,50 +63,58 @@ static int engines_ok(const bb_audio *a){
 int bb_audio_section_submit(bb_audio *a,const bb_section_bundle *b,uint32_t *out){
     if(!a||!a->patterns.ready||(!a->commands.enter!=!a->commands.leave)||
        !outside(a,b,sizeof *b)||(out&&!outside(a,out,sizeof *out))||
-       !b->section||!b->revision||!b->project_revision||b->wait_ticks>4095||b->duration_ticks>262144u||b->restart>1||b->at_tick>1||
-       !bb_audio_pattern_data_valid(&b->dillo))return 0;
+       !b->section||!b->revision||!b->project_revision||b->wait_ticks>4095||b->duration_ticks>262144u||b->restart>1||b->at_tick>1||b->keep>6u||(b->keep&&b->restart)||
+       (!(b->keep&4u)&&!bb_audio_pattern_data_valid(&b->dillo)))return 0;
     if(out){uintptr_t x=(uintptr_t)out,y=(uintptr_t)b;
         if(x>UINTPTR_MAX-sizeof *out||y>UINTPTR_MAX-sizeof *b||
            (x<y+sizeof *b&&y<x+sizeof *out))return 0;
     }
-    for(unsigned m=0;m<2;m++)if(!bb_audio_phrase_preflight_playable(&b->drum[m],BB_RICH_REPRESENTABLE_VOICES))return 0;
+    /* HOLD: a kept part is outside this ticket: no preflight, slot, copy or status. A restart is a whole
+     * transport Start (bb_start + TRANSPORT_RESTART to every player), so it cannot leave a part untouched:
+     * keep!=0 with restart!=0 is refused above. Only this function writes the handoff's keep and restart. */
+    const unsigned keep=b->keep,need=2u-(keep&1u)-((keep>>1)&1u);
+    for(unsigned m=0;m<2;m++)if(!(keep&(1u<<m))&&!bb_audio_phrase_preflight_playable(&b->drum[m],BB_RICH_REPRESENTABLE_VOICES))return 0;
     uintptr_t guard=enter(a);bb_section_handoff *s=&a->section;
     if(s->phase!=BB_SECTION_FREE||s->cancel_serial==UINT32_MAX||
        a->patterns.next_ticket==UINT32_MAX||a->commands.stop_pending||a->commands.stop_inflight||
        (b->at_tick&&(uint32_t)(b->target_tick-a->core.ticks)>4095u)){leave(a,guard);return 0;}
     unsigned slots[2],count=0,synth=BB_PATTERN_SLOTS;
     for(unsigned i=0;i<BB_PATTERN_SLOTS;i++){
-        if(a->rich.inbox[i].state==BB_PATTERN_SLOT_FREE&&count<2)slots[count++]=i;
-        if(a->patterns.inbox[i].state==BB_PATTERN_SLOT_FREE&&synth==BB_PATTERN_SLOTS)synth=i;
+        if(a->rich.inbox[i].state==BB_PATTERN_SLOT_FREE&&count<need)slots[count++]=i;
+        if(!(keep&4u)&&a->patterns.inbox[i].state==BB_PATTERN_SLOT_FREE&&synth==BB_PATTERN_SLOTS)synth=i;
     }
-    if(count!=2||synth==BB_PATTERN_SLOTS){leave(a,guard);return 0;}
-    for(unsigned m=0;m<2;m++)if(a->drum_patterns.family[m]||
-       (b->drum[m].voices&~bb_audio_phrase_source_voices_owned(a,m))){leave(a,guard);return 0;}
+    if(count!=need||(!(keep&4u)&&synth==BB_PATTERN_SLOTS)){leave(a,guard);return 0;}
+    for(unsigned m=0;m<2;m++)if(!(keep&(1u<<m))&&(a->drum_patterns.family[m]||
+       (b->drum[m].voices&~bb_audio_phrase_source_voices_owned(a,m)))){leave(a,guard);return 0;}
     uint32_t ticket=++a->patterns.next_ticket,serial=s->cancel_serial;
     s->next_duration=b->duration_ticks;s->restart=b->restart;
-    s->ticket=ticket;s->due_tick=b->at_tick?b->target_tick:a->core.ticks+b->wait_ticks;s->synth_applied=a->patterns.status[0].applied;
+    s->keep=(uint8_t)keep;s->ticket=ticket;s->due_tick=b->at_tick?b->target_tick:a->core.ticks+b->wait_ticks;s->synth_applied=a->patterns.status[0].applied;
     s->status.section=b->section;s->status.revision=b->revision;s->status.project_revision=b->project_revision;
     s->phase=BB_SECTION_WRITING;s->status.phase=BB_SECTION_WRITING;s->status.error=BB_SECTION_ERROR_NONE;
-    for(unsigned m=0;m<2;m++){
-        s->rich_slot[m]=(uint8_t)slots[m];s->generation[m]=a->rich.player[m].generation;
-        s->epoch[m]=a->drum_patterns.family_epoch[m];
-        a->rich.inbox[slots[m]].ticket=ticket;a->rich.inbox[slots[m]].state=BB_PATTERN_SLOT_WRITING;
+    for(unsigned m=0,j=0;m<2;m++){
+        s->generation[m]=a->rich.player[m].generation;s->epoch[m]=a->drum_patterns.family_epoch[m];
+        if(keep&(1u<<m)){s->rich_slot[m]=BB_PATTERN_SLOTS;continue;}
+        s->rich_slot[m]=(uint8_t)slots[j++];
+        a->rich.inbox[s->rich_slot[m]].ticket=ticket;a->rich.inbox[s->rich_slot[m]].state=BB_PATTERN_SLOT_WRITING;
     }
     s->synth_slot=(uint8_t)synth;
-    a->patterns.inbox[synth].ticket=ticket;a->patterns.inbox[synth].state=BB_PATTERN_SLOT_WRITING;
+    if(synth<BB_PATTERN_SLOTS){a->patterns.inbox[synth].ticket=ticket;a->patterns.inbox[synth].state=BB_PATTERN_SLOT_WRITING;}
     leave(a,guard);
     /* Complete metadata and source ordinals remain immutable. No sample,
      * catalogue, DSP voice, mix or effect state is copied or recalled. */
     for(unsigned m=0;m<2;m++){
-        bb_rich_slot *p=&a->rich.inbox[slots[m]];p->data=b->drum[m];p->epoch=s->epoch[m];p->enable_on_apply=0;
+        if(keep&(1u<<m))continue;
+        bb_rich_slot *p=&a->rich.inbox[s->rich_slot[m]];p->data=b->drum[m];p->epoch=s->epoch[m];p->enable_on_apply=0;
         p->machine=(uint8_t)m;p->phrase=16;p->kit=255;
     }
-    a->patterns.inbox[synth].data=b->dillo;a->patterns.inbox[synth].synth=0;
-    a->patterns.inbox[synth].phrase=16;
+    if(synth<BB_PATTERN_SLOTS){
+        a->patterns.inbox[synth].data=b->dillo;a->patterns.inbox[synth].synth=0;
+        a->patterns.inbox[synth].phrase=16;
+    }
     guard=enter(a);
     if(s->cancel_serial!=serial){release(a);leave(a,guard);return 0;}
-    for(unsigned m=0;m<2;m++)a->rich.inbox[slots[m]].state=BB_SECTION_SLOT;
-    a->patterns.inbox[synth].state=BB_SECTION_SLOT;
+    for(unsigned m=0;m<2;m++)if(s->rich_slot[m]<BB_PATTERN_SLOTS)a->rich.inbox[s->rich_slot[m]].state=BB_SECTION_SLOT;
+    if(synth<BB_PATTERN_SLOTS)a->patterns.inbox[synth].state=BB_SECTION_SLOT;
     s->phase=BB_SECTION_QUEUED;s->status.phase=BB_SECTION_QUEUED;
     leave(a,guard);
     bb_command c={0};c.type=BB_CMD_SECTION_PATTERN;c.value=(uint16_t)ticket;
@@ -343,6 +353,7 @@ static void apply(bb_audio *a){
     if(!engines_ok(a)){bb_audio_section_cancel_owned(a,BB_SECTION_ERROR_ENGINE);return;}
     bb_audio_phrase_cancel(a);bb_audio_pattern_cancel(a,0);
     for(unsigned m=0;m<2;m++){
+        if(s->keep&(1u<<m))continue; /* HOLD: no copy, restart or status */
         a->rich.active[m]=a->rich.inbox[s->rich_slot[m]].data;a->rich.valid[m]=1;
         bb_audio_phrase_restart(a,m); /* cancels obsolete future hits, retains DSP tails */
         /* N02: a section can end on an odd sixteenth, so this hand-off may land on the second step of a swing
@@ -355,9 +366,11 @@ static void apply(bb_audio *a){
         bb_pattern_status *r=&a->rich.status[m];r->seen=r->applied=s->ticket;r->queued=0;
         r->applied_frame=a->core.frame;r->launches++;r->result=BB_RICH_APPLIED;a->rich.error[m]=0;
     }
-    bb_pattern_pending *p=&a->patterns.pending[0];
-    p->data=a->patterns.inbox[s->synth_slot].data;p->ticket=s->ticket;p->ready=1;
-    a->patterns.status[0].seen=s->ticket;bb_audio_pattern_apply_owned(a,0);
+    if(!(s->keep&4u)){
+        bb_pattern_pending *p=&a->patterns.pending[0];
+        p->data=a->patterns.inbox[s->synth_slot].data;p->ticket=s->ticket;p->ready=1;
+        a->patterns.status[0].seen=s->ticket;bb_audio_pattern_apply_owned(a,0);
+    }
     s->duration_ticks=s->next_duration;s->end_armed=(uint8_t)(s->duration_ticks!=0);
     s->status.applied_tick=a->core.ticks;s->status.end_tick=a->core.ticks+s->duration_ticks;
     s->status.ended=0;
@@ -375,11 +388,11 @@ void bb_audio_section_command(bb_audio *a,const bb_command *c,bb_live_command_fn
     s->status.state.seen=t;
     if(a->commands.stop_pending||a->commands.stop_inflight){bb_audio_section_cancel_owned(a,0);return;}
     if(!identities_ok(a)||!engines_ok(a)){bb_audio_section_cancel_owned(a,BB_SECTION_ERROR_STALE);return;}
-    for(unsigned m=0;m<2;m++)if(!bb_audio_phrase_preflight_playable(
+    for(unsigned m=0;m<2;m++)if(!(s->keep&(1u<<m))&&!bb_audio_phrase_preflight_playable(
         &a->rich.inbox[s->rich_slot[m]].data,bb_audio_phrase_source_voices_owned(a,m))){
         bb_audio_section_cancel_owned(a,BB_SECTION_ERROR_DATA);return;
     }
-    if(!bb_audio_pattern_data_valid(&a->patterns.inbox[s->synth_slot].data)){
+    if(!(s->keep&4u)&&!bb_audio_pattern_data_valid(&a->patterns.inbox[s->synth_slot].data)){
         bb_audio_section_cancel_owned(a,BB_SECTION_ERROR_DATA);return;
     }
     if(s->restart){

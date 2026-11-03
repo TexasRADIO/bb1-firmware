@@ -1,0 +1,50 @@
+{
+  "origin": "Verified public BB1 2.0 corresponding-source bundle; firmware 8425ff5",
+  "original_files": {
+    "compile.py": {
+      "bytes": 2384,
+      "sha256": "e837bc85f6815a0b47a67e4478943df935aa3d4009f9318fe270f230979855ec"
+    },
+    "emu-release.c": {
+      "bytes": 13350,
+      "sha256": "8a720509d30ddea43f8a291e015f04b105bbca17a6ff9879ce29df1735d43780"
+    },
+    "flags.txt": {
+      "bytes": 1299,
+      "sha256": "f721212a133e68c0bde9b5d54a6eeedab4d1651f16d5acbcaf1b08e89e1c476f"
+    },
+    "host_prep.py": {
+      "bytes": 3170,
+      "sha256": "cb33291927b3377bd846fc6373c69de38056b2d069e81250749b6aef2bcba4d6"
+    },
+    "link.sh": {
+      "bytes": 265,
+      "sha256": "83bd6c247ddcc46b194785713a5df2bb1e4c4351452c46c4b28651b5113b4501"
+    },
+    "shim/assert.h": {
+      "bytes": 41,
+      "sha256": "c9618c68c815709b092108c34e80612312cd57450df81052fb24d2f46b38e51a"
+    },
+    "shim/math.h": {
+      "bytes": 1161,
+      "sha256": "b49e6a7a2a993816a7e73404f31de5224f335780cc046637489fbf250c31d4d8"
+    },
+    "shim/stdio.h": {
+      "bytes": 13,
+      "sha256": "b3adf106d95b8934f690943f2921308b90be5b766c4c8ba250c792de56400201"
+    },
+    "shim/stdlib.h": {
+      "bytes": 88,
+      "sha256": "9dfb9a80717e8b45bf527c4e6f5dd762ad063f2927b9c3c079e6654ea6774a23"
+    },
+    "shim/string.h": {
+      "bytes": 437,
+      "sha256": "fa8e4523ae707798f2212e939c01e2c0fd6c971c9d7c1840089046c0e44f8209"
+    },
+    "wasm_host.c": {
+      "bytes": 1749,
+      "sha256": "265240caae954b82e72a7e72ad015c8027dd81183a0d2e690ff430e92c240af1"
+    }
+  },
+  "note": "These hashes identify imported originals before 2.1 adaptation; preserve upstream licences."
+}

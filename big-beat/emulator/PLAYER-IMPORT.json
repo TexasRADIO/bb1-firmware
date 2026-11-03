@@ -1,0 +1,5 @@
+{
+  "origin": "/Volumes/Orange Base/Codex Working Cache/tmp/bb1-installer-20-release-20261101/website/public/fm1/emulator/2.0/index.html",
+  "sha256": "8173705698265717f31a82679f1c8a816c83e4674cc14a012070c384cc48d1fe",
+  "notes": "Adapted existing BB1 website player; no embedded firmware retained in template. Fonts use local fallback for a self-contained review. Browser illumination now reads semantic firmware LED state; physical brightness is not simulated."
+}

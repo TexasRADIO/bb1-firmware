@@ -1,50 +1,36 @@
-# Big Beat Studio BB1 2.0 build
+# BB-1 2.0 development build
 
-## Selected source and status — 2 November 2026
+Joe assigned Duke to design, implement and assemble2.0 while Claude is offline, with subsequent review. This checkout is an isolated development branch from exact published corrected-ID1.5 source `b0b9c01acd1edeccf25fc35716f9f29d424a59c5`. It does not change live1.5, the historicalv1.5 tag or the1.1.1 publication hold.
 
-The release firmware source is `8425ff5db5da689da7a69b161c1e66a8b7974627` (`freeze/2.0-r3`). It supersedes the pre-fix `732646dd` freeze. The section-owner correction preserves sixteenth-note swing parity across odd-length SONG handoffs.
+## Current lean build (2026-10-31)
 
-Published at the owner’s explicit direction with the recorded timing issue deferred to a minor follow-up. Whole-stack and exhaustive hardware/persistence qualification are not represented as completed passes. See the release notes for exact known limitations.
+Use `big-beat/integration/build/recipes/composition-20-lean` for the current private build with project ownership enabled. See that recipe's README for the audit, preserved APIs and measured savings. The older foundation costs and implementation descriptions below are historical. This trim was freshly compiled and host-tested; it has no new hardware acceptance.
 
-Runtime identity is `FM-1_92200200`, display `BB-1 2.0`. Historical alpha descriptions and initial foundation sizes are not the current build.
+## Alpha1 foundation actually assembled
+
+- Tempo display and first GLOBAL edit correction.
+- Later MIDI: Continue/resume distinct from Start/reset; default-OFF USB24PPQN output; source-owned bend/sustain and scoped bank/program selection. Not external phase-sync or general THRU.
+- Rich-owner Euclid/Random and reversible generator handoff, retaining curated source data and metadata. GPL source credit in bb_gen.c is retained.
+- The original1.5 two drum machines, curated catalogue, Dillo/Open303, echo/spring and Armadillo foundation remain. Telegram/FixA stay OFF; no new engine, RAM-text expansion, quality reduction or increased join/deadline bound.
+
+Internal development identity: `FM-1_92200200`, display `BB-1 2.0 alpha 1`. This is a development marker, not a published release or globally reserved Hub identity. An offline FWSC and a short scoped unit check are now qualified; see HARDWARE-2.0-ALPHA1.md. This remains an incomplete development build, with no stable-release or full device acceptance.
 
 ## Native build
 
-Use the pinned toolchain and external dependencies documented in `BB1-1.5-BUILD.md`. No proprietary toolchain is redistributed. Build the selected source with the **composition-20-sloop** recipe:
+Use the unchanged1.5 pinned toolchain/Docker build process and external dependencies documented in BB1-1.5-BUILD.md. Every object compiles from source. The composition-20 recipe adds bb_gen in the recorded link order and its compile command derives from bb_evolve, changing only unit paths. It uses the same linker/RAM-text boundaries and default audio quality. No proprietary toolchain is redistributed.
 
-```sh
+```
 bash big-beat/integration/build/run_build.sh SOURCE \
  SOURCE/big-beat/integration/build/cmds-r4-onepass \
- SOURCE/big-beat/integration/build/recipes/composition-20-sloop NEW_OUTPUT
+ SOURCE/big-beat/integration/build/recipes/composition-20-lean NEW_OUTPUT
 ```
 
-Coordinate the existing native compiler lease before running. Use a fresh output directory and retain the recipe, flags, command logs and linker map with the resulting artifacts.
+Coordinate the existing atomic native compiler lease before running. The exact initial build used BB_WORKSPACE=/Volumes/Orange Base/Codex Working Cache/tmp/dillo-duo-revamp-20261029/native-workspace. Native output and host evidence are retained alongside this checkout under /Volumes/Orange Base/Codex Working Cache/tmp/bb1-20-integration-20261030.
 
-The independent 71-object build matches the lead's app exactly:
+Initial measured combined result:76fresh objects; app554144B, SHA4acc20a98b6cbb3246ef786c720414f85032e8ed7d4ee63f23ef3bc3fd0354e0; codefree27420B; ordinaryRAMfree31364B; poolfree77204B; RAMtext24028B. These are measured combined costs, not sums of separate patch estimates. Native fit does not establish runtime timing or stability.
 
-| Artifact or measurement | Frozen candidate |
-| --- | --- |
-| App | 568,548 bytes |
-| App SHA-256 | `4e083d1d7e9af457f93b0218837fed2b5ad2608b99a97968d58df020d5fd9977` |
-| FWSC SHA-256 | `30cfd720da4b9c02121deb2c9b90f1fedcf00c4cfe149544c1b1505f99c478d1` |
-| Code free | 13,016 bytes |
-| Ordinary RAM free | 4,212 bytes |
-| Pool free | 13,096 bytes |
-| RAM text | 24,028 bytes |
-| Matched library | 1.4, SHA-256 `9911a933e25a4bd507c4fa8240f86d53785eeb5ca6654e4e51215077ed447ada` |
+## Current tests and unfinished implementation
 
-Native fit is not a runtime timing or stack-safety qualification.
+Actual combined C engine catalogue oracle:539sections/482470calls; PCM hashdd330af1fdb22d765c8e53d509d24ede6ef779934875b0cf55931a9011716ab6, identical to released1.5 with default musical settings. Actual MIDI/transport owner58105checks; generator2551298pure+8alias checks; rich-owner6004checks across539sections. ASan/UBSan enabled. These do not establish panel usability, real receiver clock jitter, persistence, native playback timing or listening.
 
-## Browser module
-
-The staged release module is 1,226,390 bytes, SHA-256 `4ee2dc6b6bb83912cdc765b7a36e84c1f988b35b323c1c76dc10c90e94f29285`, with 71 exports and no imports. It uses the frozen firmware plus the BB1 release adapter, host preprocessing, freestanding support and shims. The upstream `web/emu` Felucca adapter alone does not reproduce this module. The [corresponding BB1 source and build-input bundle](https://github.com/TexasRADIO/bb1-firmware/releases/download/v2.0/bb1-emulator-source-2.0.zip) includes that exact firmware archive and the adapter inputs. A fresh rebuild reproduces the staged module byte for byte with the recorded tools; see its `CLEAN-REPLAY-RESULT.json`.
-
-The browser adapter replaces target assembly and panel SPI access with host equivalents. Browser results do not establish native timing, USB transport, physical controls, persistence or whole-stack acceptance.
-
-## Qualification scope
-
-The frozen correction passed 16,441 scoped audio/mode checks and 472 tap/navigation checks. Keep the 539 traditional sections, 205 ACID phrases and 168 legacy scenes as distinct coverage sets; do not treat historical foundation totals as a fresh complete run on every linked image.
-
-The app-only 2.0-to-1.5 round trip passed with two final reads matching all four original regions. The later 2.0/library-1.4 session showed a 6,031.5 microsecond callback against a 5,802.667 microsecond deadline, with one deadline exceed and one DMA miss. Subsequent 20 separate capped 30-second exposures passed without reproducing the miss. Those separate runs do not establish continuous exposure or explain the original event. Profiling and a timing fix are follow-up work; measurement firmware is not part of this release.
-
-Preserve component source and licence notices, original musical quality, two independent drums, Dillo, echo and spring. Physical, persistence, timing and stack verification remain separate from these build instructions; publication does not turn unverified work into a pass.
+The named arranger, per-hit expression/independent lanes, complete musical Undo/capture/project codec/MIDI export/sync, hybrid-kit production migration/installer and remaining measured engines are not implemented by this foundation. The prior host arrangement document model is not a playable arranger. Follow big-beat/composition-20/PLAN.md and ARRANGER-CONTRACT.md for the real C owner/scene integration; all six user priorities remain in scope. Full WASM/UI integration, complete combined native/stack/performance qualification and physical recovery/listening follow implementation. No completed2.0 or ready-to-publish claim is made.

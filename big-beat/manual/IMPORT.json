@@ -1,0 +1,71 @@
+{
+  "origin": "TexasRADIO/big-beat-fm1-review/claude/2.1/manual/tools",
+  "status": "Imported historical RC2 generator; not current release documentation. Requires no-SLOOP/current UI synchronization before use.",
+  "files": [
+    {
+      "name": "all.sh",
+      "git_blob": "73e230eaa9cd3ca13972a321a3bf00c915fac7ca"
+    },
+    {
+      "name": "build.py",
+      "git_blob": "38c1bbc32e0630a455cc64490d164b59c75f977d"
+    },
+    {
+      "name": "build.sh",
+      "git_blob": "a82add78fc06330fb054c35b95653f182f2ef566"
+    },
+    {
+      "name": "catcount.c",
+      "git_blob": "172711eba3d886930927fd46b257fa9e34166326"
+    },
+    {
+      "name": "catparts.c",
+      "git_blob": "5f36c6479c60ba0485c5b8482ab1d63e651ff657"
+    },
+    {
+      "name": "content.py",
+      "git_blob": "f9268bff2ac437a3ac3a143d6521daec57ed7f9f"
+    },
+    {
+      "name": "fitcheck.py",
+      "git_blob": "9b6a60725bf71837b7b031028064698d3ef6c387"
+    },
+    {
+      "name": "keymap.c",
+      "git_blob": "565d19a48bcb8b440816153f9c6e05bba161d479"
+    },
+    {
+      "name": "lib.py",
+      "git_blob": "91179b826bbd14ecd6b0bc5c9f0850907f86427d"
+    },
+    {
+      "name": "manual_capture.c",
+      "git_blob": "f993331d4c21ceb87321306b3513a7371e460ca2"
+    },
+    {
+      "name": "pdf.py",
+      "git_blob": "76f3a65e87d836b1001c0cd0185a117200dd3ee3"
+    },
+    {
+      "name": "raw2png.py",
+      "git_blob": "95659d315dd197a2fc14b849ee433cc0cfb94bc8"
+    },
+    {
+      "name": "release_flags.txt",
+      "git_blob": "c552f5b386999601343a3db5999af11fedd5422c"
+    },
+    {
+      "name": "secpage_probe.c",
+      "git_blob": "dd5a92d1a6eaa28065a09c49f5584fe591ec16b7"
+    },
+    {
+      "name": "shots21.py",
+      "git_blob": "eb628ca7e71c95cfce52218fba24269f00ffa17d"
+    },
+    {
+      "name": "whatsnew.py",
+      "git_blob": "c316af3f53219fae0afd905c2665aa1eeef93e44"
+    }
+  ]
+}
+

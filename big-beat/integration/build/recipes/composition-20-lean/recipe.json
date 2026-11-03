@@ -100,7 +100,7 @@
   "linker_script": "/link/run-r3/guarded-gc.ld",
   "asset_symbols": "/assets/asset-symbols.ld",
   "flag_edits": {
-    "-DFELUCCA_ID=\"FM-1_900\"": "-DFELUCCA_ID=\"FM-1_92200200\""
+    "-DFELUCCA_ID=\"FM-1_900\"": "-DFELUCCA_ID=\"FM-1_92200201\""
   },
   "extra_flags": [
     "-fdata-sections",
@@ -120,10 +120,14 @@
     ],
     "files": [
       "bb_ui_v3/bb_ui.c",
+      "bb_ui_v3/bb_ui_play.c",
       "bb_ui_v3_firmware.inc",
+      "bb_ui_play_firmware.inc",
       "bb_ui_v3_route.h",
       "bb_nav.c",
       "bb_nav_firmware.inc",
+      "bb_conductor_firmware.inc",
+      "bb_dillo_audition_firmware.inc",
       "bb_nav_draw.inc",
       "bb_nav_arm.h",
       "aux_navigation.c",
@@ -161,15 +165,63 @@
       "bb/bb_save_claim.h",
       "bb_pattern_edit_firmware.inc",
       "bb/bb_pattern_edit.h",
-      "bb_gen_firmware.inc"
+      "bb_gen_firmware.inc",
+      "bb_arranger_firmware.inc",
+      "bb_sample_boot.inc",
+      "bb_record_firmware.inc",
+      "bb_user_kit_firmware.inc",
+      "bb_user_kit_state.inc",
+      "bb_home_draw.inc",
+      "bb_home_input.inc",
+      "bb_kit_shelf.inc",
+      "bb_remote_transport.inc",
+      "bb_remote_effects.inc",
+      "bb_recovery_console.inc",
+      "bb_knob_contract.inc",
+      "bb_mixer_contract.inc",
+      "bb_ui_909.inc",
+      "bb/bb_midi_compat.h"
     ]
   },
   "unit_flag_edits": {
     "bb_project": {
       "-Os": "-Oz"
+    },
+    "bb_arrangement": {
+      "-Os": "-Oz"
+    },
+    "bb_gen": {
+      "-Os": "-Oz"
+    },
+    "sample_scene": {
+      "-Os": "-Oz"
+    },
+    "bb_sound_picker": {
+      "-Os": "-Oz"
+    },
+    "bb_live_record": {
+      "-Os": "-Oz"
+    },
+    "bb_live_record_arr": {
+      "-Os": "-Oz"
+    },
+    "bb_rich_scene": {
+      "-Os": "-Oz"
+    },
+    "bb_expression_scene": {
+      "-Os": "-Oz"
+    },
+    "group_scene": {
+      "-Os": "-Oz"
+    },
+    "bb_phrase_shaker": {
+      "-Os": "-Oz"
+    },
+    "bb_note_expression_catalogue": {
+      "-Os": "-Oz"
     }
   },
-  "unit_flag_edits_note": "2.0 size lane (claude/2.0/size): main-loop project-file unit only; no unit reached from an interrupt, CPU1 or audio render changes flags",
+  "unit_flag_edits_note": "2.0 size lane (claude/2.0/size): main-loop project-file unit only; no unit reached from an interrupt, CPU1 or audio render changes flags; 2.1 RC3 size pass: main-loop units with no function reachable from a timing root (wpgraph over every unit), bb_arr_sources / bb_arr_controller excluded (P3a owner review)",
   "inactive_render_root_note": "The candidate profile sets BB_WITH_909_ROUTE=0. Do not force inactive 909 renderer/probe/init/set/trigger API roots into this private composition build. All source objects and real reference resolution remain; family/scene compatibility decoders stay retained. Any actual reference still retains its dependency through normal linking. The roots list retains the selected project/recorder cost. The seven unrooted_unreferenced APIs have no native caller in this recipe and are not reserved in this native cost; source and referenced host/WASM APIs remain. Any new native caller requires fresh fit and acceptance.",
   "excluded_inactive_modules": [
     "bb909",

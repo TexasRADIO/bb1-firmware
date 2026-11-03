@@ -1,0 +1,46 @@
+{
+  "repository": "TexasRADIO/texas-radio-and-the-big-beat",
+  "commit": "0372632d00c8dd3c5b4b89c200482724bac7f0ca",
+  "files": [
+    {
+      "name": "FELUCCA-COMMIT",
+      "sha": "134d1a3e2b8951aea9d5c8553240f381e5361b11"
+    },
+    {
+      "name": "bb1sounds.js",
+      "sha": "7c9abb89f2ea97a71c2d24ff5c4c45652b726ab8"
+    },
+    {
+      "name": "fm1backup.js",
+      "sha": "17995d56a700a3054472d1bffe22969b0ea5eaf2"
+    },
+    {
+      "name": "fm1ota.js",
+      "sha": "bd41d40ddf8126752de2ddcc09f056af6c1a2d6d"
+    },
+    {
+      "name": "fm1pkg.js",
+      "sha": "82d35ce63e16c3a80769dadd32f234f02b33fa04"
+    },
+    {
+      "name": "index.tpl.html",
+      "sha": "9e91d557005506abdf1768963b6442e411dfd395"
+    },
+    {
+      "name": "make_installer.py",
+      "sha": "b563433c2112d3b6ba7b96b98870cd72a4064bbf"
+    },
+    {
+      "name": "backup.html",
+      "path": "public/fm1/install/backup.html",
+      "sha": "e5ac7df9f7f76cd783c6df72088dbb96a27b170a",
+      "adaptation": "Updated for 2.1; original blob recorded for provenance."
+    },
+    {
+      "name": "compatibility.html",
+      "path": "public/fm1/install/compatibility.html",
+      "sha": "72f9801afe0e43df5c1d8ae48ca6d41f57cebc26",
+      "adaptation": "Updated for 2.1; original blob recorded for provenance."
+    }
+  ]
+}

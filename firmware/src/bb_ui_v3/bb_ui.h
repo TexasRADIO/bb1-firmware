@@ -96,7 +96,7 @@ typedef struct {
 } bb_ui_lane;
 
 #define BB_UI_SECTIONS 11   /* = BB_NAV_SECTION_KEYS: one black key per drawn section */
-#define BB_UI_LIST 5
+#define BB_UI_LIST 10   /* RC2 (Joe 10:09): a chooser page is the list, ten rows */
 #define BB_UI_NO 0xFFu
 /* Cursor state is distinct from an audio-owner request and acknowledgement. */
 enum { BB_UI_BROWSER_NONE, BB_UI_BROWSER_BROWSE, BB_UI_BROWSER_REQUESTED,
@@ -161,6 +161,7 @@ typedef struct {
     const char *title, *subtitle;    /* big name, one grey line                    */
     const char *item[BB_UI_LIST];
     uint8_t items, cursor, playing_item, queued_item;
+    uint8_t welcome;         /* one-time HOME card; song cursor and PLAY use the normal list owner */
     uint8_t small_items; /* compact instructions, rather than section-name type */
     uint8_t progress;        /* 0..255 of the way to the boundary while queued     */
     uint8_t browser_state;   /* BB_UI_BROWSER_* for the highlighted pattern        */
@@ -180,7 +181,32 @@ typedef struct {
      * BB_EV_LEGEND, over the key band (y 181-195: the key map, or OUT / DSP on PLAY drums); the page's own
      * layout is untouched at rest. HOME gives it up while the quick start or the Dillo NEXT line needs the room. */
     const char *legend;
+    /* 2.1 P1: HELP rows generated from navigation's role tables (bb_nav_help): one screen page of them, the row of
+     * the control pressed while HOME is held (help_sel, BB_UI_NO: none) and that control in one line (help_note). */
+    const struct bb_ui_help_row *help_row;
+    uint8_t help_rows, help_sel, help_page, help_pages;
+    const char *help_note;
+    const char *help_word;   /* RC1: the HELP title's page when the layout's own word would be wrong (SONGS, PATCH) */
+    /* 2.1 P1: tabs on screen (FX: ECHO .. SENDS on white 1-5; EVOLVE: its three modes); tab_cur is bright */
+    const char *const *tab;
+    uint8_t tabs, tab_cur;
+    const char *tab_note;    /* one grey line with the tabs ("LFO OR B3: MODE", "ECHO ONLY \xB7 DRY DRIVE: SOUND") */
+    /* RC2 (Joe 10:09): chooser pages (KIT, PATTERN, HOME/SONGS) are the list only: each row's white key (0: none) and
+     * one footer line ("SONGS 3 of 71 \xB7 keys pick 1-16 \xB7 EDIT choose"); a notice takes the footer */
+    uint8_t item_key[BB_UI_LIST];
+    const char *footer;
+    /* RC2 (Joe 10:17): PERFORM (HOME/CONDUCT): the song, "SONG n of 71 \xB7 all three parts", the three parts (lane[]: name =
+     * section, flags MUTED / FOCUS), the sixteen section rows (white 1-16 on the section page tile_page), a status
+     * line and the legend */
+    const char *perf_song, *perf_status;   /* (perf_status: bb_ui_perform_status of these buttons and lanes) */
+    const char *tile[16];    /* RC2 (Joe 10:32): white keys 1-16 */
+    uint8_t tile_state[16];  /* BB_UI_TILE_* */
+    uint8_t tile_page;       /* section page 0..3: row k is section 16 * tile_page + k + 1 */
 } bb_ui_in;
+enum { BB_UI_TILE_NONE, BB_UI_TILE_HALF, BB_UI_TILE_QUEUED, BB_UI_TILE_PLAYING };
+/* one HELP row: keycaps (BB_UI_NO: none; rec: the REC keycap first), a key range or labels, and the text */
+#define BB_UI_HELP_ROWS 9
+typedef struct bb_ui_help_row { uint8_t kc, kc2, rec; const char *keys, *text; } bb_ui_help_row;
 
 /* ------------------------------------------------------------ state */
 #define BB_UI_MAX_EL 64
@@ -223,6 +249,8 @@ void bb_ui_init(bb_ui *u, uint32_t now_ms, uint8_t running);
 const bb_ui_stats *bb_ui_frame(bb_ui *u, const bb_ui_in *in);
 /* force a whole-screen redraw on the next frame (after a firmware overlay) */
 void bb_ui_invalidate(bb_ui *u);
+/* RC2 r2: PERFORM's status line from in's buttons (tile_state) and lanes: what the lit / queued button shows */
+void bb_ui_perform_status(char *o, uint32_t cap, const bb_ui_in *in);
 
 #define BB_UI_POPUP_MS 1000u      /* 2.0 D4: a turned knob's NAME + value for about 1 s, on every page */
 #define BB_UI_LEGEND_MS 2000u     /* 2.0 D4: the key legend, for about 2 s (shares the pop-up's timer) */
