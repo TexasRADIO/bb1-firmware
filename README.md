@@ -8,3 +8,4 @@ Firmware for the M-VAVE FM-1.
 
 Source is licensed under GPL-3.0. Third-party notices are included with each release.
 
+You can also try Big Beat Studio BB1 in the browser, no flashing needed, in the free community [FM-1 Emulator](https://fm1-emulator.atst.tools/).
