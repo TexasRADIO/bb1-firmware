@@ -1,0 +1,8 @@
+[
+  "-target",
+  "pi32v2",
+  "-c",
+  "/work/source/firmware/hal/bb_core1_probe.S",
+  "-o",
+  "/work/group_target_build-r1/bb_core1_probe.o"
+]

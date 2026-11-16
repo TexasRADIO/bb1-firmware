@@ -1,0 +1,291 @@
+/* Picnic Filled and Ghost Town Fill by Taylor Rushing; glyph use under the project-owner licence. */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#ifndef BB_UI_H
+#define BB_UI_H
+#include <stdint.h>
+
+/* ------------------------------------------------------------ tokens (audit §4.2) */
+#define BB_UI_BG    0x0000u
+#define BB_UI_TEXT  0xF79Du
+#define BB_UI_GREY  0x83EFu
+#define BB_UI_FAINT 0x2124u
+#define BB_UI_KIT_A 0xFD68u
+#define BB_UI_KIT_B 0x4E7Cu
+#define BB_UI_DILLO 0xFB14u
+#define BB_UI_RED   0xFA26u
+
+/* ------------------------------------------------------------ pages */
+enum {
+    BB_UI_STUDIO,       /* HOME: three instrument lanes                                   */
+    BB_UI_PLAY_DRUMS,   /* ARP on a drum kit: now row, four group lanes, master, knobs    */
+    BB_UI_STEPS,        /* SEQ on a drum kit: 11 x 16 matrix + selected voice             */
+    BB_UI_PLAY_DILLO,   /* ARP / SEQ on Dillo: piano roll + filter curve                  */
+    BB_UI_KIT,          /* PRESETS: kit / patch browser                                   */
+    BB_UI_PATTERN,      /* ALGORITHM: song timeline + fill countdown                      */
+    BB_UI_FX,           /* FX: the echo machine                                           */
+    BB_UI_KNOBS,        /* SOUND, SAVE, EVOLVE, GLOBAL: title + four meters                */
+    BB_UI_ATTRACT,      /* 30 s idle on STUDIO: the full engraving, the only full-size one */
+    BB_UI_ARRANGE,       /* named-section RAM project and source chooser */
+    BB_UI_PAGES
+};
+/* which page draws a bb_nav page (nav_page = bb_nav_page, play_keys =
+ * BB_NAV_PLAY_LIVE/STEPS, synth = the focused instrument is Dillo/Telegram) */
+uint8_t bb_ui_page_for(uint8_t nav_page, uint8_t play_keys, uint8_t synth);
+
+enum { BB_UI_INST_A, BB_UI_INST_B, BB_UI_INST_DILLO };
+#define BB_UI_HAS_QUICK_START 1
+#define BB_UI_HAS_RATCHET 1
+#define BB_UI_RATCHET_MIXED 0xFFu   /* ratchet[i]: the hit's copies have different counts */        /* colour identity */
+#if BB_WITH_STEP_CONDITIONS
+#define BB_UI_CONDITION_MIXED 0xFFu
+enum {BB_UI_CONDITION_ALWAYS,BB_UI_CONDITION_FIRST,BB_UI_CONDITION_EVERY_2,
+      BB_UI_CONDITION_EVERY_4,BB_UI_CONDITION_FILL,BB_UI_CONDITION_NOT_FILL,
+      BB_UI_CONDITION_COUNT};
+#endif
+enum { BB_UI_LED_DARK, BB_UI_LED_DIM, BB_UI_LED_LIT, BB_UI_LED_BREATH };   /* = BB_NAV_LED_* */
+enum { BB_UI_Q_KIT = 1u, BB_UI_Q_PATTERN = 2u, BB_UI_Q_SECTION = 4u, BB_UI_Q_START = 8u }; /* = BB_NAV_Q_* */
+
+/* events since the last frame (a bitmask the firmware ORs in from the sequencer / audio side
+ * and clears after each frame). v3 uses BEAT (beat dots), the group hits (lane level flash),
+ * KNOB (pop-up) and any input (attract timer); the rest are accepted and ignored. */
+enum {
+    BB_EV_BEAT   = 1u << 0,   /* a quarter note                                  */
+    BB_EV_BAR    = 1u << 1,   /* a bar start (with BEAT)                         */
+    BB_EV_KICK   = 1u << 2,   /* group hits: KICK, SN/CL, HATS, PERC             */
+    BB_EV_SNARE  = 1u << 3,
+    BB_EV_HATS   = 1u << 4,
+    BB_EV_PERC   = 1u << 5,
+    BB_EV_ACCENT = 1u << 6,   /* an accented hit (REC held)                      */
+    BB_EV_NOTE   = 1u << 7,   /* a Dillo note                                    */
+    BB_EV_NOTE_ACCENT = 1u << 8,
+    BB_EV_TAP    = 1u << 9,   /* tap tempo                                       */
+    BB_EV_KNOB   = 1u << 10,  /* K1-K4 turned; which in ev_knob                  */
+    BB_EV_INPUT  = 1u << 11,  /* any other key / button / encoder                */
+    BB_EV_LEGEND = 1u << 12   /* 2.0 D4: show the key legend (page entered, a key the page does not use) */
+};
+#define BB_EV_HITS (BB_EV_KICK | BB_EV_SNARE | BB_EV_HATS | BB_EV_PERC)
+
+/* one knob column */
+enum { BB_UI_KN_MUTE = 1u, BB_UI_KN_OFF = 2u, BB_UI_KN_FOCUS = 4u };
+typedef struct {
+    const char *label;      /* from bb_nav_knobs()                      */
+    const char *text;       /* value as text ("100", "1/8", "ON") ...   */
+    uint8_t bar;            /* value bar 0..255                         */
+    uint8_t flags;          /* BB_UI_KN_*                               */
+} bb_ui_knob;
+
+/* one STUDIO lane */
+enum { BB_UI_LN_MUTED = 1u, BB_UI_LN_NEXT = 2u, BB_UI_LN_FOCUS = 4u, BB_UI_LN_SOLO = 8u, BB_UI_LN_OFF = 16u, BB_UI_LN_EDITED = 32u };
+typedef struct {
+    const char *name, *pattern, *part;   /* "KIT A", "Posse On Broadway", "HOOK 3/8" */
+    const char *next;                    /* the queued section / pattern ("HOOK"), or 0 */
+    uint16_t steps, accents;             /* this bar's 16 steps (bit 0 = step 1)    */
+    uint8_t level;                       /* live output level 0..255                */
+    uint8_t flags;                       /* BB_UI_LN_*                              */
+} bb_ui_lane;
+
+#define BB_UI_SECTIONS 11   /* = BB_NAV_SECTION_KEYS: one black key per drawn section */
+#define BB_UI_LIST 10                                                              
+#define BB_UI_NO 0xFFu
+/* Cursor state is distinct from an audio-owner request and acknowledgement. */
+enum { BB_UI_BROWSER_NONE, BB_UI_BROWSER_BROWSE, BB_UI_BROWSER_REQUESTED,
+       BB_UI_BROWSER_QUEUED, BB_UI_BROWSER_PLAYING, BB_UI_BROWSER_LOADED };
+
+typedef struct {
+    uint32_t now_ms;
+    uint8_t page;            /* BB_UI_*                                            */
+    uint8_t help;            /* HELP overlay (hold HOME)                           */
+    uint8_t instr;           /* BB_UI_INST_* of the focused instrument             */
+    const char *page_name;   /* bb_nav_page_name() / bank name: "PLAY", "FX  ECHO" */
+    const char *instr_name;  /* "KIT A", "KIT B", "DILLO"                          */
+    /* transport and status */
+    uint8_t running, beat;   /* beat 0..3 within the bar                           */
+    uint8_t step;            /* playhead 0..15; Steps: 16 + bank if offscreen */
+    uint32_t ticks;          /* sequencer ticks, 4 per quarter note (bb_ticks, as the installed
+                                bb_playbook_face.inc reads it): the tower rings are born on them */
+    uint16_t bpm_x10;
+    uint8_t accent;          /* REC held: the instrument dot turns red             */
+    uint8_t queued;          /* BB_UI_Q_*                                          */
+    uint8_t loading;         /* a kit / sound is being prepared                    */
+    uint8_t fault;           /* show the fault toast; text below                   */
+    const char *fault_text;  /* one line, plain words                              */
+    const char *notice;      /* the firmware's current message (bb_say), or 0: shown as one
+                                line in the toast slot, never over a fault          */
+    const char *silence;     /* persistent reason that visible playing steps may be inaudible;
+                                a transient notice takes precedence                 */
+    uint8_t level;           /* master output level 0..255 (attract rays)          */
+    /* events since the last frame (BB_EV_*) */
+    uint32_t events;
+    uint8_t ev_knob;
+    /* knob bar + key map strip (mirrors the key LEDs) */
+    bb_ui_knob knob[4];
+    uint8_t knob_turning;    /* 0..3: show the pop-up (bb_ui keeps it BB_UI_POPUP_MS) / BB_UI_NO */
+    uint8_t key_led[27];     /* BB_UI_LED_* from bb_nav_leds(): white 1-16, black 1-11 */
+    uint32_t keys_down;      /* held keys (drawn white)                            */
+    uint32_t keys_red;       /* keys whose function is engaged as a cut: muted group, kill */
+    /* STUDIO */
+    bb_ui_lane lane[3];
+    /* PLAY drums (v3 §2) */
+    const char *pattern_name;    /* the playing pattern ("Posse On Broadway")      */
+    const char *section_name;    /* its current section ("HOOK")                   */
+    uint8_t bar, bars;           /* bar n of N in the section (1-based; 0 = hide)  */
+    const char *next_name;       /* what is queued for the boundary ("VERSE", "KIT B"), or 0 */
+    uint16_t gsteps[4], gacc[4]; /* this bar's 16 steps per group (KICK SN/CL HATS PERC) */
+    uint8_t group_level[4];      /* K1-K4 group levels 0..255 (the knob values)    */
+    uint8_t group_out[4];        /* live output level per group 0..255             */
+    uint8_t group_muted;         /* bits KICK SN/CL HATS PERC                      */
+    uint8_t group_zero;          /* faders confirmed at zero, independent of mute */
+    uint8_t out_peak[2];         /* master output L / R 0..255 (the published output peak) */
+    uint8_t dsp;                 /* audio block time / budget, 0..255 (255 = the whole budget) */
+    uint8_t fill;                /* fill playing                                   */
+    /* STEPS (drums) */
+    const char *voice_name;  /* "CLOSED HAT"                                       */
+    uint8_t voice;           /* selected voice 0..10                               */
+    uint16_t vsteps[11], vacc[11];
+    uint8_t bank, banks;     /* 16-step bank                                       */
+    uint8_t step_length;     /* total drum steps or Dillo phrase steps             */
+    /* PLAY Dillo */
+    const char *patch, *scale;   /* "Rubber Acid", "A MIN"                         */
+    int8_t note[16];         /* semitones above the lowest shown note, -1 rest     */
+    uint16_t note_acc, note_slide;
+    uint8_t cutoff, reso, envmod;    /* 0..255: the filter curve                   */
+    int8_t octave;
+    /* KIT / PATTERN browsers */
+    const char *title, *subtitle;    /* big name, one grey line                    */
+    const char *item[BB_UI_LIST];
+    uint8_t items, cursor, playing_item, queued_item;
+    uint8_t welcome;         /* one-time HOME card; song cursor and PLAY use the normal list owner */
+    uint8_t small_items; /* compact instructions, rather than section-name type */
+    uint8_t row_repeats[4]; /* SONG rows: repeat count, zero for ADD or RECORD */
+    uint8_t progress;        /* 0..255 of the way to the boundary while queued     */
+    uint8_t browser_state;   /* BB_UI_BROWSER_* for the highlighted pattern        */
+    uint8_t quick_start;     /* 2.0 N7: nothing loaded yet: HOME shows the three first moves */
+    uint8_t ratchet[16];     /* 2.0: STEPS, selected voice: x1..x4 per visible step (0 or 1 = none) */
+#if BB_WITH_STEP_CONDITIONS
+    uint8_t condition[16];   /* rich STEPS: BB_PC_*; 0 ALWAYS, 0xff mixed duplicates */
+#endif
+    uint8_t sections, sec_cur, sec_next;   /* sec_next BB_UI_NO = none            */
+    const char *sec_name[BB_UI_SECTIONS];
+    uint8_t sec_bars[BB_UI_SECTIONS];
+    uint8_t sec_pos;         /* 0..255 through the current section                 */
+    uint8_t fill_beats;      /* beats until the fill lands (0 = none)              */
+    /* FX (2.3: fxbus chain) */
+    uint16_t echo_ms;        /* delay time                                         */
+    uint8_t repeats;         /* feedback 0..255                                    */
+    uint8_t heads;           /* bits: heads 1-3 on                                 */
+    uint8_t banks_fx, bank_fx;
+    uint8_t fx_delay_type;   /* 0 DIGI, 1 TAPE                                    */
+    uint8_t fx_dist_type;    /* 0..4 (Diode..PDIST); 255 = off                    */
+    uint8_t fx_drive;        /* distortion drive 0..255                            */
+    uint8_t fx_comp;         /* compressor amount 0..255                           */
+    uint8_t fx_comp_gr;      /* compressor gain reduction 0..255 (live)            */
+    uint8_t fx_rv_decay;     /* reverb decay 0..255                                */
+    uint8_t fx_rv_level;     /* reverb return level 0..255                         */
+    uint8_t fx_motion;       /* motion depth 0..255                                */
+    uint8_t fx_wear;         /* tape wear 0..255                                   */
+    /* 2.0 D4: the page's one-line key legend (bb_nav_legend), or 0. Shown only for BB_UI_LEGEND_MS after
+     * BB_EV_LEGEND, over the key band (y 181-195: the key map, or OUT / DSP on PLAY drums); the page's own
+     * layout is untouched at rest. HOME gives it up while the quick start or the Dillo NEXT line needs the room. */
+    const char *legend;
+    /* 2.1 P1: HELP rows generated from navigation's role tables (bb_nav_help): one screen page of them, the row of
+     * the control pressed while HOME is held (help_sel, BB_UI_NO: none) and that control in one line (help_note). */
+    const struct bb_ui_help_row *help_row;
+    uint8_t help_rows, help_sel, help_page, help_pages;
+    const char *help_note;
+    const char *help_word;   /* RC1: the HELP title's page when the layout's own word would be wrong (SONGS, PATCH) */
+    /* 2.1 P1: tabs on screen (FX: ECHO .. SENDS on white 1-5; EVOLVE: its three modes); tab_cur is bright */
+    const char *const *tab;
+    uint8_t tabs, tab_cur;
+    const char *tab_note;    /* one grey line with the tabs ("LFO OR B3: MODE", "ECHO ONLY \xB7 DRY DRIVE: SOUND") */
+                                                                                                                      
+                                                                                                           
+    uint8_t item_key[BB_UI_LIST];
+    const char *footer;
+                                                                                                                              
+                                                                                                                   
+                             
+    const char *perf_song, *perf_status;   /* queued bank or mixed-band reference, and derived status line */
+    const char *perf_cue_name; /* pending section or pending/applied combination, independent of grid page */
+    const char *tile[16];                                          
+    uint8_t tile_state[16];  /* BB_UI_TILE_* */
+    uint8_t perf_combo_playing; /* bit per drum owner still playing the applied combination */
+    uint8_t perf_combo_queued;  /* a chord cue needs the same chord to cancel */
+    uint8_t tile_page;       /* section page 0..3: row k is section 16 * tile_page + k + 1 */
+} bb_ui_in;
+enum { BB_UI_TILE_NONE, BB_UI_TILE_HALF, BB_UI_TILE_QUEUED, BB_UI_TILE_PLAYING };
+/* one HELP row: keycaps (BB_UI_NO: none; rec: the REC keycap first), a key range or labels, and the text */
+#define BB_UI_HELP_ROWS 9
+typedef struct bb_ui_help_row { uint8_t kc, kc2, rec; const char *keys, *text; } bb_ui_help_row;
+
+/* ------------------------------------------------------------ state */
+#define BB_UI_MAX_EL 64
+typedef struct {
+    uint16_t px;             /* pixels sent this frame                              */
+    uint8_t regions;         /* regions drawn                                       */
+    uint8_t waiting;         /* dirty regions left for a later frame                */
+    uint8_t full;            /* the whole screen was drawn (page change)            */
+} bb_ui_stats;
+
+/* the tower's quarter-note rings: a port of the installed bb_pb_motion (bb_playbook_face.inc) */
+typedef struct { uint32_t born; uint8_t active; } bb_ui_wave;
+typedef struct {
+    bb_ui_wave wave[4];
+    uint32_t tick;
+    uint8_t slot, seen;
+} bb_ui_rings;
+
+#define BB_UI_ROLL_STEPS 9   /* STOP: the plate re-inks into the ball in 5 ordered steps, BIG BEAT in 4 */
+
+typedef struct {
+    uint8_t page;            /* drawn page (BB_UI_NO: none yet)                     */
+    uint8_t help;
+    uint8_t n_el;
+    uint32_t drawn[BB_UI_MAX_EL];    /* state hash of what is on the screen per element */
+    uint32_t flash_t[4];     /* group hit times (lane level flash), |1              */
+    uint32_t pop_t;          /* knob pop-up shown since, |1                         */
+    uint8_t pop_k;
+    uint32_t beat_t;         /* last beat, |1 (attract rays)                        */
+    uint32_t idle_t;         /* last input on STUDIO (attract after 30 s)           */
+    uint8_t roll;            /* 0 = the plate .. BB_UI_ROLL_STEPS = the ball with BIG BEAT */
+    uint32_t roll_t;         /* last roll step                                      */
+    bb_ui_rings rings;
+    uint32_t budget_px;      /* pixels per frame (0 = unlimited)                    */
+    bb_ui_stats st;
+} bb_ui;
+
+void bb_ui_init(bb_ui *u, uint32_t now_ms, uint8_t running);
+/* one UI frame: update the rings and the roll, redraw what changed within the budget. */
+const bb_ui_stats *bb_ui_frame(bb_ui *u, const bb_ui_in *in);
+/* force a whole-screen redraw on the next frame (after a firmware overlay) */
+void bb_ui_invalidate(bb_ui *u);
+/* RC2 r2: PERFORM's status line from in's buttons (tile_state) and lanes: what the lit / queued button shows */
+void bb_ui_perform_status(char *o, uint32_t cap, const bb_ui_in *in);
+
+#define BB_UI_POPUP_MS 1000u      /* 2.0 D4: a turned knob's NAME + value for about 1 s, on every page */
+#define BB_UI_LEGEND_MS 2000u     /* 2.0 D4: the key legend, for about 2 s (shares the pop-up's timer) */
+#define BB_UI_POP_LEGEND 4u       /* pop_k: the legend, not a knob */
+#define BB_UI_FLASH_MS 120u
+#define BB_UI_ATTRACT_MS 30000u
+#define BB_UI_RING_MS 900u       /* installed: a ring lives 900 ms                  */
+#define BB_UI_MINI_MS 66u        /* the mini and its rings: ~15 frames a second     */
+#define BB_UI_ROLL_MS 90u        /* one roll step (the lettering: 60 ms)            */
+#define BB_UI_BUDGET_PX 24000u   /* ~32 ms of SPI at 12 MHz per frame by default    */
+
+#endif

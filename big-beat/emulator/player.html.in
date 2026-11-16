@@ -1,0 +1,2111 @@
+<meta charset="utf-8">
+<title>Big Beat Studio BB1 · Browser player</title>
+<meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>
+/* Layout: one device body, screen and encoders on top, the button bank, then the 27-key keyboard; notes underneath. Single dark look: it is a black instrument. */
+:root {
+  --room: #121315;         /* page */
+  --body: #1d1f22;         /* device shell */
+  --body-edge: #2c2f33;
+  --cap: #34383d;          /* button caps */
+  --cap-down: #ffb547;
+  --ink: #e9e6df;          /* printed legends */
+  --ink-dim: #8e918f;
+  --amber: #ffb547;        /* Big Beat accent (matches the firmware's ember) */
+  --white-key: #e8e5dc;
+  --black-key: #16171a;
+  --display: "Archivo Narrow", "Arial Narrow", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { background: var(--room); color: var(--ink); }
+body { margin: 0; font-family: var(--display); padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 980px; min-width: 0; margin: 0 auto; display: grid; gap: 18px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 20px; }
+h1 { font-size: 1.6rem; letter-spacing: .02em; margin: 0; font-weight: 700; text-wrap: balance; }
+h1 span { color: var(--amber); }
+.build { font-family: var(--mono); font-size: .72rem; color: var(--ink-dim); }
+.device { background: var(--body); border: 1px solid var(--body-edge); border-radius: 18px; padding: 18px; display: grid; gap: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04); }
+.top { display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: start; }
+.screen-wrap { position: relative; background: #000; border-radius: 6px; padding: 8px; border: 1px solid #000; box-shadow: inset 0 0 0 2px #26292d; }
+canvas#screen { display: block; width: 360px; height: 360px; max-width: 100%; image-rendering: auto; }
+.power { position: static; min-height: 48px; padding: 12px 18px; display: grid; place-items: center; background: #34383d; border: 0; color: #fff; font: 700 1.05rem var(--display); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.power[hidden] { display: none; }
+.power small { display: block; font: 400 .72rem var(--mono); letter-spacing: 0; text-transform: none; color: #ddd; margin-top: 6px; }
+.power:disabled { opacity: .6; }
+.power:focus-visible { outline: 2px solid var(--amber); outline-offset: -4px; }
+.controls { display: grid; gap: 16px; min-width: 0; }
+.encoders { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 10px; }
+.enc:nth-child(4) { grid-column: 1; }
+.enc { display: grid; justify-items: center; gap: 6px; user-select: none; touch-action: none; }
+.knob { width: 54px; height: 54px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #4a4f55, #24272b 70%); border: 1px solid #0c0d0e; position: relative; cursor: ns-resize; }
+.knob::after { content: ""; position: absolute; left: 50%; top: 5px; width: 3px; height: 14px; margin-left: -1.5px; background: var(--ink); border-radius: 2px; transform-origin: 50% 22px; transform: rotate(var(--a, 0deg)); }
+.knob:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+.enc label { font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); }
+.nudge { display: flex; gap: 4px; }
+.nudge button { width: 26px; height: 20px; border-radius: 4px; border: 1px solid #0c0d0e; background: var(--cap); color: var(--ink); font: 600 .8rem var(--mono); line-height: 1; cursor: pointer; padding: 0; }
+.buttons { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px 8px; }
+.btn { display: grid; justify-items: center; gap: 5px; }
+.btn button { width: 100%; max-width: 64px; height: 30px; border-radius: 6px; border: 1px solid #0c0d0e; background: var(--cap); color: var(--ink); font: 700 .74rem var(--display); letter-spacing: .08em; cursor: pointer; touch-action: none; box-shadow: 0 2px 0 #0c0d0e; }
+.btn button.down { background: var(--cap-down); color: #1b1408; transform: translateY(1px); box-shadow: 0 1px 0 #0c0d0e; }
+.btn button.latched { outline: 2px dashed var(--amber); outline-offset: 2px; }
+.btn button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.btn kbd { font: 400 .62rem var(--mono); color: var(--ink-dim); }
+.keyboard { position: relative; height: 150px; touch-action: none; user-select: none; overflow-x: auto; }
+.keys { position: relative; height: 100%; min-width: 560px; }
+.wk, .bk { position: absolute; top: 0; border: 1px solid #0c0d0e; cursor: pointer; }
+.wk { background: var(--white-key); height: 100%; border-radius: 0 0 6px 6px; }
+.bk { background: var(--black-key); height: 60%; border-radius: 0 0 4px 4px; z-index: 2; box-shadow: inset 0 -4px 0 #2a2c30; }
+.wk.down { background: var(--amber); } .bk.down { background: #a8701f; }
+.wk span, .bk span { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; font: 400 .6rem var(--mono); color: #6c6a64; }
+.bk span { color: #7b7e83; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px 28px; font-size: .92rem; line-height: 1.5; color: var(--ink-dim); }
+.notes h2 { font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); margin: 0 0 6px; }
+.notes p, .notes ul { margin: 0; max-width: 62ch; }
+.notes ul { padding-left: 1.1em; }
+.notes code { font-family: var(--mono); font-size: .8rem; color: var(--ink); }
+.status { font-family: var(--mono); font-size: .75rem; color: var(--ink-dim); display: flex; gap: 16px; flex-wrap: wrap; }
+.status b { color: var(--amber); font-weight: 600; }
+.candidate { border: 2px solid #b54137; background: #fff0ed; color: #6d1f18; padding: 10px 14px; font: 700 .78rem/1.4 var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+@media (max-width: 760px) {
+  .top { grid-template-columns: 1fr; justify-items: center; }
+  canvas#screen { width: min(360px, calc(100vw - 80px)); height: auto; aspect-ratio: 1; }
+  .controls { width: 100%; }
+  .buttons { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px 5px; }
+  .btn button { font-size: .6rem; letter-spacing: .02em; height: 34px; }
+  .device { padding: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* Controls view: a Logic-style list editor (one row per encoder) as an alternative to the knobs, for phones */
+.view-toggle { display: inline-flex; border: 1px solid #0c0d0e; border-radius: 8px; overflow: hidden; justify-self: start; }
+.view-toggle button { font: 700 .72rem var(--display); letter-spacing: .1em; text-transform: uppercase; padding: 8px 14px; min-height: 36px; background: var(--cap); color: var(--ink-dim); border: 0; cursor: pointer; }
+.view-toggle button[aria-pressed="true"] { background: var(--amber); color: #1b1408; }
+.view-toggle button:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+.ctl-list { display: grid; gap: 8px; }
+.ctl-list[hidden], .encoders[hidden] { display: none; }
+.ctl { display: grid; grid-template-columns: 88px 1fr auto; align-items: center; gap: 8px; background: #17191c; border: 1px solid #0c0d0e; border-radius: 8px; padding: 6px 8px; }
+.ctl .name { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); }
+.ctl .name small { display: block; font: 400 .62rem var(--mono); letter-spacing: 0; text-transform: none; color: var(--ink-dim); }
+.ctl .strip { position: relative; height: 40px; border-radius: 6px; background: repeating-linear-gradient(90deg, #26292d 0 1px, #1f2125 1px 14px); border: 1px solid #0c0d0e; touch-action: none; cursor: ew-resize; overflow: hidden; }
+.ctl .strip i { position: absolute; top: 4px; bottom: 4px; width: 4px; margin-left: -2px; left: var(--p, 50%); background: var(--amber); border-radius: 2px; transition: left .08s; }
+.ctl .strip:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.ctl .steps { display: flex; gap: 4px; }
+.ctl .steps button { min-width: 40px; height: 40px; border-radius: 6px; border: 1px solid #0c0d0e; background: var(--cap); color: var(--ink); font: 600 .8rem var(--mono); cursor: pointer; padding: 0 4px; }
+.ctl .steps button:active { background: var(--cap-down); color: #1b1408; }
+@media (max-width: 760px) { .ctl { grid-template-columns: 1fr auto; } .ctl .strip { grid-column: 1 / -1; grid-row: 2; height: 44px; } .ctl .steps button { min-width: 44px; height: 44px; } }
+
+/* ===== Guide look: the player's-guide cover. Light paper, FM-1 wordmark, flat FM-1 panel drawn from
+   the guide's measured control boxes (Felucca gen_panel_diagram CTRL), live firmware screen in its window. ===== */
+:root {
+  --paper:#e9eae8; --sheet:#f6f6f4; --pink:#1b1c1b; --mute:#6b6e69; --line:#c9cbc6;
+  --pbody:#45474a; --face:#3a3c3f; --well:#2c2d30; --pbtn:#55585c; --btnink:#c7c9cc; --keyw:#4a4b4f; --keyb:#35363a; --knob:#8d8f92;
+  --lit:#ffae41; --litink:#1b1c1b;
+  --f-disp:"Archivo","Helvetica Neue",Arial,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme: light;
+  /* the earlier dark tokens, re-pointed at the paper look (the reviewer panel reads these) */
+  --room: var(--paper); --ink: #1b1c1b; --ink-dim: #6b6e69; --amber: #ffae41;
+  --rv-line-page: #c9cbc6; --rv-card-page: #f6f6f4; --rv-field: #ffffff;
+}
+html, body { background: var(--paper); color: var(--pink); }
+body { font-family: var(--f-disp); }
+.wrap { max-width: 1080px; gap: 22px; }
+.cover { display: grid; grid-template-columns: 1fr 1fr; gap: 26px 28px; align-items: start; padding: 8px 0 6px; }
+.cover .model { font: 400 clamp(64px, 11vw, 112px)/.9 "BB Rodeo", var(--f-disp); letter-spacing: .01em; color: var(--pink); }
+.cover .sub { font: 500 clamp(26px, 3.6vw, 40px)/1.15 var(--f-mono); text-transform: lowercase; color: var(--pink); }
+.cover .doc { font: 500 clamp(24px, 3.3vw, 38px)/1.3 var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--pink); }
+.cover .ver { font: 500 clamp(24px, 3.3vw, 38px)/1.3 var(--f-mono); color: var(--mute); }
+.cover .doc small { display: block; font-size: .42em; letter-spacing: .1em; color: var(--mute); margin-top: 8px; }
+section.device { background: transparent; border: 0; box-shadow: none; padding: 0; gap: 14px; }
+.stage { position: relative; width: 100%; aspect-ratio: 1750 / 1020; user-select: none; -webkit-user-select: none; touch-action: none; }
+.stage svg.panel { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.stage .screen-wrap { position: absolute; left: 26.857%; top: 6.863%; width: 20.571%; height: 35.294%; padding: 0; border: 0; border-radius: 0; background: #000; box-shadow: none; }
+.stage canvas#screen { width: 100%; height: 100%; max-width: none; }
+.stage .power { inset: 0; font-size: clamp(.6rem, 1.3vw, 1rem); }
+.panel text { font-family: var(--f-mono); text-transform: uppercase; pointer-events: none; }
+.panel .hit { cursor: pointer; }
+.panel .knobg { cursor: ns-resize; }
+.panel .down rect.cap, .panel .down circle.cap, .panel .lit rect.cap { fill: var(--lit); }
+.panel .down text, .panel .fw-full text, .panel .lit text { fill: var(--litink); }
+.panel .deck-legend { fill: #fff; font-weight: 700; }
+.panel .pad-name { fill: #f6f6f4; font-size: 17px; font-weight: 700; }
+.panel :is(.down,.fw-full,.fw-mid) .pad-name { fill: var(--litink); }
+.panel .fw-breath:not(.down) .pad-name { stroke: var(--litink); stroke-width: 3; paint-order: stroke; }
+.device:not([data-drum-landing]) .deck-legend { display:none; }
+/* Semantic illumination: CSS contrast is not a physical LED brightness calibration. */
+.panel .fw-full rect.cap, .panel .fw-full circle.cap { fill: var(--lit); }
+.panel .fw-mid rect.cap { fill: #ad7938; }
+.panel .fw-dim rect.cap { fill: #6f573b; }
+.panel .fw-breath rect.cap { animation: bb-led-breathe 1.8s ease-in-out infinite alternate; }
+@keyframes bb-led-breathe { from { fill: #6f573b; } to { fill: var(--lit); } }
+@media (prefers-reduced-motion: reduce) { .panel .fw-breath rect.cap { animation: none; fill: #ad7938; } }
+.panel .down rect.cap { fill: var(--lit); }
+.panel .knobg:focus-visible circle.cap, .panel .hit:focus-visible rect.cap { stroke: var(--lit); stroke-width: 6; }
+.panel g:focus { outline: none; }
+.big-screen { display: none; }
+.encoders { display: none !important; }
+.buttons { display: none !important; }
+.keyboard { display: none !important; }
+/* Keep focused readout controls rendered across the breakpoint until the
+   next frame puts them back beside the desktop panel. */
+@media(min-width:761px) {
+  .keyboard:has(.conductor-readout), .keys:has(> .conductor-readout) { display:contents !important; }
+  .keys:has(> .conductor-readout) > .key-bank { display:none; }
+}
+.view-toggle { justify-self: center; }
+.view-toggle button { background: var(--sheet); color: var(--mute); border: 0; }
+.view-toggle { border: 1px solid var(--pink); border-radius: 3px; }
+.view-toggle button[aria-pressed="true"] { background: var(--pink); color: var(--paper); }
+.ctl { background: var(--sheet); border: 1px solid var(--line); }
+.ctl .name { color: var(--pink); } .ctl .name small { color: var(--mute); }
+.ctl .strip { background: repeating-linear-gradient(90deg, #d7d9d4 0 1px, #eceeea 1px 14px); border-color: var(--line); }
+.ctl .strip i { background: var(--pink); }
+.ctl .steps button { background: var(--pbtn); color: #fff; border-color: #2c2d30; }
+.status { color: var(--mute); justify-content: center; } .status b { color: #b86a00; }
+.notes { color: var(--mute); border-top: 1px solid var(--pink); padding-top: 18px; }
+.notes h2 { color: var(--pink); } .notes code { color: var(--pink); }
+.controls-row { display: grid; gap: 12px; }
+@media (max-width: 760px) {
+  .cover { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px 16px; }
+  .cover > * { min-width: 0; overflow-wrap: anywhere; }
+  .cover .doc small, .cover .doc small span { overflow-wrap: anywhere; word-break: break-word; }
+  .big-screen { display: block; position: relative; box-sizing: border-box; width: min(100%, 360px); aspect-ratio: 1; margin: 0 auto; background: #000; border-radius: 10px; padding: 8px; }
+  .big-screen .power { inset: 8px; font-size: 1rem; }
+  .cover .model { font-size: 64px; } .cover .sub { font-size: 22px; } .cover .doc, .cover .ver { font-size: 17px; }
+  .big-screen canvas { display: block; width: 100%; height: 100%; }
+}
+</style>
+<style id="bb1-20-project-layout">
+.project-tools { grid-template-columns:1fr; }
+.project-tools button { min-height:44px; padding:8px 14px; margin:4px 4px 4px 0; border:1px solid currentColor; background:transparent; color:inherit; font:inherit; cursor:pointer; }
+@media(max-width:760px) { .cover .model { font-size:clamp(40px,12vw,56px); white-space:nowrap; } }
+
+:is(#open-drums,#drum-recover,#drum-audio,#conductor-cancel,#stage-band,#drum-decks button,.song-actions button,.drum-mix button) { min-height:44px; padding:8px 16px; border:1px solid var(--pink); background:var(--sheet); color:var(--pink); font:700 .9rem var(--f-disp); cursor:pointer; }
+:is(#open-drums,#drum-recover,#drum-audio,#conductor-cancel,#stage-band,#drum-decks button,.song-actions button,.drum-mix button):disabled { color:var(--mute); border-color:var(--line); cursor:default; }
+:is(#open-drums,#drum-recover,#drum-audio,#conductor-cancel,#stage-band,#drum-decks button,.song-actions button,.drum-mix button):focus-visible { outline:2px solid var(--pink); outline-offset:2px; }
+#drum-decks:not([hidden]) { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+#drum-decks button { padding:6px; }
+#drum-decks [aria-pressed="true"] { background:var(--pink); color:var(--sheet); }
+#drum-decks #drum-recover[hidden] { display:block; visibility:hidden; }
+.conductor-readout { border:1px solid var(--line); padding:10px 12px; color:var(--ink); background:var(--sheet); }
+.conductor-readout h2, .conductor-readout p { margin:0; font:700 .85rem/1.4 var(--mono); }
+.conductor-readout ul { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px 12px; margin:8px 0; padding:0; list-style:none; }
+.conductor-readout li { min-width:0; overflow-wrap:anywhere; font:500 .85rem/1.4 var(--mono); }
+.conductor-readout strong { color:var(--pink); }
+.conductor-readout span { display:block; }
+.conductor-readout p { overflow-wrap:anywhere; }
+.conductor-cue { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+#conductor-cancel { flex:none; }
+#stage-band { margin-top:8px; }
+.drum-mix { border:1px solid var(--line); padding:10px 12px; background:var(--sheet); }
+.drum-mix h2, .drum-mix p { margin:0 0 6px; font:700 .85rem/1.4 var(--mono); }
+.drum-mix h2, .drum-mix strong { color:var(--pink); }
+.drum-mix > div { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+.drum-mix article { min-width:0; padding:6px; border:1px solid var(--line); font:500 .8rem/1.4 var(--mono); }
+.drum-mix article > span { display:block; }
+.drum-mix meter { width:100%; height:12px; }
+.drum-mix .mix-buttons { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; }
+.drum-mix button { padding:4px; }
+.drum-mix .mix-mute { grid-column:1 / -1; }
+.drum-recovery { border:1px solid var(--line); padding:10px 12px; background:var(--sheet); }
+.drum-recovery p { margin:0 0 6px; font:700 .85rem/1.4 var(--mono); }
+.step-voice-picker { border:1px solid var(--line); padding:8px 12px; background:var(--sheet); }
+.step-position { margin:0 0 8px; color:var(--pink); font:700 .85rem/1.4 var(--mono); }
+.step-voice-picker label { display:flex; align-items:center; justify-content:space-between; gap:10px; font:700 .85rem/1.4 var(--mono); }
+.step-voice-picker button { width:100%; min-height:44px; margin-top:8px; }
+.step-voice-picker select { min-width:0; min-height:44px; padding:4px 8px; font:inherit; color:inherit; background:var(--sheet); border:1px solid var(--line); }
+.song-actions { border:1px solid var(--line); padding:10px 12px; background:var(--sheet); }
+.song-actions h2, .song-actions p { margin:0 0 6px; font:700 .85rem/1.4 var(--mono); }
+.song-actions h2 { color:var(--pink); }
+.song-actions div { display:flex; flex-wrap:wrap; gap:8px; }
+.song-preview { margin:8px 0; padding:0; list-style:none; font:500 .85rem/1.4 var(--mono); }
+.song-preview li { display:grid; grid-template-columns:7ch minmax(0,1fr); gap:8px; padding:4px 6px; overflow-wrap:anywhere; }
+.song-preview li[aria-current] { background:var(--bg); box-shadow:inset 2px 0 var(--pink); }
+.song-preview strong { color:var(--pink); }
+.conductor-redirect:not([hidden]) { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr) auto; align-items:end; gap:8px; margin-top:12px; }
+.conductor-redirect label { min-width:0; font:600 .8rem/1.4 var(--mono); }
+.conductor-redirect select, .conductor-redirect button { box-sizing:border-box; width:100%; min-height:44px; font:inherit; padding:6px; color:inherit; background:var(--sheet); border:1px solid var(--line); }
+.conductor-redirect button { font:700 .85rem var(--mono); }
+.conductor-redirect button:disabled { color:var(--mute); }
+.conductor-redirect p { grid-column:1/-1; }
+.conductor-combine { margin-top:12px; font:600 .85rem/1.4 var(--mono); }
+.conductor-combine summary { display:list-item; padding:12px 0; cursor:pointer; }
+.conductor-combine form { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
+.conductor-combine label { min-width:0; }
+.conductor-combine form :is(select,button) { box-sizing:border-box; min-height:44px; padding:6px 10px; font:inherit; color:inherit; background:var(--sheet); border:1px solid var(--line); }
+.conductor-combine select { width:100%; }
+.conductor-combine button:disabled { color:var(--mute); }
+.conductor-combine .combine-members, .conductor-combine form p { grid-column:1/-1; }
+.conductor-combine .combine-members { display:flex; flex-wrap:wrap; gap:6px; margin:0; }
+.conductor-combine .combine-members li { display:block; }
+.audio-control { display:contents; }
+.phone-master, .phone-select, .phone-audio-status { display:none; }
+@media(max-width:760px) {
+  .device { display:flex; flex-direction:column; gap:14px; }
+  .big-screen, .song-actions, .drum-recovery, .step-voice-picker { order:0; }
+  .stage { display:none; }
+  #open-drums { order:1; }
+  #drum-audio { order:4; scroll-margin-block:12px; }
+  #drum-decks, .drum-mix { order:4; }
+  .drum-mix > div { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .conductor-readout { order:5; }
+  .conductor-readout[data-song-row] { order:0; }
+  .keys > .conductor-readout { grid-column:1 / -1; order:0; }
+  .conductor-readout ul { grid-template-columns:1fr; }
+  .conductor-redirect:not([hidden]) { grid-template-columns:minmax(0,1fr) minmax(0,2fr); }
+  .conductor-redirect button { grid-column:1/-1; }
+  .conductor-readout li { display:grid; grid-template-columns:7ch minmax(0,1fr); gap:8px; }
+  .phone-select { display:block; order:1; }
+  .phone-select .ctl { grid-template-columns:auto minmax(0,1fr) auto; }
+  .phone-select .strip { grid-column:auto; grid-row:auto; }
+  .phone-select .steps button:first-child, .phone-select .steps button:last-child { display:none; }
+  .audio-control { display:grid; order:1; }
+  .audio-control > * { grid-area:1 / 1; }
+  /* Starting audio must not move the pads under a second finger. */
+  .power[hidden] { display:grid; visibility:hidden; }
+  .power[hidden] + .phone-audio-status { display:grid; place-items:center; }
+  .phone-audio-status { padding:12px 18px; border:1px solid var(--line); background:var(--sheet); text-align:center; font:600 .82rem/1.4 var(--mono); }
+  .phone-master { display:flex; align-items:center; gap:12px; order:2; color:var(--pink); font:700 .8rem var(--mono); }
+  .phone-master input { flex:1; min-width:0; height:44px; }
+  .controls-row { display:contents; }
+  .buttons { display:grid !important; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; order:3; }
+  .btn button { max-width:none; height:48px; font-size:.78rem; color:#fff; }
+  .btn kbd { display:none; }
+  .keyboard { display:block !important; height:auto; overflow:visible; order:4; touch-action:auto; user-select:auto; }
+  .keys { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; min-width:0; height:auto; }
+  .key-bank { display:grid; grid-column:1 / -1; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+  .key-bank h2 { grid-column:1 / -1; margin:4px 0 2px; font:700 .8rem var(--mono); }
+  .key-bank .wk span { padding:0 3px; text-align:center; overflow-wrap:anywhere; }
+  [data-drum-landing] .key-bank .wk { scroll-margin-block:12px; }
+  [data-drum-landing] .extra-step { display:none; }
+  .keys .wk,.keys .bk { position:relative; left:auto !important; width:auto !important; height:48px; border-radius:5px; box-sizing:border-box; touch-action:none; user-select:none; }
+  .keys :is(.wk,.bk) > span { position:static; display:grid; place-items:center; height:100%; font:700 .8rem var(--mono); }
+  .keys .bk span { color:#fff; padding:0 3px; text-align:center; line-height:1.15; }
+  .keys [aria-disabled="true"]:not(.down) { opacity:.45; }
+  .btn button.fw-full,.keys .fw-full { background:var(--lit); color:var(--litink); }
+  .btn button.fw-mid,.keys .fw-mid { background:#ad7938; }
+  .btn button.fw-dim,.keys .fw-dim { background:#6f573b; }
+  .btn button.fw-breath,.keys .fw-breath { background:#ad7938; outline:2px solid var(--lit); }
+  .keys .fw-full span,.keys .fw-mid span,.keys .fw-dim span { color:#111; }
+  .btn button.down,.keys .down { background:var(--lit); color:var(--litink); }
+  .keys [role=button]:focus-visible { outline:3px solid #b86a00; outline-offset:2px; }
+  .view-toggle { display:none; }
+  .ctl-list { display:grid !important; order:5; }
+  .status { order:6; }
+}
+</style>
+
+<div class="wrap">
+  <header class="cover">
+    <div class="model">FM-1</div>
+    <div class="sub">Big Beat<br>Studio BB1</div>
+    <div class="doc">browser<br>player<small>the real BB1 firmware, running here <span id="buildstamp">@DISPLAY_HTML@ · @PRODUCT_HTML@ · @WASM_SHORT@</span></small></div>
+    <div class="ver">two beats<br>one little box</div>
+  </header>
+  @CANDIDATE_BANNER@
+
+  <section class="device" aria-label="FM-1 front panel">
+    <div class="big-screen"><canvas id="screen-big" width="240" height="240"></canvas></div>
+    <button id="open-drums" type="button" disabled>Open drum pads</button>
+    <button id="drum-audio" type="button" hidden>Enable pad audio</button>
+    <div class="stage" id="stage">
+      <svg class="panel" id="panel" viewBox="0 0 1750 1020" role="group" aria-label="FM-1 controls"></svg>
+      <div class="screen-wrap">
+        <canvas id="screen" width="240" height="240" aria-label="FM-1 display"></canvas>
+      </div>
+    </div>
+    <section class="drum-recovery" id="drum-recovery" aria-label="Drum sound" hidden>
+      <p id="drum-recovery-status" role="status"></p>
+      <button id="drum-recover" type="button"></button>
+    </section>
+    <div id="step-voice-picker" class="step-voice-picker" hidden>
+      <p id="step-position" class="step-position" role="status"></p>
+      <label><span id="step-voice-label">Drum voice</span><select id="step-voice"></select></label>
+      <button id="step-voice-audition" type="button" title="Uses the current drum mix">Hear voice</button>
+    </div>
+    <section class="song-actions" id="song-actions" aria-labelledby="song-action-heading" hidden>
+      <h2 id="song-action-heading"></h2>
+      <p id="song-action-status" role="status"></p>
+      <ul id="song-preview-parts" class="song-preview" aria-label="Parts in this row" hidden>
+        <li><strong>Kit A</strong><span></span></li>
+        <li><strong>Kit B</strong><span></span></li>
+        <li><strong>Dillo</strong><span></span></li>
+      </ul>
+      <div><button id="song-action" type="button"></button><button id="song-choose" type="button">Choose parts</button><button id="song-back" type="button"></button></div>
+    </section>
+    <div class="phone-select" id="phone-select"></div>
+    <div class="audio-control">
+      <button class="power" id="power" type="button" disabled>Enable sound<small>Turn up MASTER or Volume to hear the pads or a song.</small></button>
+      <div class="phone-audio-status" id="phone-audio-status" role="status"></div>
+    </div>
+    <label class="phone-master">VOLUME <input id="phone-volume" type="range" min="0" max="100" value="0" aria-label="Volume"></label>
+    <div class="controls-row">
+      <div class="view-toggle" role="group" aria-label="Encoder view"><button type="button" id="view-knobs" aria-pressed="true">Knobs</button><button type="button" id="view-controls" aria-pressed="false">Controls</button></div>
+      <div class="encoders" id="encoders"></div>
+      <div class="ctl-list" id="ctl-list" hidden></div>
+      <div class="buttons" id="buttons"></div>
+    </div>
+    <div id="drum-decks" role="group" aria-label="Drum pad deck" hidden>
+      <button type="button" aria-pressed="false" data-deck="0">Drum A</button>
+      <button type="button" aria-pressed="false" data-deck="1">Drum B</button>
+    </div>
+    <div class="keyboard"><div class="keys" id="keys"></div></div>
+    <section id="drum-mix" class="drum-mix" aria-labelledby="drum-mix-heading" hidden>
+      <h2 id="drum-mix-heading">Drum group mix</h2>
+      <p id="drum-mix-help" hidden>Hold REC and press the soloed group's black key to clear solo.</p>
+      <div></div>
+    </section>
+    <section id="conductor-readout" class="conductor-readout" aria-labelledby="conductor-current" hidden>
+      <h2 id="conductor-current">Current parts</h2>
+      <ul><li><strong>Kit A</strong><span></span></li>
+          <li><strong>Kit B</strong><span></span></li>
+          <li><strong>Dillo</strong><span></span></li></ul>
+      <div class="conductor-cue">
+        <p role="status"></p>
+        <button id="conductor-cancel" type="button" hidden disabled>Cancel cue</button>
+      </div>
+      <button id="stage-band" type="button" hidden disabled>Stage band for song</button>
+      <p id="stage-band-result" role="status"></p>
+      <form id="conductor-redirect" class="conductor-redirect" aria-label="Redirect one player" hidden>
+        <label>Player<select id="redirect-player"><option value="">Choose…</option><option value="1">Kit A</option><option value="2">Kit B</option><option value="3">Dillo</option></select></label>
+        <label>Section<select id="redirect-section"><option value="">Choose section</option></select></label>
+        <button type="submit" disabled>Queue redirect</button>
+        <p id="redirect-result" role="status"></p>
+      </form>
+      <details id="conductor-combine" class="conductor-combine" hidden>
+        <summary>Combine rhythms</summary>
+        <form aria-label="Build a rhythm mix">
+          <p>Choose 2–4 rhythms. Dillo follows the lowest-numbered section.</p>
+          <label>Rhythm<select id="combine-section"><option value="">Choose rhythm</option></select></label>
+          <button id="combine-add" type="button" disabled>Add</button>
+          <ul class="combine-members" aria-label="Rhythms in this mix"></ul>
+          <button id="combine-queue" type="submit" disabled>Queue mix</button>
+          <p id="combine-result" role="status"></p>
+        </form>
+      </details>
+    </section>
+    <div class="status" id="status"><span>loading firmware…</span></div>
+  </section>
+
+  <section class="notes project-tools" aria-label="Project files"><div><h2>Project files</h2><p>Save your drum steps, arrangement and sounds as a <b>.bbp2 project</b>. A release-matched player can also verify and open a dependency-bound <b>.bb1bundle</b>.</p><p>Stop playback first. Opening replaces the project in RAM and starts fresh Undo. Saving never changes the project in RAM.</p><button id="project-download" type="button" disabled>Save project (.bbp2)</button> <button id="project-open" type="button" disabled>Open project…</button><input id="project-input" type="file" accept=".bbp2,.bb1bundle,application/octet-stream,application/zip" hidden><p id="project-state" role="status" aria-live="polite">Preparing project files…</p><p id="project-notice" role="status" aria-live="polite">A .bb1bundle opens only when its application, release package, catalogue and sound-library pins match this player exactly.</p><div id="project-recovery" hidden><p>A recovery copy from this tab is available.</p><button id="project-recover" type="button">Recover tab edits</button> <button id="project-recovery-discard" type="button">Discard recovery copy</button></div><p>BB1 can keep a recovery copy for a reload when playback and editing pause. Save a project file to keep your work outside this tab.</p></div></section>
+  <section class="notes">
+    <div>
+      <h2>How to play it</h2>
+      <ul>
+        <li>Tap a pad or press PLAY to start sound. If the browser needs another gesture, press <b>Enable sound</b>. Turn up <b>MASTER</b> (or <b>Volume</b> on a phone) if the level is at zero.</li>
+        <li>Press PLAY on the welcome screen to start the selected song. Turn SELECT on the landing screen to move directly between Rhythm Conductor, Big Beat and Dillo. Hold HOME for help with the current screen.</li>
+        <li>From the welcome screen, choose <b>Open drum pads</b> or turn <b>SELECT</b> to Big Beat. When the browser is muted, choose <b>Enable pad audio</b> near the pads to turn on sound at 20% volume. On a phone, the shortcut brings that control or the first pads into view. Tap white keys <b>1–11</b> to play the current kit, whether the song is running or stopped. The browser labels the pads with their current sounds. Switch decks with <b>B5 A/B</b>. If a kit is silent, use the sound notice below the display. Press <b>SEQ</b> (computer key <code>/</code>) to open Steps. Tap a white key to toggle its step, even while stopped. The same sound notice works in Steps. Tap <b>HOME</b> to return to the pads. Use <b>Save project</b> to keep your beat while playback is stopped.</li>
+        @STEP_CONDITION_HELP@
+        <li>On the Big Beat landing, press black key <b>B5</b> marked <b>A/B</b> (computer key <code>J</code>) to choose which kit you play and edit. If that kit is off, hold <b>REC</b> and press <b>ARP</b> to enable it. In Rhythm Conductor, <b>B2</b> mutes or unmutes Kit B.</li>
+        <li>In Rhythm Conductor, the three player rows show each current song and section. The browser also lists the current parts below the panel and names the players and destination of a queued cue. The browser labels the section keys for the current page. On a phone, Current parts and the waiting cue sit just below the Sections bank. Press a lit section key to move the whole band together at the next bar. To cancel a waiting whole-band cue, press its pulsing key again or press the currently playing section key.</li>
+        <li>To move just one player, choose Kit A, Kit B or Dillo with <b>K4 SCOPE</b> (computer keys <code>Shift</code> + ←/→), then hold REC and press a section key. In the browser you can also choose a player and any section in the current song or rhythm bank below Current parts, then press <b>Queue redirect</b>. Use <b>Cancel cue</b> while it waits to keep the current parts playing. The next plain section press brings all three back together. Tap HOME to clear the redirect target.</li>
+        <li>Open <b>Combine rhythms</b> below Current parts to choose two to four rhythms from the same bank and queue a mix.</li>
+        <li>To arrange the current Conductor parts in the browser, stop and choose <b>Stage band for song</b>. Choose <b>Add row</b> under the preview, then <b>Play song</b> when you want to hear the arrangement. On the panel, press <b>B4 BAND</b> on stopped Conductor, then <b>EDIT</b> to add the row. You can also open <b>GLO → white 4 (SONG) → white 1 (ADD)</b> to build a row by hand.</li>
+        <li>Knobs: drag up or down on a knob, or scroll over it. MASTER is the volume. On a phone, SELECT is under the screen and the other encoder rows are below the keys. Drag sideways along a strip or tap its − and + buttons.</li>
+        <li>Buttons work while held. Shift-click a button to latch it down (for REC + key or HOME-hold), click again to release. On a phone, hold two buttons with two fingers. On iPhone, turn off silent mode to hear it.</li>
+        <li>Computer keys: <code>Space</code> PLAY, <code>Enter</code> EDIT, <code>H</code> HOME, <code>R</code> REC, <code>A</code> ARP, <code>/</code> SEQ, <code>[</code> <code>]</code> OCT− / OCT+, arrows turn ALGORITHM (↑↓) and PRESETS (←→). <code>Shift</code> + ↑↓ turns SELECT. <code>Shift</code> + ←→ turns K4 on the Rhythm Conductor landing screen. <code>Esc</code> releases held or latched panel controls.</li>
+        <li>Play white keys with <code>Z X C V B N M ,</code> and <code>W E T Y U I O P</code> (<code>Q</code> also plays white 8). Play black keys with <code>S D G F J 2 3 5 6 7 9</code> in panel order.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>What this is</h2>
+      <p>This is the BB1 firmware itself, running in your browser: the same screen and the same sound engine as on the FM-1. Only the panel around it is drawn for the web.</p>
+    </div>
+    <div>
+      <h2>Good to know</h2>
+      <ul>
+        <li id="kitnote">Loading the sound library…</li>
+        <li>The panel is drawn for the browser. Available controls glow; active controls shine brighter. The browser illustrates the firmware’s light states; it does not calibrate physical LED brightness.</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+const BUNDLE_PINS = @BUNDLE_PINS_JSON@;
+const PROJECT_WIRE_MAX = @PROJECT_WIRE_MAX@;
+const WASM_GZ_B64 = "@WASM_GZ_B64@";
+const B = ["FX","SCL","ENV","LFO","EDIT","GLO","HOME","SAVE","ARP","SEQ","PLAY","REC","OCT-","OCT+"];
+const KEYMAP = {" ":10,"Enter":4,"h":6,"r":11,"a":8,"/":9,"[":12,"]":13};
+const ENC = ["SELECT","ALGORITHM","PRESETS","KNOB 1","KNOB 2","KNOB 3","KNOB 4"];
+const statusEl = document.getElementById("status");
+const phoneAudioStatus = document.getElementById("phone-audio-status");
+const openDrums = document.getElementById("open-drums");
+const drumAudio = document.getElementById("drum-audio");
+const drumDecks = document.getElementById("drum-decks");
+const drumDeckButtons = drumDecks.querySelectorAll("[data-deck]");
+let requestedDrumDeck = -1;
+const drumMix = document.getElementById("drum-mix");
+const drumMixHeading = document.getElementById("drum-mix-heading");
+const drumMixHelp = document.getElementById("drum-mix-help");
+const drumMixStrips = [];
+let renderedDrumMixDeck = -1;
+const stepVoicePicker = document.getElementById("step-voice-picker");
+const stepPosition = document.getElementById("step-position");
+const stepVoiceLabel = document.getElementById("step-voice-label");
+const stepVoiceSelect = document.getElementById("step-voice");
+const stepVoiceAudition = document.getElementById("step-voice-audition");
+let stepVoiceContext = 0;
+const drumRecovery = document.getElementById("drum-recovery");
+const drumRecoveryStatus = document.getElementById("drum-recovery-status");
+const drumRecover = document.getElementById("drum-recover");
+let drumRecoveryState = 0;
+const deviceEl = statusEl.closest(".device");
+const conductorReadout = document.getElementById("conductor-readout");
+const conductorRows = conductorReadout.querySelectorAll("li span");
+const conductorNext = conductorReadout.querySelector('[role="status"]');
+const conductorCancel = document.getElementById("conductor-cancel");
+const stageBand = document.getElementById("stage-band");
+const stageBandResult = document.getElementById("stage-band-result");
+const songActions = document.getElementById("song-actions");
+const songActionHeading = document.getElementById("song-action-heading");
+const songActionStatus = document.getElementById("song-action-status");
+const songPreviewParts = document.getElementById("song-preview-parts");
+const songPreviewLanes = songPreviewParts.querySelectorAll("li");
+const songAction = document.getElementById("song-action");
+const songChoose = document.getElementById("song-choose");
+const songBack = document.getElementById("song-back");
+const SONG_ADD = 2, SONG_READY = 4, SONG_PLAYING = 8, SONG_CHOOSE = 16;
+let renderedSongPage = 0;
+let cancelTicket = 0, pointerCancelTicket = 0;
+const redirectForm = document.getElementById("conductor-redirect");
+const redirectPlayer = document.getElementById("redirect-player");
+const redirectSection = document.getElementById("redirect-section");
+const redirectButton = redirectForm.querySelector("button");
+const redirectResult = document.getElementById("redirect-result");
+let redirectSet = 0;
+const combinePanel = document.getElementById("conductor-combine");
+const combineSection = document.getElementById("combine-section");
+const combineAdd = document.getElementById("combine-add");
+const combineQueue = document.getElementById("combine-queue");
+const combineResult = document.getElementById("combine-result");
+const combineMembers = combinePanel.querySelector("ul");
+const selectedRhythms = new Set();
+let combineBank = 0;
+const phoneLayout = window.matchMedia("(max-width: 760px)");
+let revealPhonePads = false;
+const CONDUCTOR_STAGE_KEY = 19; // Logical B4.
+let panelStageBandFrame = -1;
+const DRUM_DECK_KEY = 20; // Logical B5.
+let x = null, audio = null, nextT = 0, lastFrame = 0, frames = 0, masterGain = null, masterLevel = @MASTER@;
+const pendingTurns = new Array(7).fill(0);
+let livePadBufferUntil = 0;
+
+async function loadWasm() {
+  const bin = Uint8Array.from(atob(WASM_GZ_B64), c => c.charCodeAt(0));
+  const ds = new Blob([bin]).stream().pipeThrough(new DecompressionStream("gzip"));
+  const buf = await new Response(ds).arrayBuffer();
+  const { instance } = await WebAssembly.instantiate(buf, { env: { drum909_nparams: () => 0, drum909_param: () => 0 } });
+  return instance.exports;
+}
+
+/* ---- screen */
+const cv = document.getElementById("screen"), cx = cv.getContext("2d"), img = cx.createImageData(240, 240);
+const bigCv = document.getElementById("screen-big"), bigCx = bigCv && bigCv.getContext("2d");
+function draw() {
+  const fb = new Uint16Array(x.memory.buffer, x.emu_fb(), 240 * 240), d = img.data;
+  for (let i = 0, j = 0; i < 57600; i++, j += 4) {
+    const v = fb[i], r = v >> 11 & 31, g = v >> 5 & 63, b = v & 31;
+    d[j] = r << 3 | r >> 2; d[j + 1] = g << 2 | g >> 4; d[j + 2] = b << 3 | b >> 2; d[j + 3] = 255;
+  }
+  cx.putImageData(img, 0, 0);
+  if (bigCx && bigCv.offsetParent) bigCx.drawImage(cv, 0, 0);
+}
+
+/* ---- one firmware frame (16 ms), with its audio */
+function step() {
+  applyDrumDeckRequest();
+  replayPadTaps();
+  for (let e = 0; e < 7; e++) if (pendingTurns[e]) { const s = Math.sign(pendingTurns[e]); x.emu_turn(e, s); pendingTurns[e] -= s; }
+  x.emu_frame(); frames++;
+  const n = x.emu_audio_take();
+  if (audio && audio.state === "running" && n) {
+    const src = new Float32Array(x.memory.buffer, x.emu_audio_ptr(), n * 2);
+    const ab = audio.createBuffer(2, n, 44100), L = ab.getChannelData(0), R = ab.getChannelData(1);
+    for (let i = 0; i < n; i++) { L[i] = src[2 * i] * 256; R[i] = src[2 * i + 1] * 256; }
+    const s = audio.createBufferSource(); s.buffer = ab; s.connect(masterGain || audio.destination);
+    // Keep a still-playable queue contiguous when a callback runs late.
+    if (nextT < audio.currentTime + 0.008) nextT = audio.currentTime + 0.06;
+    s.start(nextT); nextT += ab.duration;
+  }
+}
+function loop(t) {
+  if (soundStarting && t < soundStartDeadline) {
+    // Leave pressed edges in firmware until the audio clock can play them.
+    // A stalled resume must not freeze the panel.
+    lastFrame = t;
+  } else if (audio && audio.state === "running") {
+    // Give live Big Beat pads a shorter queue. A late callback buys a
+    // second of extra headroom for the backing pattern before trying again.
+    if (nextT < audio.currentTime + 0.03) livePadBufferUntil = t + 1000;
+    let guard = 0;
+    while (guard++ < 12) {
+      let target = 0.12;
+      if (x.emu_top_mode() === 1 && x.emu_nav_landing()) {
+        if (!x.emu_running()) target = 0.072;
+        else if (t >= livePadBufferUntil) target = 0.088;
+      }
+      if (nextT >= audio.currentTime + target) break;
+      step();
+    }
+  } else {                                     /* no sound yet: the page clock, 16 ms a frame */
+    if (!lastFrame) lastFrame = t;
+    let guard = 0;
+    while (t - lastFrame >= 16 && guard++ < 6) { step(); lastFrame += 16; }
+    if (t - lastFrame > 200) lastFrame = t;
+  }
+  draw();
+  drawLights();
+  requestAnimationFrame(loop);
+}
+
+function drawLights() {
+  syncScopeHint(document.getElementById("k4-hint"), x);
+  const landing = !!x.emu_nav_landing();
+  const drumLanding = x.emu_top_mode() === 1 && landing;
+  const drumsShortcutText = drumLanding ? "Big Beat pads open" : "Open drum pads";
+  const drumsShortcutDisabled = drumLanding || !landing || !!pendingTurns[0];
+  if (openDrums.textContent !== drumsShortcutText) openDrums.textContent = drumsShortcutText;
+  if (openDrums.disabled !== drumsShortcutDisabled) openDrums.disabled = drumsShortcutDisabled;
+  syncDrumAudio(drumLanding);
+  syncDrumDeckButtons(drumLanding);
+  syncDrumMix(drumLanding);
+  const sectionSet = x.emu_ui_section_label_set?.() ?? 0;
+  syncConductorReadout(x, sectionSet);
+  const canStageBand = syncStageBand(x, sectionSet);
+  syncSongActions(x);
+  syncConductorRedirect(x, sectionSet);
+  syncConductorCombine(x, sectionSet);
+  const stepBank = x.emu_ui_step_bank?.() ?? 0;
+  syncDrumRecovery(drumLanding, stepBank);
+  const drumVoiceKeys = syncStepVoicePicker(x, stepBank);
+  syncFunctionKeys(deviceEl, keyViews, drumLanding, !!sectionSet, !!buttonHolds[11].size, canStageBand, stepBank, x, drumVoiceKeys);
+  syncPhoneKeys(drumLanding, sectionSet, stepBank);
+  if (panelStageBandFrame >= 0 && frames > panelStageBandFrame && !keyHolds[CONDUCTOR_STAGE_KEY].size) {
+    panelStageBandFrame = -1;
+    if (x.emu_arr_add_subtitle?.()) focusStagedBand();
+  }
+  syncPadNames(x, drumLanding, sectionSet, stepBank);
+  if (revealPhonePads && !pendingTurns[0]) {
+    revealPhonePads = false;
+    if (phoneLayout.matches && drumLanding) {
+      const firstPad = keyViews[0][0];
+      if (drumAudio.disabled) {
+        firstPad.focus({preventScroll: true});
+        firstPad.scrollIntoView({block: "nearest", inline: "nearest"});
+      } else {
+        drumAudio.focus({preventScroll: true});
+        drumAudio.scrollIntoView({block: "start", inline: "nearest"});
+      }
+    }
+  }
+  for (let i = 0; i < 41; i++) {
+    const targets = i < 14 ? [document.querySelector('g[aria-label="' + B[i] + '"]'), document.getElementById('btn-' + B[i])] : keyViews[i - 14];
+    const state = x.emu_led_state(i);
+    const level = state & 1 ? 'full' : state & 4 ? 'mid' : state & 8 ? 'breath' : state & 2 ? 'dim' : 'off';
+    for (const el of targets) {
+      if (!el || el.dataset.led === level) continue;
+      el.dataset.led = level;
+      for (const name of ['full','mid','dim','breath']) el.classList.toggle('fw-' + name, name === level);
+    }
+  }
+}
+
+// Tab can move focus before the activation key is released.
+function bindPanelActivation(el, press) {
+  let held = null;
+  const release = () => {
+    if (held === null) return;
+    held = null;
+    press(false);
+  };
+  el.addEventListener("keydown", ev => {
+    if (ev.key !== " " && ev.key !== "Enter") return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (ev.repeat || held !== null) return;
+    held = ev.key;
+    press(true);
+  });
+  el.addEventListener("keyup", ev => {
+    if (held !== ev.key) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    release();
+  });
+  el.addEventListener("blur", release);
+  el.addEventListener("click", ev => {
+    // Pointer and activation-key handlers already sent their press.
+    if (ev.detail !== 0 || held !== null) return;
+    press(true);
+    press(false);
+  });
+}
+
+/* ---- panel */
+const buttonHolds = B.map(() => new Set());
+const buttonLatch = Symbol("latched button");
+function holdButton(button, source, down) {
+  if (!changeHold(buttonHolds[button], source, down)) return;
+  sendButton(button, down);
+  document.getElementById("btn-" + B[button]).classList.toggle("down", down);
+}
+
+function makeButtons() {
+  const host = document.getElementById("buttons");
+  const order = [10,6,0,4,9,8,11,5,1,2,3,7,12,13];
+  const keyHint = {10:"space",4:"enter",6:"H",11:"R",8:"A",9:"/",12:"[",13:"]"};
+  for (const b of order) {
+    const wrap = document.createElement("div"); wrap.className = "btn";
+    const el = document.createElement("button"); el.type = "button"; el.id = "btn-" + B[b]; el.textContent = B[b];
+    el.addEventListener("pointerdown", ev => {
+      ev.preventDefault();
+      if (ev.shiftKey) { holdButton(b, buttonLatch, el.classList.toggle("latched")); return; }
+      if (el.classList.contains("latched")) { el.classList.remove("latched"); holdButton(b, buttonLatch, false); return; }
+      if (ev.isTrusted) el.setPointerCapture(ev.pointerId);
+      holdButton(b, ev.pointerId, true);
+    });
+    const up = ev => holdButton(b, ev.pointerId, false);
+    el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up); el.addEventListener("lostpointercapture", up);
+    bindPanelActivation(el, down => holdButton(b, el, down));
+    wrap.append(el);
+    const k = document.createElement("kbd"); k.textContent = keyHint[b] || " "; wrap.append(k);
+    host.append(wrap);
+  }
+}
+function bindEncoderDrag(el, horizontal, pixelsPerDetent, turn, settled = () => {}) {
+  let owner = null, last = 0, remainder = 0;
+  const position = ev => horizontal ? ev.clientX : -ev.clientY;
+  el.addEventListener("pointerdown", ev => {
+    if (owner !== null) return;
+    el.setPointerCapture(ev.pointerId);
+    owner = ev.pointerId;
+    last = position(ev);
+    remainder = 0;
+    el.classList.add("lit");
+  });
+  el.addEventListener("pointermove", ev => {
+    if (ev.pointerId !== owner) return;
+    const at = position(ev);
+    remainder += at - last;
+    last = at;
+    while (Math.abs(remainder) >= pixelsPerDetent) {
+      const direction = Math.sign(remainder);
+      turn(direction);
+      remainder -= direction * pixelsPerDetent;
+    }
+  });
+  const finish = ev => {
+    if (ev.pointerId !== owner) return;
+    owner = null;
+    el.classList.remove("lit");
+    settled();
+  };
+  el.addEventListener("pointerup", finish);
+  el.addEventListener("pointercancel", finish);
+  el.addEventListener("lostpointercapture", finish);
+}
+function makeEncoders() {
+  const host = document.getElementById("encoders");
+  ENC.forEach((name, e) => {
+    const wrap = document.createElement("div"); wrap.className = "enc";
+    const knob = document.createElement("div"); knob.className = "knob"; knob.tabIndex = 0; knob.id = "enc-" + e;
+    knob.setAttribute("role", "slider"); knob.setAttribute("aria-label", name);
+    let angle = 0;
+    const turn = (n) => { pendingTurns[e] += n; angle += n * 18; knob.style.setProperty("--a", angle + "deg"); };
+    bindEncoderDrag(knob, false, 14, turn);
+    knob.addEventListener("wheel", ev => { ev.preventDefault(); turn(ev.deltaY < 0 ? 1 : -1); }, { passive: false });
+    knob.addEventListener("keydown", ev => {
+      if (ev.key === "ArrowUp" || ev.key === "ArrowRight") { ev.preventDefault(); ev.stopPropagation(); turn(1); }
+      if (ev.key === "ArrowDown" || ev.key === "ArrowLeft") { ev.preventDefault(); ev.stopPropagation(); turn(-1); }
+    });
+    const nudge = document.createElement("div"); nudge.className = "nudge";
+    for (const [t, n] of [["−", -1], ["+", 1]]) { const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.setAttribute("aria-label", name + (n > 0 ? " up" : " down")); b.addEventListener("click", () => turn(n)); nudge.append(b); }
+    const lab = document.createElement("label"); lab.textContent = name; lab.htmlFor = knob.id;
+    wrap.append(knob, lab, nudge); host.append(wrap);
+    window["turn" + e] = turn;
+  });
+}
+/* 16 white keys (logical 0-15) and 11 black keys (logical 16-26) in piano order from C */
+const keyViews = Array.from({length:27}, () => []);
+const keyHolds = Array.from({length:27}, () => new Set());
+const phoneKeys = document.getElementById("keys");
+const phonePianoOrder = [];
+const padNamePointers = new Array(16).fill(0);
+const desktopPadLabels = [];
+const padNameDecoder = new TextDecoder();
+let padSectionSet = 0, padStepBank = 0;
+const phoneKeyBanks = ["Drum pads 1–11", "Function keys"].map(title => {
+  const bank = document.createElement("div");
+  bank.className = "key-bank";
+  bank.setAttribute("role", "group");
+  bank.setAttribute("aria-label", title);
+  const heading = document.createElement("h2");
+  heading.textContent = title;
+  bank.append(heading);
+  return bank;
+});
+function makeKeys() {
+  let black = 0;
+  const pc = ["C","D","E","F","G","A","B"];
+  for (let w = 0; w < 16; w++) {
+    const el = document.createElement("div"); el.className = w < 11 ? "wk" : "wk extra-step";
+    el.innerHTML = "<span>W" + (w + 1) + "</span>"; bindKey(el, w); phonePianoOrder.push(el);
+    const name = pc[w % 7];
+    if (w < 15 && name !== "E" && name !== "B" && black < 11) {
+      const b = document.createElement("div"); b.className = "bk";
+      const k = 16 + black;
+      b.innerHTML = "<span>B" + (black + 1) + "</span>";
+      bindKey(b, k); phonePianoOrder.push(b); black++;
+    }
+  }
+  phoneKeys.append(...phonePianoOrder);
+}
+function syncPhoneKeys(drumLanding, sectionSet, stepBank = 0) {
+  const grouped = drumLanding || !!sectionSet || !!stepBank;
+  if (grouped) {
+    const start = (stepBank & 255) * 16 + 1;
+    const length = (stepBank >>> 8) & 255;
+    const end = Math.min(start + 15, length);
+    const titles = [stepBank ? (end < start ? "No steps on this bank" : "Steps " + start + "–" + end + " of " + length) :
+                    drumLanding ? "Drum pads 1–11" : "Sections",
+                    stepBank >>> 16 ? "Pitch keys" : "Function keys"];
+    phoneKeyBanks.forEach((bank, index) => {
+      const title = titles[index];
+      if (bank.firstElementChild.textContent === title) return;
+      bank.firstElementChild.textContent = title;
+      bank.setAttribute("aria-label", title);
+    });
+  }
+  // Keep the readout immediately after the section keys on a phone. The
+  // section targets stay put when a queued cue or a long part name appears.
+  const besideSections = !!sectionSet && phoneLayout.matches;
+  const groupedNow = phoneKeys.contains(phoneKeyBanks[0]);
+  const readoutInKeys = conductorReadout.parentNode === phoneKeys;
+  if ((groupedNow === grouped && readoutInKeys === besideSections) ||
+      keyHolds.some(holds => holds.size)) return;
+  const active = document.activeElement;
+  const restoreFocus = phoneKeys.contains(active) || conductorReadout.contains(active);
+  if (readoutInKeys && !besideSections) phoneKeys.parentElement.after(conductorReadout);
+  if (groupedNow !== grouped) {
+    // Move the existing controls so tab order matches the pad rows. Wait
+    // for releases before moving any node with pointer or keyboard capture.
+    if (grouped) {
+      phoneKeyBanks[0].append(...phonePianoOrder.filter(key => key.classList.contains("wk")));
+      phoneKeyBanks[1].append(...phonePianoOrder.filter(key => key.classList.contains("bk")));
+      phoneKeys.replaceChildren(...phoneKeyBanks);
+    } else {
+      phoneKeys.replaceChildren(...phonePianoOrder);
+    }
+  }
+  if (besideSections) phoneKeyBanks[0].after(conductorReadout);
+  if (restoreFocus) active.focus({preventScroll: true});
+}
+function writeDesktopPadName({title, top, bottom}, name) {
+  // Two lines fit the physical key drawing. Keep the full name in the title
+  // and accessible label even when the cap needs an ellipsis.
+  const width = 8;
+  const wordBreak = name.lastIndexOf(" ", width);
+  const cut = name.length <= width ? name.length : wordBreak > 0 ? wordBreak : width;
+  const rest = name.slice(cut).trimStart();
+  title.textContent = name;
+  top.textContent = name.slice(0, cut);
+  bottom.textContent = rest.length > width ? rest.slice(0, width - 1) + "…" : rest;
+}
+function syncPadNames(firmware, showDrums, sectionSet = 0, stepBank = 0) {
+  // The section cache reuses string addresses across banks and pages.
+  const contextChanged = sectionSet !== padSectionSet || stepBank !== padStepBank;
+  if ((sectionSet || stepBank) && !contextChanged) return;
+  padSectionSet = sectionSet;
+  padStepBank = stepBank;
+  for (let i = 0; i < padNamePointers.length; i++) {
+    const pointer = sectionSet ? firmware.emu_ui_section_label?.(i) ?? 0 :
+                    showDrums && i < 11 ? firmware.emu_ui_drum_pad_name?.(i) ?? 0 : 0;
+    if (!contextChanged && pointer === padNamePointers[i]) continue;
+    padNamePointers[i] = pointer;
+    let name = "";
+    if (pointer) {
+      const memory = firmware.memory.buffer;
+      const bytes = new Uint8Array(memory, pointer, Math.min(32, memory.byteLength - pointer));
+      const end = bytes.indexOf(0);
+      if (end > 0) name = padNameDecoder.decode(bytes.subarray(0, end));
+    }
+    const step = stepBank ? (stepBank & 255) * 16 + i + 1 : 0;
+    const unavailable = step > ((stepBank >>> 8) & 255);
+    if (step) name = unavailable ? "—" : "Step " + step;
+    const pad = keyViews[i][0]; // The phone keys are built before the SVG panel.
+    pad.firstElementChild.textContent = name || "W" + (i + 1);
+    writeDesktopPadName(desktopPadLabels[i], name);
+    const label = "White key " + (i + 1) + (unavailable ? ": outside the pattern" : name ? ": " + name : "");
+    for (const view of keyViews[i]) {
+      view.setAttribute("aria-label", label);
+      if (unavailable) view.setAttribute("aria-disabled", "true");
+      else view.removeAttribute("aria-disabled");
+    }
+  }
+}
+// The panel scan holds one press bit per key. Keep up to three extra taps
+// per pad, and replay one per frame while the player stays on that deck.
+const padRepeats = new Uint8Array(11);
+let pressedPads = 0, repeatDeck = -1;
+function drumPadDeck() {
+  return x.emu_top_mode() === 1 && x.emu_nav_landing() ? x.emu_focus_row() : -1;
+}
+function clearPadRepeats() {
+  if (repeatDeck < 0) return;
+  padRepeats.fill(0);
+  repeatDeck = -1;
+}
+function replayPadTaps() {
+  if (repeatDeck >= 0) {
+    if (pendingTurns[0] || drumPadDeck() !== repeatDeck) clearPadRepeats();
+    else {
+      for (let k = 0; k < padRepeats.length; k++) {
+        if (!padRepeats[k] || (pressedPads & (1 << k))) continue;
+        padRepeats[k]--;
+        x.emu_key(k, 1);
+        if (!keyHolds[k].size) x.emu_key(k, 0);
+      }
+      if (!padRepeats.some(Boolean)) repeatDeck = -1;
+    }
+  }
+  pressedPads = 0;
+}
+function setKey(k, down) {
+  let forward = true;
+  if (down && x) {
+    if (k === CONDUCTOR_STAGE_KEY && x.emu_conductor_stage_song_state?.() === 1)
+      panelStageBandFrame = frames;
+    void enableSound();
+    const deck = k < padRepeats.length ? drumPadDeck() : -1;
+    if (deck !== repeatDeck) clearPadRepeats();
+    if (deck >= 0) {
+      const bit = 1 << k;
+      if ((pressedPads & bit) || padRepeats[k]) {
+        repeatDeck = deck;
+        if (padRepeats[k] < 3) padRepeats[k]++;
+        forward = false;
+      } else pressedPads |= bit;
+    }
+  }
+  if (x && forward) x.emu_key(k, down ? 1 : 0);
+  for (const el of keyViews[k]) el.classList.toggle("down", down);
+}
+function changeHold(holds, source, down) {
+  const wasDown = holds.size > 0;
+  if (down) holds.add(source);
+  else holds.delete(source);
+  return wasDown !== (holds.size > 0);
+}
+function holdKey(k, source, down) {
+  if (changeHold(keyHolds[k], source, down)) setKey(k, down);
+}
+function bindKey(el, k) {
+  keyViews[k].push(el);
+  el.setAttribute('role','button'); el.setAttribute('tabindex','0');
+  el.setAttribute('aria-label',(k < 16 ? 'White key ' + (k+1) : 'Black key ' + (k-15)));
+  bindPanelActivation(el, down => holdKey(k, el, down));
+  el.addEventListener("pointerdown", ev => { ev.preventDefault(); el.setPointerCapture(ev.pointerId); holdKey(k, ev.pointerId, true); });
+  const up = ev => holdKey(k, ev.pointerId, false);
+  el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up); el.addEventListener("lostpointercapture", up);
+}
+/* Computer keyboard shortcuts for all 16 white and 11 black panel keys. */
+const PIANO = { z:0,x:1,c:2,v:3,b:4,n:5,m:6,",":7, q:7,w:8,e:9,t:10,y:11,u:12,i:13,o:14,p:15,
+                s:16,d:17,g:18,f:19,j:20,"2":21,"3":22,"5":23,"6":24,"7":25,"9":26 };
+const heldPianoShortcuts = new Map();
+const heldButtonShortcuts = new Map();
+function releasePanel() {
+  requestedDrumDeck = -1;
+  clearPadRepeats();
+  heldPianoShortcuts.clear();
+  heldButtonShortcuts.clear();
+  B.forEach((name, button) => {
+    const el = document.getElementById("btn-" + name);
+    const holds = buttonHolds[button];
+    if (!holds.size) return;
+    holds.clear();
+    sendButton(button, false);
+    el.classList.remove("down", "latched");
+  });
+  keyHolds.forEach((holds, key) => {
+    if (!holds.size) return;
+    holds.clear();
+    setKey(key, false);
+  });
+}
+window.addEventListener("blur", releasePanel);
+document.addEventListener("visibilitychange", () => { if (document.hidden) releasePanel(); });
+window.addEventListener("keydown", ev => {
+  if (ev.defaultPrevented || ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  // Release panel holds without cancelling Escape's native action.
+  if (ev.key === "Escape") {
+    releasePanel();
+    return;
+  }
+  // Focused links and form controls keep their native keyboard behavior. The panel's
+  // own focusable buttons and pads handle their keys before they bubble here.
+  const focus = ev.target?.closest?.('a[href], input, select, textarea, button, [contenteditable]');
+  if (focus && !focus.matches('#buttons button')) return;
+  const k = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key;
+  if (k in KEYMAP) {
+    ev.preventDefault();
+    const button = KEYMAP[k];
+    const shortcut = ev.code || k;
+    heldButtonShortcuts.set(shortcut, button);
+    holdButton(button, shortcut, true);
+    return;
+  }
+  if (k === "ArrowUp") { ev.preventDefault(); (ev.shiftKey ? window.turn0 : window.turn1)(1); return; }
+  if (k === "ArrowDown") { ev.preventDefault(); (ev.shiftKey ? window.turn0 : window.turn1)(-1); return; }
+  if (ev.shiftKey && x?.emu_top_mode() === 0 && x.emu_nav_landing() &&
+      (k === "ArrowLeft" || k === "ArrowRight")) {
+    ev.preventDefault();
+    window.turn6(k === "ArrowRight" ? 1 : -1);
+    return;
+  }
+  if (k === "ArrowLeft") { ev.preventDefault(); window.turn2(-1); return; }
+  if (k === "ArrowRight") { ev.preventDefault(); window.turn2(1); return; }
+  if (k in PIANO) {
+    ev.preventDefault();
+    const note = PIANO[k];
+    const shortcut = ev.code || k;
+    heldPianoShortcuts.set(shortcut, note);
+    holdKey(note, shortcut, true);
+  }
+});
+window.addEventListener("keyup", ev => {
+  const k = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key;
+  const shortcut = ev.code || k;
+  const button = heldButtonShortcuts.get(shortcut);
+  if (button !== undefined) {
+    heldButtonShortcuts.delete(shortcut);
+    holdButton(button, shortcut, false);
+    return;
+  }
+  const note = heldPianoShortcuts.get(shortcut);
+  if (note === undefined) return;
+  heldPianoShortcuts.delete(shortcut);
+  holdKey(note, shortcut, false);
+});
+
+let soundStarting = null, soundStartDeadline = 0;
+function showSoundStatus() {
+  const muted = masterLevel === 0;
+  statusEl.textContent = muted
+    ? "Sound enabled · volume is at zero · turn up MASTER or Volume"
+    : "Firmware running · sound enabled · 44.1 kHz stereo";
+  const phoneMessage = muted ? "Volume is at zero. Turn it up to hear BB1." : "Sound enabled";
+  if (phoneAudioStatus.textContent !== phoneMessage) phoneAudioStatus.textContent = phoneMessage;
+}
+function sendButton(button, down) {
+  if (!x) return;
+  clearPadRepeats();
+  if (button === 10 && down) void enableSound();
+  x.emu_button(button, down ? 1 : 0);
+}
+function watchSoundState(context, button) {
+  context.addEventListener("statechange", () => {
+    if (context !== audio || soundStarting) return;
+    const running = context.state === "running";
+    button.hidden = running;
+    if (running) showSoundStatus();
+    else statusEl.textContent = "Sound paused by the browser. Press Enable sound to resume.";
+  });
+}
+function enableSound() {
+  if (!x) return Promise.resolve();
+  if (soundStarting) return soundStarting;
+  const btn = document.getElementById("power");
+  const ready = () => {
+    btn.hidden = true;
+    showSoundStatus();
+  };
+  if (audio && audio.state === "running") {
+    ready();
+    return Promise.resolve();
+  }
+  soundStartDeadline = performance.now() + 250;
+  soundStarting = (async () => {
+    let resumeTimer;
+    try {
+      if (!audio || audio.state === "closed") {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        try { audio = new AC({ sampleRate: 44100 }); } catch (_) { audio = new AC(); }
+        watchSoundState(audio, btn);
+        masterGain = audio.createGain(); masterGain.gain.value = masterLevel; masterGain.connect(audio.destination);
+      }
+      await Promise.race([
+        audio.resume(),
+        new Promise((_, reject) => {
+          resumeTimer = setTimeout(() => reject(Error("Sound start timed out")), 2000);
+        }),
+      ]);
+      if (audio.state !== "running") throw Error("Sound is suspended");
+      nextT = audio.currentTime + 0.06;
+      ready();
+    } catch (_) {
+      btn.hidden = false;
+      statusEl.textContent = "Sound could not start. Press Enable sound to retry; the screen and controls still work.";
+    } finally {
+      clearTimeout(resumeTimer);
+    }
+  })();
+  soundStarting.finally(() => { soundStarting = null; });
+  return soundStarting;
+}
+document.getElementById("power").addEventListener("click", () => { void enableSound(); });
+const DRUM_START_LEVEL = 0.2;
+function syncDrumAudio(landing) {
+  if (drumAudio.hidden === landing) drumAudio.hidden = !landing;
+  if (!landing) return;
+  const ready = audio?.state === "running" && masterLevel > 0;
+  const text = soundStarting ? "Starting audio…" : ready ? "Browser volume " + Math.round(masterLevel * 100) + "%"
+    : masterLevel === 0 ? "Enable pad audio · set volume to 20%" : "Enable pad audio";
+  if (drumAudio.textContent !== text) drumAudio.textContent = text;
+  const disabled = !!soundStarting || ready;
+  if (drumAudio.disabled !== disabled) drumAudio.disabled = disabled;
+}
+drumAudio.addEventListener("click", () => {
+  if (!x || drumPadDeck() < 0 || pendingTurns[0] || soundStarting) return;
+  if (masterLevel === 0) setMasterLevel(DRUM_START_LEVEL);
+  void enableSound();
+});
+function syncDrumRecovery(landing, stepBank) {
+  drumRecoveryState = x.emu_ui_drum_recovery_state?.() ?? 0;
+  const reason = drumRecoveryState & 255;
+  const drumSteps = !!stepBank && !(stepBank >>> 16);
+  const volume = drumSteps && !reason && masterLevel === 0;
+  const show = !!drumRecoveryState && (landing || drumSteps) && (!!reason || volume);
+  drumRecovery.hidden = !show;
+  if (!show) return;
+  const name = (drumRecoveryState >>> 8) === 2 ? "Drum B" : "Drum A";
+  let status, action;
+  if (volume) {
+    status = "Browser volume is at zero.";
+    action = "Enable sound at 20%";
+  } else if (reason === 1) {
+    status = name + " is off.";
+    action = "Enable " + name;
+  } else if (reason === 2) {
+    status = name + " is muted.";
+    action = "Unmute " + name;
+  } else if (reason === 3) {
+    status = name + " level is at zero.";
+    action = "Set " + name + " to 25%";
+  } else {
+    const solo = ["Drum A", "Drum B", "Dillo"][reason - 4];
+    status = solo + " is soloed. " + name + " is excluded.";
+    action = "Clear " + solo + " solo";
+  }
+  if (drumRecoveryStatus.textContent !== status) drumRecoveryStatus.textContent = status;
+  if (drumRecover.textContent !== action) drumRecover.textContent = action;
+  drumRecover.disabled = volume && !!soundStarting;
+}
+drumRecover.addEventListener("click", () => {
+  if (!drumRecoveryState || drumRecovery.hidden || requestedDrumDeck >= 0 || drumDeckChangeBlocked()) return;
+  if (drumRecoveryState & 255) {
+    if (x.emu_ui_drum_recover(drumRecoveryState)) syncDrumRecovery(drumPadDeck() >= 0, x.emu_ui_step_bank());
+  } else if (masterLevel === 0) {
+    setMasterLevel(DRUM_START_LEVEL);
+    void enableSound();
+  }
+});
+
+function drumDeckChangeBlocked() {
+  return projectFileBusy || pendingTurns.some(Boolean) || pressedPads ||
+    keyHolds.some(holds => holds.size) || buttonHolds.some(holds => holds.size);
+}
+function syncDrumDeckButtons(landing) {
+  if (drumDecks.hidden === landing) drumDecks.hidden = !landing;
+  if (!landing) return;
+  const deck = drumPadDeck();
+  const blocked = !!drumDeckChangeBlocked();
+  for (const [index, button] of drumDeckButtons.entries()) {
+    const selected = String(deck === index);
+    if (button.getAttribute("aria-pressed") !== selected) button.setAttribute("aria-pressed", selected);
+    if (button.disabled !== blocked) button.disabled = blocked;
+  }
+}
+function applyDrumDeckRequest() {
+  if (requestedDrumDeck < 0) return;
+  const target = requestedDrumDeck;
+  requestedDrumDeck = -1;
+  const current = drumPadDeck();
+  if (current < 0 || current === target || drumDeckChangeBlocked()) return;
+  clearPadRepeats();
+  // Send the existing B5 press on the next panel scan without starting audio.
+  x.emu_key(DRUM_DECK_KEY, 1);
+  x.emu_key(DRUM_DECK_KEY, 0);
+}
+for (const [index, button] of drumDeckButtons.entries()) {
+  button.addEventListener("click", event => {
+    if (!x || drumPadDeck() < 0 || drumDeckChangeBlocked()) return;
+    requestedDrumDeck = index;
+    // A desktop pointer user can keep playing the computer keys immediately.
+    if (event.detail && !phoneLayout.matches) keyViews[0][1].focus({preventScroll: true});
+  });
+}
+
+conductorCancel.addEventListener("pointerdown", () => { pointerCancelTicket = cancelTicket; });
+conductorCancel.addEventListener("click", event => {
+  const ticket = event.detail ? pointerCancelTicket : cancelTicket;
+  pointerCancelTicket = 0;
+  if (!ticket || projectFileBusy || pendingTurns.some(Boolean)) return;
+  if (x.emu_conductor_cancel(ticket)) {
+    cancelTicket = 0;
+    conductorCancel.disabled = true;
+  }
+});
+
+function stepPositionText(stepBank, editState = 0) {
+  if (!stepBank || stepBank >>> 16) return "";
+  const bank = stepBank & 255, length = (stepBank >>> 8) & 255;
+  const start = bank * 16 + 1;
+  const range = !length || start > length
+    ? "No steps on this page"
+    : "Steps " + start + "–" + Math.min(length, start + 15) + " of " + length;
+  return range + (editState === 1 ? " · Edit queued" : editState === 2 ? " · Edited pattern playing" : "");
+}
+function syncStepVoicePicker(firmware, stepBank = firmware.emu_ui_step_bank?.() ?? 0) {
+  stepVoiceContext = firmware.emu_ui_step_voice_context?.() ?? 0;
+  stepVoicePicker.hidden = !stepVoiceContext;
+  if (!stepVoiceContext) return [];
+  const position = stepPositionText(stepBank, firmware.emu_ui_step_edit_state?.() ?? 0);
+  if (stepPosition.textContent !== position) stepPosition.textContent = position;
+  const name = "Drum " + ((stepVoiceContext & 3) === 2 ? "B" : "A") + " voice";
+  if (stepVoiceLabel.textContent !== name) stepVoiceLabel.textContent = name;
+  const count = stepVoiceContext >>> 8;
+  if (stepVoiceSelect.options.length > count) stepVoiceSelect.length = count;
+  for (let voice = 0; voice < count; voice++) {
+    let option = stepVoiceSelect.options[voice];
+    if (!option) {
+      option = document.createElement("option");
+      option.value = voice;
+      stepVoiceSelect.append(option);
+    }
+    const label = readConductorText(firmware, firmware.emu_ui_step_voice_name(voice));
+    if (option.textContent !== label) option.textContent = label;
+  }
+  const selected = firmware.emu_ui_step_voice_selected();
+  if (stepVoiceSelect.selectedIndex !== selected) stepVoiceSelect.selectedIndex = selected;
+  stepVoiceAudition.disabled = masterLevel === 0 || !!(drumRecoveryState & 255) || !!soundStarting;
+  return stepVoiceSelect.options;
+}
+stepVoiceSelect.addEventListener("change", () => {
+  if (stepVoiceContext && !drumDeckChangeBlocked())
+    x.emu_ui_step_voice_choose(stepVoiceContext, stepVoiceSelect.selectedIndex);
+  syncStepVoicePicker(x, x.emu_ui_step_bank?.() ?? 0);
+});
+
+stepVoiceAudition.addEventListener("click", async () => {
+  if (!stepVoiceContext || stepVoiceAudition.disabled || drumDeckChangeBlocked()) return;
+  const context = stepVoiceContext, voice = stepVoiceSelect.selectedIndex;
+  await enableSound();
+  if (audio?.state === "running" && masterLevel > 0 && !drumDeckChangeBlocked())
+    x.emu_ui_step_voice_audition(context, voice);
+});
+
+function buildDrumMix() {
+  const groupNames = ["Kick", "Snare / clap", "Hats", "Percussion"];
+  for (const [group, name] of groupNames.entries()) {
+    const strip = document.createElement("article");
+    const label = document.createElement("strong");
+    label.textContent = name;
+    const level = document.createElement("span");
+    const meter = document.createElement("meter");
+    meter.max = 127;
+    meter.setAttribute("aria-label", name + " gain setting");
+    const controls = document.createElement("div");
+    controls.className = "mix-buttons";
+    const buttons = [[-8, "−", " level down"], [8, "+", " level up"], [0, "Mute", " mute"]]
+      .map(([delta, text, description]) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = text;
+        button.setAttribute("aria-label", name + description);
+        button.addEventListener("click", () => {
+          if (renderedDrumMixDeck < 0 || requestedDrumDeck >= 0 || drumDeckChangeBlocked()) return;
+          x.emu_ui_drum_mix_press(renderedDrumMixDeck, group, delta);
+        });
+        controls.append(button);
+        return button;
+      });
+    buttons[2].className = "mix-mute";
+    strip.append(label, level, meter, controls);
+    drumMix.lastElementChild.append(strip);
+    drumMixStrips.push({level, meter, buttons});
+  }
+}
+buildDrumMix();
+
+function syncDrumMix(landing) {
+  renderedDrumMixDeck = landing && x.emu_ui_drum_mix ? drumPadDeck() : -1;
+  drumMix.hidden = renderedDrumMixDeck < 0;
+  if (drumMix.hidden) return;
+  const title = "Drum " + (renderedDrumMixDeck ? "B" : "A") + " group mix";
+  if (drumMixHeading.textContent !== title) drumMixHeading.textContent = title;
+  let anySolo = false;
+  for (const [group, strip] of drumMixStrips.entries()) {
+    const state = x.emu_ui_drum_mix(renderedDrumMixDeck, group);
+    const level = state & 127;
+    const muted = !!(state & 128), solo = !!(state & 256), excluded = !!(state & 512);
+    anySolo ||= solo;
+    const status = solo ? "Solo" : excluded ? "Other group soloed" : muted ? "Muted" : "";
+    const text = state ? Math.round(level * 100 / 127) + "%" + (status ? " · " + status : "") : "Waiting…";
+    if (strip.level.textContent !== text) strip.level.textContent = text;
+    if (strip.meter.value !== level) strip.meter.value = level;
+    const [down, up, mute] = strip.buttons;
+    down.disabled = !state || !level;
+    up.disabled = !state || level === 127;
+    mute.disabled = !state || solo || excluded;
+    if (mute.getAttribute("aria-pressed") !== String(muted)) mute.setAttribute("aria-pressed", String(muted));
+    const label = muted ? "Unmute" : "Mute";
+    if (mute.textContent !== label) mute.textContent = label;
+  }
+  drumMixHelp.hidden = !anySolo;
+}
+
+function syncStageBand(firmware, sectionSet) {
+  const show = !!sectionSet && !!firmware.emu_conductor_stage_song;
+  stageBand.hidden = !show;
+  if (!show) {
+    stageBandResult.textContent = "";
+    return false;
+  }
+  const state = firmware.emu_conductor_stage_song_state();
+  const label = state === 2 ? "Stop to stage band" :
+    state === 3 ? "Band not ready to stage" : "Stage band for song";
+  if (stageBand.textContent !== label) stageBand.textContent = label;
+  stageBand.disabled = state !== 1 || projectFileBusy || pendingTurns.some(Boolean) ||
+    keyHolds.some(holds => holds.size) || buttonHolds.some(holds => holds.size);
+  return state === 1;
+}
+stageBand.addEventListener("click", () => {
+  if (!x) return;
+  syncStageBand(x, x.emu_ui_section_label_set());
+  if (stageBand.disabled) return;
+  if (x.emu_conductor_stage_song() !== 1) {
+    stageBandResult.textContent = "Band is still settling. Try again when the parts are ready.";
+    return;
+  }
+  stageBand.disabled = true;
+  focusStagedBand();
+});
+function focusStagedBand() {
+  syncSongActions(x);
+  if (songActions.hidden) return;
+  (songAction.disabled ? songBack : songAction).focus({preventScroll: true});
+  (phoneLayout.matches ? bigCv : document.getElementById("stage")).scrollIntoView({block: "start"});
+}
+
+function syncSongActions(firmware) {
+  renderedSongPage = firmware.emu_ui_song_page?.() ?? 0;
+  songActions.hidden = !renderedSongPage;
+  if (!renderedSongPage) return;
+  const adding = !!(renderedSongPage & SONG_ADD);
+  const playing = !!(renderedSongPage & SONG_PLAYING);
+  const rows = firmware.emu_arr_rows();
+  const heading = adding ? "Preview song row" : "Song arrangement";
+  const primary = adding ? "Add row" : playing ? "Stop song" : "Play song";
+  const back = adding ? "Back to song" : "Back to instrument";
+  const preview = adding ? firmware.emu_ui_song_preview?.() ?? 0 : 0;
+  const previewStatus = syncSongPreview(firmware, preview);
+  const status = adding
+    ? rows === 64 ? "Song is full. Go back to make room." : previewStatus || "Check the parts above, then add this row."
+    : rows ? rows + (rows === 1 ? " row" : " rows") : "No rows yet. Choose parts to make one.";
+  for (const [control, label] of [[songActionHeading, heading], [songAction, primary],
+                                   [songBack, back], [songActionStatus, status]]) {
+    if (control.textContent !== label) control.textContent = label;
+  }
+  songAction.disabled = !(renderedSongPage & (SONG_READY | SONG_PLAYING));
+  const focusPreview = adding && document.activeElement === songChoose;
+  songChoose.hidden = !(renderedSongPage & SONG_CHOOSE);
+  if (focusPreview) (songAction.disabled ? songBack : songAction).focus({preventScroll: true});
+}
+function syncSongPreview(firmware, preview) {
+  songPreviewParts.hidden = !preview;
+  if (!preview) return "";
+  const target = preview >>> 16;
+  for (const [lane, row] of songPreviewLanes.entries()) {
+    if (lane === target) {
+      if (!row.hasAttribute("aria-current")) row.setAttribute("aria-current", "true");
+    } else if (row.hasAttribute("aria-current")) row.removeAttribute("aria-current");
+    const label = readConductorText(firmware, firmware.emu_ui_song_preview_part(lane));
+    const value = row.lastElementChild;
+    if (value.textContent !== label) value.textContent = label;
+  }
+  const steps = preview & 65535;
+  const bars = steps / 16;
+  const length = steps % 4 ? steps + " steps" : bars + (bars === 1 ? " bar" : " bars");
+  return length + " · Editing " + songPreviewLanes[target].firstElementChild.textContent;
+}
+for (const [control, action] of [[songAction, 0], [songBack, 1], [songChoose, 2]]) {
+  control.addEventListener("click", () => {
+    if (projectFileBusy || pendingTurns.some(Boolean) || keyHolds.some(holds => holds.size) ||
+        buttonHolds.some(holds => holds.size)) return;
+    if (!x?.emu_ui_song_press?.(renderedSongPage, action)) return;
+    if (action === 0 && !(renderedSongPage & (SONG_ADD | SONG_PLAYING))) void enableSound();
+  });
+}
+
+redirectForm.addEventListener("change", () => {
+  redirectResult.textContent = "";
+  syncConductorRedirect(x, x.emu_ui_section_label_set());
+});
+redirectForm.addEventListener("submit", event => {
+  event.preventDefault();
+  if (!x) return;
+  syncConductorRedirect(x, x.emu_ui_section_label_set());
+  if (redirectButton.disabled) return;
+  const submit = x.emu_conductor_bank_redirect ?? x.emu_conductor_redirect;
+  const result = submit(Number(redirectPlayer.value), Number(redirectSection.value), redirectSet);
+  redirectPlayer.value = "";
+  redirectSection.value = "";
+  redirectResult.textContent = result === 1 ? "" : result === 2
+    ? readConductorText(x, x.emu_ui_hint()) || "Redirect refused."
+    : "Redirect unavailable on this screen.";
+  syncConductorRedirect(x, x.emu_ui_section_label_set());
+});
+
+combineSection.addEventListener("change", () => syncConductorCombine(x, x.emu_ui_section_label_set()));
+combineAdd.addEventListener("click", () => {
+  syncConductorCombine(x, x.emu_ui_section_label_set());
+  if (combineAdd.disabled) return;
+  const key = combineSection.value;
+  const label = combineSection.selectedOptions[0].textContent;
+  const item = document.createElement("li");
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.textContent = label + " ×";
+  remove.setAttribute("aria-label", "Remove " + label);
+  remove.addEventListener("click", () => {
+    selectedRhythms.delete(key);
+    item.remove();
+    combineSection.focus();
+    combineResult.textContent = "";
+    syncConductorCombine(x, x.emu_ui_section_label_set());
+  });
+  item.append(remove);
+  combineMembers.append(item);
+  selectedRhythms.add(key);
+  combineSection.value = "";
+  combineSection.focus();
+  combineResult.textContent = "";
+  syncConductorCombine(x, x.emu_ui_section_label_set());
+});
+combinePanel.querySelector("form").addEventListener("submit", event => {
+  event.preventDefault();
+  if (!x) return;
+  syncConductorCombine(x, x.emu_ui_section_label_set());
+  if (combineQueue.disabled) return;
+  let mask = 0n;
+  for (const key of selectedRhythms) mask |= 1n << BigInt(key);
+  const result = x.emu_conductor_combine(mask, combineBank);
+  if (result === 1 || result === 3) {
+    selectedRhythms.clear();
+    combineMembers.replaceChildren();
+    combineSection.value = "";
+  }
+  combineResult.textContent = result === 1 ? "" : result === 2 ? "A cue is pending. Wait for it before queuing a mix."
+    : result === 3 ? "This mix is already playing."
+    : result === 4 ? readConductorText(x, x.emu_ui_hint()) || "This mix was refused."
+    : "This mix is unavailable on the current screen.";
+  syncConductorCombine(x, x.emu_ui_section_label_set());
+});
+
+function syncScopeHint(hint, firmware) {
+  let label = "see screen";
+  if (firmware.emu_top_mode() === 0 && firmware.emu_nav_landing()) {
+    const scope = firmware.emu_conduct_scope();
+    label = ["scope: all three", "REC target: Kit A", "REC target: Kit B", "REC target: Dillo"][scope] ?? "scope";
+  }
+  if (hint.textContent !== label) hint.textContent = label;
+}
+
+const conductorText = new TextDecoder("latin1");
+const conductorPlayers = ["Kit A", "Kit B", "Dillo"];
+function readConductorText(firmware, pointer) {
+  if (!pointer) return "";
+  const memory = firmware.memory.buffer;
+  const bytes = new Uint8Array(memory, pointer, Math.min(256, memory.byteLength - pointer));
+  const end = bytes.indexOf(0);
+  return end >= 0 ? conductorText.decode(bytes.subarray(0, end)) : "";
+}
+function syncConductorReadout(firmware, sectionSet) {
+  const songRow = firmware.emu_ui_conductor_song_row?.() ?? 0;
+  const show = !!(sectionSet || songRow) && !!firmware.emu_ui_conductor_flags;
+  if (conductorReadout.hidden === show) conductorReadout.hidden = !show;
+  conductorReadout.toggleAttribute("data-song-row", !!songRow && !sectionSet);
+  if (!show) { cancelTicket = 0; return; }
+
+  // BB_UI_LN_* from the same frame that supplied the LCD rows.
+  const MUTED = 1, NEXT = 2, SOLO = 8, OFF = 16, EDITED = 32;
+  const queued = [];
+  for (let lane = 0; lane < conductorRows.length; lane++) {
+    const flags = firmware.emu_ui_conductor_flags(lane);
+    if (flags & NEXT) queued.push(conductorPlayers[lane]);
+    const song = readConductorText(firmware, firmware.emu_ui_conductor_song(lane));
+    const section = readConductorText(firmware, firmware.emu_ui_conductor_section(lane));
+    const state = flags & OFF ? "Off" : flags & MUTED ? "Muted" : flags & SOLO ? "Solo" : "";
+    const text = [song, section, flags & EDITED ? songRow ? "Working" : "Edited" : "", state].filter(Boolean).join(" · ") || "No section";
+    if (conductorRows[lane].textContent !== text) conductorRows[lane].textContent = text;
+  }
+
+  const cue = queued.length ? readConductorText(firmware, firmware.emu_ui_conductor_next()) : "";
+  const who = queued.length === 3 ? "All three" : queued.join(" + ");
+  const timing = firmware.emu_running() ? "Next at the bar" : "Queued";
+  const text = queued.length ? timing + " · " + who + (cue ? " → " + cue : "") :
+    songRow ? (firmware.emu_running() ? "Playing song row " : "Song row loaded ") + songRow : "No cue queued";
+  if (conductorNext.textContent !== text) conductorNext.textContent = text;
+  const canCancel = !!sectionSet && !!firmware.emu_conductor_cancel;
+  cancelTicket = canCancel && queued.length && !projectFileBusy && !pendingTurns.some(Boolean)
+    ? firmware.emu_ui_conductor_cancel_ticket() : 0;
+  conductorCancel.hidden = !canCancel;
+  conductorCancel.disabled = !cancelTicket;
+}
+
+function conductorBank(sectionSet) {
+  return sectionSet ? ((sectionSet - 1) & 0x00ffffff) + 1 : 0;
+}
+
+function syncConductorRedirect(firmware, sectionSet) {
+  const wholeBank = !!firmware.emu_conductor_bank_redirect;
+  const set = wholeBank ? conductorBank(sectionSet) : firmware.emu_conductor_redirect ? sectionSet : 0;
+  if (redirectSet !== set) {
+    redirectSet = set;
+    redirectPlayer.value = "";
+    redirectSection.length = 1;
+    redirectSection.value = "";
+    redirectResult.textContent = "";
+    if (set) {
+      const offset = wholeBank ? 0 : ((set - 1) >>> 24) * 16;
+      const label = wholeBank ? firmware.emu_ui_conductor_bank_section : firmware.emu_ui_section_label;
+      for (let index = 0; index < (wholeBank ? 64 : 16); index++) {
+        const name = readConductorText(firmware, label(index));
+        if (name) redirectSection.add(new Option((offset + index + 1) + " · " + name, String(index)));
+        else if (wholeBank) break;
+      }
+    }
+    redirectForm.hidden = !set;
+  }
+  const disabled = !set || projectFileBusy || pendingTurns.some(Boolean) ||
+    !redirectPlayer.value || !redirectSection.value;
+  if (redirectButton.disabled !== disabled) redirectButton.disabled = disabled;
+}
+
+function syncConductorCombine(firmware, sectionSet) {
+  const bank = firmware.emu_conductor_combine ? conductorBank(sectionSet) : 0;
+  if (combineBank !== bank) {
+    combineBank = bank;
+    selectedRhythms.clear();
+    combineMembers.replaceChildren();
+    combineSection.length = 1;
+    combineSection.value = "";
+    combineResult.textContent = "";
+    if (bank) {
+      for (let index = 0; index < 64; index++) {
+        const label = readConductorText(firmware, firmware.emu_ui_conductor_bank_section(index));
+        if (!label) break;
+        combineSection.add(new Option((index + 1) + " · " + label, String(index)));
+      }
+    }
+    combinePanel.hidden = combineSection.length < 3;
+  }
+  const blocked = !bank || projectFileBusy || pendingTurns.some(Boolean);
+  const noAdd = blocked || !combineSection.value || selectedRhythms.has(combineSection.value) || selectedRhythms.size >= 4;
+  if (combineAdd.disabled !== noAdd) combineAdd.disabled = noAdd;
+  const noQueue = blocked || selectedRhythms.size < 2;
+  if (combineQueue.disabled !== noQueue) combineQueue.disabled = noQueue;
+}
+
+const drumGroupKeys = [["kick", "kick"], ["sn/cl", "snare and clap"], ["hats", "hi-hats"], ["perc", "percussion"]];
+const drumFunctionKeys = [
+  ["A/B", "Switch drum deck"], ["Prev section", "Previous section"], ["Next section", "Next section"],
+  ["A on/mute", "Enable Drum A or toggle its mute"], ["B on/mute", "Enable Drum B or toggle its mute"], ["Mute Dillo", "Toggle Dillo mute"],
+  ["Mute A+B", "Toggle both drum mutes"],
+];
+const conductorMuteKeys = [
+  ["Kit A on/mute", "Enable Kit A or toggle its mute"], ["Kit B on/mute", "Enable Kit B or toggle its mute"],
+  ["Mute Dillo", "Toggle Dillo mute"],
+];
+const conductorSoloKeys = ["Solo Kit A", "Solo Kit B", "Solo Dillo"];
+const stepFunctions = ["Voice 1", "Voice 2", "Voice 3", "Voice 4", "Voice 5", "Voice 6", "Voice 7", "Voice 8",
+  "Accent", "Prev bank", "Next bank"];
+const pitchNames = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
+function syncFunctionKeys(device, views, drums, conductor, rec, canStageBand = false, stepBank = 0, firmware, drumVoiceKeys = []) {
+  const mode = drums ? "drums" : conductor ? "conductor" : "";
+  const stage = conductor && !rec && canStageBand;
+  const pitch = stepBank >>> 16;
+  const stepKeys = stepBank ? stepFunctions.map((name, i) => {
+    if (pitch) {
+      const note = (firmware.emu_ui_step_pitch?.(16 + i) ?? 0) - 1;
+      return note < 0 ? "" : pitchNames[note % 12] + (Math.floor(note / 12) - 1);
+    }
+    return firmware.emu_led_state(30 + i) ? (i < 8 && drumVoiceKeys[i]?.textContent) || name : "";
+  }) : null;
+  const legend = stepKeys ? "steps:" + stepKeys.join(",") :
+    mode && rec ? mode + "-solo" : stage ? mode + "-stage" : mode;
+  if (device.dataset.keyLegend === legend) return;
+  device.dataset.keyLegend = legend;
+  device.toggleAttribute("data-drum-landing", drums);
+  const action = rec ? "Solo " : "Mute ";
+  for (let i = 0; i < 11; i++) {
+    const group = drums ? drumGroupKeys[i] : null;
+    const solo = conductor && rec ? conductorSoloKeys[i] : null;
+    const functionKey = drums ? drumFunctionKeys[i - 4] : stage && i === 3 ? ["Stage band", "Stage band for song"] :
+      conductor ? conductorMuteKeys[i] : null;
+    const [short, full] = stepKeys ? [stepKeys[i], stepKeys[i]] :
+      group ? group.map(name => action + name) : solo ? [solo, solo] : functionKey ?? [];
+    const number = i + 1;
+    const unavailable = stepKeys && !short;
+    const label = "Black key " + number + (unavailable ? ": unavailable" : full ? ": " + full : "");
+    const [phone, desktop] = views[16 + i];
+    phone.firstElementChild.textContent = short || "B" + number;
+    phone.setAttribute("aria-label", label);
+    desktop.firstElementChild.textContent = label;
+    desktop.setAttribute("aria-label", label);
+    for (const view of [phone, desktop]) {
+      if (unavailable) view.setAttribute("aria-disabled", "true");
+      else view.removeAttribute("aria-disabled");
+    }
+  }
+}
+
+/* Controls view: the same seven encoders as rows (Logic-style), sending the same turns as the knobs. */
+function makeControls() {
+  const host = document.getElementById("ctl-list");
+  const phoneSelect = document.getElementById("phone-select");
+  const hints = ["instrument / focus", "song / pattern", "kit / sound", "see screen", "see screen", "see screen", "see screen"];
+  ENC.forEach((name, e) => {
+    const row = document.createElement("div"); row.className = "ctl";
+    const nm = document.createElement("div"); nm.className = "name"; nm.innerHTML = name + "<small>" + hints[e] + "</small>";
+    const strip = document.createElement("div"); strip.className = "strip"; strip.tabIndex = 0;
+    strip.setAttribute("role", "slider"); strip.setAttribute("aria-label", name + " (drag sideways)");
+    const mark = document.createElement("i"); strip.append(mark);
+    let pos = 50;
+    let settle = 0;
+    const center = () => { pos = 50; mark.style.setProperty("--p", "50%"); };
+    const turn = n => {
+      window["turn" + e](n);
+      pos = Math.max(4, Math.min(96, pos + n * 4));
+      mark.style.setProperty("--p", pos + "%");
+      clearTimeout(settle);
+      settle = setTimeout(() => { if (!strip.classList.contains("lit")) center(); }, 450);
+    };
+    bindEncoderDrag(strip, true, 12, turn, center);
+    strip.addEventListener("keydown", ev => {
+      if (ev.key === "ArrowUp" || ev.key === "ArrowRight") { ev.preventDefault(); ev.stopPropagation(); turn(1); }
+      if (ev.key === "ArrowDown" || ev.key === "ArrowLeft") { ev.preventDefault(); ev.stopPropagation(); turn(-1); }
+    });
+    const steps = document.createElement("div"); steps.className = "steps";
+    for (const n of [-5, -1, 1, 5]) {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = (n > 0 ? "+" : "−") + Math.abs(n);
+      b.setAttribute("aria-label", name + " " + (n > 0 ? "up " : "down ") + Math.abs(n));
+      b.addEventListener("click", () => { for (let i = 0; i < Math.abs(n); i++) turn(Math.sign(n)); });
+      steps.append(b);
+    }
+    if (e === 6) nm.querySelector("small").id = "k4-hint";
+    row.append(nm, strip, steps); host.append(row);
+  });
+  const selectRow = host.firstElementChild;
+  const placeSelect = () => {
+    const target = phoneLayout.matches ? phoneSelect : host;
+    if (selectRow.parentElement !== target) target.prepend(selectRow);
+  };
+  placeSelect();
+  phoneLayout.addEventListener("change", placeSelect);
+  const kb = document.getElementById("view-knobs"), cb = document.getElementById("view-controls");
+  const set = (v) => {
+    const ctl = v === "controls";
+    document.getElementById("encoders").hidden = ctl; host.hidden = !ctl;
+    kb.setAttribute("aria-pressed", String(!ctl)); cb.setAttribute("aria-pressed", String(ctl));
+    try { localStorage.setItem("fm1-encoder-view", v); } catch (_) {}
+  };
+  kb.addEventListener("click", () => set("knobs")); cb.addEventListener("click", () => set("controls"));
+  let saved = null; try { saved = localStorage.getItem("fm1-encoder-view"); } catch (_) {}
+  set(saved || (phoneLayout.matches ? "controls" : "knobs"));
+}
+
+/* ---- the FM-1 panel, drawn as in the player's guide (control boxes measured on the 1750 x 1050 panel photo,
+   Felucca tools/gen_panel_diagram.py CTRL), wired to the same firmware inputs as the hidden controls above */
+function makePanel() {
+  const NS = "http://www.w3.org/2000/svg", svg = document.getElementById("panel");
+  const P = {'MASTER':[124,117,219,237],'SELECT':[299,117,394,240],'PRESETS':[114,287,217,410],'ALGORITHM':[286,286,394,413],
+             'KNOB 1':[919,113,1019,238],'KNOB 2':[1108,115,1203,238],'KNOB 3':[1294,112,1389,238],'KNOB 4':[1477,113,1577,236]};
+  const BTN = {'FX':[962,319,1037,394],'SCL':[1066,318,1141,393],'ENV':[1170,318,1245,393],'LFO':[1274,318,1349,393],'EDIT':[1378,317,1452,392],'GLO':[1482,317,1557,392],
+               'HOME':[963,421,1038,497],'SAVE':[1068,420,1143,496],'ARP':[1172,420,1247,496],'SEQ':[1276,420,1351,495],'PLAY':[1380,419,1455,495],'REC':[1483,419,1559,495],
+               'OCT-':[154,461,241,509],'OCT+':[284,461,371,508]};
+  const KEYS = [91,585,1652,951], SCREEN = [470,70,830,430];
+  const el = (n, a, p) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+  el('rect', {x:0, y:0, width:1750, height:1020, rx:46, fill:'var(--pbody)'}, svg);
+  el('rect', {x:24, y:24, width:1702, height:972, rx:32, fill:'var(--face)'}, svg);
+  el('rect', {x:SCREEN[0]-34, y:SCREEN[1]-28, width:SCREEN[2]-SCREEN[0]+68, height:SCREEN[3]-SCREEN[1]+56, rx:26, fill:'#0c0c0d'}, svg);
+  el('rect', {x:938, y:296, width:644, height:222, rx:20, fill:'var(--well)'}, svg);
+  el('rect', {x:136, y:446, width:252, height:78, rx:16, fill:'var(--well)'}, svg);
+  const label = (t, x, y) => { const s = el('text', {x, y, 'text-anchor':'middle', 'font-size':20, fill:'var(--btnink)', 'letter-spacing':2}, svg); s.textContent = t; };
+  /* encoders: MASTER is the page volume; the others turn the firmware encoders (same turnN as the Controls view) */
+  const encIndex = {'SELECT':0,'ALGORITHM':1,'PRESETS':2,'KNOB 1':3,'KNOB 2':4,'KNOB 3':5,'KNOB 4':6};
+  Object.keys(P).forEach(k => {
+    const b = P[k], cx = (b[0]+b[2])/2, cy = (b[1]+b[3])/2 + 10, r = 44;
+    const g = el('g', {class:'knobg', tabindex:0, role:'slider', 'aria-label':k === 'MASTER' ? 'MASTER (volume)' : k}, svg);
+    el('circle', {cx, cy, r:r+8, fill:'var(--well)'}, g);
+    el('circle', {class:'cap', cx, cy, r, fill:'var(--knob)'}, g);
+    const tick = el('rect', {x:cx-3, y:cy-r+6, width:6, height:22, rx:3, fill:'var(--well)'}, g);
+    label(k.replace('KNOB ','K'), cx, b[1]-6);
+    let angle = k === 'MASTER' ? (masterLevel * 270 - 135) : 0;
+    const show = () => tick.setAttribute('transform', `rotate(${angle} ${cx} ${cy})`);
+    if (k === 'MASTER') {
+      showMaster = () => {
+        angle = masterLevel * 270 - 135;
+        g.setAttribute('aria-valuenow', String(Math.round(masterLevel * 100)));
+        show();
+      };
+      g.setAttribute('aria-valuemin', '0');
+      g.setAttribute('aria-valuemax', '100');
+      showMaster();
+    } else show();
+    const turn = (n) => {
+      if (k === 'MASTER') setMasterLevel(masterLevel + n * 0.04);
+      else { window["turn" + encIndex[k]](n); angle += n * 18; show(); }
+    };
+    g.addEventListener('pointerdown', ev => ev.preventDefault());
+    bindEncoderDrag(g, false, 10, turn);
+    g.addEventListener('wheel', ev => { ev.preventDefault(); turn(ev.deltaY < 0 ? 1 : -1); }, { passive: false });
+    g.addEventListener('keydown', ev => {
+      if (ev.key === 'ArrowUp' || ev.key === 'ArrowRight') { ev.preventDefault(); ev.stopPropagation(); turn(1); }
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowLeft') { ev.preventDefault(); ev.stopPropagation(); turn(-1); }
+    });
+  });
+  /* buttons: the same press as the hidden HTML buttons (keeps latch and keyboard shortcuts in one place) */
+  Object.keys(BTN).forEach(k => {
+    const b = BTN[k], idx = B.indexOf(k);
+    const g = el('g', {class:'hit', tabindex:0, role:'button', 'aria-label':k}, svg);
+    el('rect', {class:'cap', x:b[0], y:b[1], width:b[2]-b[0], height:b[3]-b[1], rx:14, fill:'var(--pbtn)'}, g);
+    const t = el('text', {x:(b[0]+b[2])/2, y:(b[1]+b[3])/2+7, 'text-anchor':'middle', 'font-size':19, fill:'var(--btnink)'}, g); t.textContent = k.replace('-', '−');
+    const html = document.getElementById('btn-' + k);
+    const fwd = (type, ev) => html.dispatchEvent(new PointerEvent(type, { pointerId: ev.pointerId, shiftKey: ev.shiftKey, bubbles: true }));
+    g.addEventListener('pointerdown', ev => { ev.preventDefault(); try { g.setPointerCapture(ev.pointerId); } catch (_) {} fwd('pointerdown', ev); });
+    g.addEventListener('pointerup', ev => fwd('pointerup', ev)); g.addEventListener('pointercancel', ev => fwd('pointercancel', ev));
+    g.addEventListener('lostpointercapture', ev => fwd('lostpointercapture', ev));
+    bindPanelActivation(g, down => holdButton(idx, g, down));
+    new MutationObserver(() => { g.classList.toggle('down', html.classList.contains('down') || html.classList.contains('latched')); }).observe(html, { attributes: true, attributeFilter: ['class'] });
+  });
+  /* keys: 11 black above, 16 white below (logical 0-15 white, 16-26 black, as the firmware numbers them) */
+  el('rect', {x:KEYS[0], y:KEYS[1], width:KEYS[2]-KEYS[0], height:KEYS[3]-KEYS[1], rx:30, fill:'var(--well)'}, svg);
+  const wx = KEYS[0]+14, ww = (KEYS[2]-KEYS[0]-28)/16;
+  for (let i = 0; i < 16; i++) {
+    const g = el('g', {class:'hit'}, svg);
+    const title = el('title', {}, g);
+    el('rect', {class:'cap', x:wx+i*ww+6, y:KEYS[1]+188, width:ww-12, height:150, rx:22, fill:'var(--keyw)'}, g);
+    const center = wx+(i+0.5)*ww;
+    const name = el('text', {class:'pad-name', x:center, y:KEYS[1]+252, 'text-anchor':'middle', 'aria-hidden':true}, g);
+    const top = el('tspan', {x:center}, name);
+    const bottom = el('tspan', {x:center, dy:23}, name);
+    desktopPadLabels.push({title, top, bottom});
+    bindKey(g, i);
+  }
+  [0.5,1.5,2.5, 4.5,5.5, 7.5,8.5,9.5, 11.5,12.5, 14.5].forEach((p, j) => {
+    const k = 16 + j, center = wx + (p + 0.5) * ww;
+    const g = el('g', {class:'hit'}, svg);
+    el('title', {}, g).textContent = 'Black key ' + (j + 1);
+    el('rect', {class:'cap', x:center-ww*0.34, y:KEYS[1]+30, width:ww*0.68, height:132, rx:20, fill:'var(--keyb)'}, g);
+    if (k === DRUM_DECK_KEY)
+      el('text', {class:'deck-legend', x:center, y:KEYS[1]+125, 'text-anchor':'middle', 'font-size':23, 'aria-hidden':true}, g).textContent = 'A/B';
+    bindKey(g, k);
+  });
+}
+let showMaster;
+const phoneVolume = document.getElementById('phone-volume');
+function setMasterLevel(level) {
+  masterLevel = Math.max(0, Math.min(1, level));
+  phoneVolume.value = String(Math.round(masterLevel * 100));
+  showMaster();
+  if (masterGain) masterGain.gain.value = masterLevel;
+  if (audio?.state === 'running' && !soundStarting) showSoundStatus();
+}
+makeEncoders(); makeControls(); makeButtons(); makeKeys(); makePanel();
+setMasterLevel(masterLevel);
+phoneVolume.addEventListener('input', () => setMasterLevel(Number(phoneVolume.value) / 100));
+openDrums.addEventListener("click", () => {
+  if (!x?.emu_nav_landing() || pendingTurns[0]) return;
+  const mode = x.emu_top_mode();
+  if (mode === 1) return;
+  revealPhonePads = phoneLayout.matches;
+  window.turn0(1 - mode); // Normal SELECT detent from either neighboring instrument.
+});
+
+/* The FM-1's own sound library (the file the installer writes), placed where the firmware reads it before start-up.
+ * The library URL is reused across builds. Revalidate it before checking the release hash. */
+const SOUND_FILES = ["./@LIBRARY_NAME@"];
+const SOUND_SHA256 = "@LIBRARY_SHA@";
+async function loadSounds(ex) {
+  for (const url of SOUND_FILES) {
+    try {
+      const r = await fetch(url, { cache: "no-cache" });
+      if (!r.ok) continue;
+      const b = new Uint8Array(await r.arrayBuffer());
+      if (b.length !== 245760) continue;
+      const h = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", b)), v => v.toString(16).padStart(2, "0")).join("");
+      if (h !== SOUND_SHA256) continue;
+      new Uint8Array(ex.memory.buffer, ex.emu_sound_window(), b.length).set(b);
+      return true;
+    } catch (_) { /* try the next copy */ }
+  }
+  return false;
+}
+loadWasm().then(async ex => {
+  const readIdentity = pointer => {
+    const bytes = new Uint8Array(ex.memory.buffer); let end = pointer;
+    while (end < bytes.length && end - pointer < 80 && bytes[end]) end++;
+    if (end >= bytes.length || end - pointer >= 80) throw Error("Invalid firmware identity");
+    return new TextDecoder().decode(bytes.subarray(pointer, end));
+  };
+  if (readIdentity(ex.emu_product_id()) !== @PRODUCT_JSON@ || readIdentity(ex.emu_display_name()) !== @DISPLAY_JSON@) throw Error("Wrong firmware identity");
+  if (!await loadSounds(ex)) {
+    statusEl.textContent = location.protocol === "file:"
+      ? "Open the player through the local server described in START-HERE.md, then reload."
+      : "The matching sound library could not load. Restore the original @LIBRARY_NAME@ beside this player, then reload.";
+    return;
+  }
+  if (typeof ex.emu_led_state !== "function") throw Error("Player requires firmware LED-state support");
+  ex.emu_init();
+  x = ex;
+  const kits = x.emu_sound_kits ? x.emu_sound_kits() : 0, note = document.getElementById("kitnote");
+  if (note) note.textContent = kits === 7
+    ? "The 808, seven sampled kits and BUILD. SLOOP is removed in 2.1. The matching sound library is loaded."
+    : "The sampled-library directory could not be read. Reload the player before continuing.";
+
+  for (let i = 0; i < 8; i++) x.emu_frame();
+  x.emu_audio_take();
+  rememberProject("new");
+  draw();
+  statusEl.innerHTML = "<span>firmware <b>running</b></span><span>44.1 kHz stereo</span><span>16 ms per main-loop pass</span>";
+  document.getElementById("power").disabled = false;
+  requestAnimationFrame(loop);
+}).catch(error => {
+  statusEl.textContent = "The firmware could not start. " + (error.message || String(error));
+});
+/* Project file adapter. Direct saves are acknowledged only after close. */
+const projectNotice = document.getElementById('project-notice');
+const projectDownload = document.getElementById('project-download');
+const projectOpen = document.getElementById('project-open');
+const projectInput = document.getElementById('project-input');
+let projectFileBusy = false, projectFilesReady = false;
+let openedPublic211 = false;
+const projectErrors = {1:'Invalid project file.',2:'Project exceeds capacity.',3:'Unsupported project version.',4:'Project checksum failed.',5:'This project needs another catalogue.',6:'This project needs another sound library.',7:'Sound snapshot cannot be restored.',8:'A project part cannot play with its saved kit.',9:'Project storage overlaps live state.',10:'Project operation timed out.',11:'Project changed during the operation.',64:'Stop playback and finish any pending edit first.',66:'Audio reset failed. Reload this preview before continuing.'};
+function projectMessage(s){projectNotice.textContent=s;}
+let projectCheckpoint;
+function projectStamp(){
+ return [x.emu_project_epoch() >>> 0, x.emu_project_arrangement_revision() >>> 0];
+}
+function rememberProject(kind, stamp = projectStamp()){
+ projectCheckpoint = {kind, stamp};
+}
+function projectChanged(){
+ const [scene, arrangement] = projectStamp();
+ const [savedScene, savedArrangement] = projectCheckpoint.stamp;
+ return scene === 0xffffffff || scene !== savedScene || arrangement !== savedArrangement;
+}
+function projectStatus(){
+ const kind = projectCheckpoint.kind, changed = projectChanged();
+ if(kind === "recovered") return "Recovered RAM project · save to keep";
+ if(kind === "saved") return changed ? "RAM edits since save" : "Saved project · no new edits";
+ if(kind === "imported") return changed ? "RAM edits since import" : "Imported project · no new edits";
+ return changed ? "RAM project · save to keep" : "New RAM project · no edits";
+}
+function projectUnavailable(){
+ if(x.emu_running())return 'Stop playback to save or open a project.';
+ return x.emu_project_can_begin() ? '' : 'Wait for pending changes before saving or opening a project.';
+}
+/* BEGIN BUNDLE VERIFIER */
+const BUNDLE_DATA_LIMIT = 20 * 1024 * 1024;
+const BUNDLE_FILE_LIMIT = BUNDLE_DATA_LIMIT + 65536;
+const bundleHex=b=>Array.from(new Uint8Array(b),x=>x.toString(16).padStart(2,'0')).join('');
+async function bundleSha(bytes){return bundleHex(await crypto.subtle.digest('SHA-256',bytes));}
+const bundleU16=(v,p)=>v.getUint16(p,true),bundleU32=(v,p)=>v.getUint32(p,true);
+let bundleCrcTable;
+function bundleCrc(bytes){
+ if(!bundleCrcTable)bundleCrcTable=Array.from({length:256},(_,n)=>{let c=n;for(let k=0;k<8;k++)c=(c&1)?0xedb88320^(c>>>1):c>>>1;return c>>>0;});
+ let c=0xffffffff;for(const b of bytes)c=bundleCrcTable[(c^b)&255]^(c>>>8);return (c^0xffffffff)>>>0;
+}
+function bundleSafeName(name){return !!name&&!name.startsWith('/')&&!name.includes('\\')&&name.split('/').every(x=>x&&x!=='.'&&x!=='..');}
+function bundleCanonical(value){
+ if(value===null||typeof value!=='object')return JSON.stringify(value);
+ if(Array.isArray(value))return '['+value.map(bundleCanonical).join(',')+']';
+ return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+bundleCanonical(value[k])).join(',')+'}';
+}
+function bundleFields(value,names){return value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join('\0')===names.slice().sort().join('\0');}
+function bundleZip(raw){
+ if(raw.length>BUNDLE_FILE_LIMIT)throw Error('Bundle exceeds the 20 MiB expanded-data limit.');
+ const v=new DataView(raw.buffer,raw.byteOffset,raw.byteLength);let eocd=-1;
+ for(let p=raw.length-22;p>=Math.max(0,raw.length-65557);p--)if(bundleU32(v,p)===0x06054b50){eocd=p;break;}
+ if(eocd<0)throw Error('Invalid or incomplete .bb1bundle.');
+ const count=bundleU16(v,eocd+10),cdBytes=bundleU32(v,eocd+12),cdOff=bundleU32(v,eocd+16),comment=bundleU16(v,eocd+20);
+ if(bundleU16(v,eocd+4)||bundleU16(v,eocd+6)||bundleU16(v,eocd+8)!==count||count<1||count>8||eocd+22+comment!==raw.length||cdOff+cdBytes!==eocd)throw Error('Unsupported .bb1bundle ZIP structure.');
+ const files=new Map(),decoder=new TextDecoder('utf-8',{fatal:true});let p=cdOff,total=0;
+ for(let n=0;n<count;n++){
+  if(p+46>eocd||bundleU32(v,p)!==0x02014b50)throw Error('Invalid .bb1bundle directory.');
+  const flags=bundleU16(v,p+8),method=bundleU16(v,p+10),crc=bundleU32(v,p+16),packed=bundleU32(v,p+20),size=bundleU32(v,p+24),nl=bundleU16(v,p+28),xl=bundleU16(v,p+30),cl=bundleU16(v,p+32),disk=bundleU16(v,p+34),local=bundleU32(v,p+42);
+  if(flags||method||disk||packed!==size||p+46+nl+xl+cl>eocd)throw Error('Bundle entries must be unencrypted and stored without compression.');
+  const name=decoder.decode(raw.subarray(p+46,p+46+nl));if(!bundleSafeName(name)||files.has(name))throw Error('Unsafe or duplicate bundle path.');
+  if(local+30>cdOff||bundleU32(v,local)!==0x04034b50||bundleU16(v,local+6)!==flags||bundleU16(v,local+8)!==method||bundleU32(v,local+14)!==crc||bundleU32(v,local+18)!==packed||bundleU32(v,local+22)!==size)throw Error('Bundle entry header mismatch.');
+  const lnl=bundleU16(v,local+26),lxl=bundleU16(v,local+28),dataAt=local+30+lnl+lxl;
+  if(decoder.decode(raw.subarray(local+30,local+30+lnl))!==name||dataAt+size>cdOff)throw Error('Bundle entry bounds mismatch.');
+  const data=raw.slice(dataAt,dataAt+size);if(bundleCrc(data)!==crc)throw Error(`Bundle checksum failed: ${name}.`);
+  total+=size;if(total>BUNDLE_DATA_LIMIT)throw Error('Bundle exceeds the 20 MiB expanded-data limit.');files.set(name,data);p+=46+nl+xl+cl;
+ }
+ if(p!==eocd)throw Error('Bundle directory length mismatch.');return files;
+}
+function bundleProjectMeta(data,sha){
+ const v=new DataView(data.buffer,data.byteOffset,data.byteLength),ascii=new TextDecoder().decode(data.subarray(0,4));
+ if(data.length<64||data.length>32768||ascii!=='BBP2'||data[4]<1||data[4]>(BUNDLE_PINS.project_wire_max||2)||data[5]||data[6]!==64||data[7]||bundleU32(v,8)!==data.length||bundleU32(v,16)!==data[4]||data.slice(56,64).some(Boolean))throw Error('Bundle contains an invalid BBP2 project.');
+ const check=new Uint8Array(data.length-4);check.set(data.subarray(0,12));check.set(data.subarray(16),12);const crc=bundleU32(v,12);
+ if(bundleCrc(check)!==crc)throw Error('Bundle project checksum failed.');
+ const hex=n=>n.toString(16).padStart(8,'0'),scene=bundleU32(v,36),sections=data[40],rows=data[41],references=data[42],working=data[43];
+ if(!bundleU32(v,20)||!bundleU32(v,28)||!bundleU32(v,32)||!scene||scene>3840||scene>data.length-64||sections>32||rows>64||references>96||working>16)throw Error('Bundle project bounds failed.');
+ return {wire_version:data[4],bytes:data.length,sha256:sha,crc32:hex(crc),catalogue_crc32:hex(bundleU32(v,20)),catalogue_stamp:bundleU32(v,24),library_header_crc32:hex(bundleU32(v,28)),library_payload_crc32:hex(bundleU32(v,32)),scene_bytes:scene,counts:{sections,rows,references,working_parts:working}};
+}
+async function bundleProject(raw){
+ if(!BUNDLE_PINS)throw Error('This player was not packaged with native release pins; import the extracted .bbp2 project instead.');
+ const files=bundleZip(raw);if(!files.has('manifest.json')||!files.has('project.bbp2'))throw Error('Bundle manifest or project is missing.');
+ const manifestText=new TextDecoder('utf-8',{fatal:true}).decode(files.get('manifest.json'));let m;try{m=JSON.parse(manifestText);}catch{throw Error('Bundle manifest is invalid.');}
+ if(manifestText!==bundleCanonical(m)+'\n'||!bundleFields(m,['format','schema','identity','project','dependencies','entries'])||m.format!==BUNDLE_PINS.format||m.schema!==BUNDLE_PINS.schema)throw Error('Bundle manifest is not canonical schema 1.');
+ if(!Array.isArray(m.entries)||m.entries.length!==files.size-1)throw Error('Bundle entry table is invalid.');
+ const transferHelp=' Open the bundle in its matching player and save a separate .bbp2 project to move it between builds. Your current project is unchanged.';
+ if(bundleCanonical(m.identity)!==bundleCanonical(BUNDLE_PINS.identity))throw Error('Bundle release identity does not match this player.'+transferHelp);
+ const records=new Map();for(const r of m.entries){
+  if(!bundleFields(r,['path','role','bytes','sha256'])||!bundleSafeName(r.path)||r.path==='manifest.json'||records.has(r.path)||!files.has(r.path)||r.bytes!==files.get(r.path).length||r.sha256!==await bundleSha(files.get(r.path)))throw Error('Bundle entry manifest mismatch.');records.set(r.path,r);
+ }
+ if(files.size!==records.size+1||records.get('project.bbp2')?.role!=='project')throw Error('Bundle contains an unlisted or missing project entry.');
+ const d=m.dependencies;if(!bundleFields(d,['application','release_package','sound_library','catalogue_source'])||!bundleFields(d.application,['bytes','sha256','embedded_path'])||!bundleFields(d.release_package,['bytes','sha256','embedded_path'])||!bundleFields(d.sound_library,['bytes','sha256','embedded_path','name','header_crc32','payload_crc32'])||!bundleFields(d.catalogue_source,['bytes','sha256','embedded_path','compiled_bytes','compiled_sha256','runtime_crc32','runtime_stamp']))throw Error('Bundle dependency table is invalid.');
+ const pins=[['application','application_sha256','application_bytes'],['release_package','release_package_sha256','release_package_bytes'],['sound_library','sound_library_sha256','sound_library_bytes'],['catalogue_source','catalogue_source_sha256','catalogue_source_bytes']];
+ for(const [name,hashPin,bytesPin] of pins)if(d[name].sha256!==BUNDLE_PINS[hashPin]||d[name].bytes!==BUNDLE_PINS[bytesPin])throw Error(`Bundle ${name.replace('_',' ')} does not match this player.`+transferHelp);
+ if(d.sound_library.name!==BUNDLE_PINS.sound_library_name)throw Error('Bundle sound library name does not match this player.'+transferHelp);
+ for(const name of ['release_package','sound_library']){const path=d[name].embedded_path;if(!path||!files.has(path)||records.get(path)?.role!==name||files.get(path).length!==d[name].bytes)throw Error(`Bundle is not self-contained: ${name.replace('_',' ')} missing.`);}
+ const library=files.get(d.sound_library.embedded_path),lv=new DataView(library.buffer,library.byteOffset,library.byteLength),header=bundleU32(lv,16).toString(16).padStart(8,'0'),payload=bundleU32(lv,12).toString(16).padStart(8,'0');
+ const project=files.get('project.bbp2'),meta=bundleProjectMeta(project,await bundleSha(project));
+ if(bundleCanonical(m.project)!==bundleCanonical({path:'project.bbp2',...meta})||d.sound_library.header_crc32!==header||d.sound_library.payload_crc32!==payload||meta.library_header_crc32!==header||meta.library_payload_crc32!==payload||d.catalogue_source.runtime_crc32!==BUNDLE_PINS.catalogue_runtime_crc32||d.catalogue_source.runtime_stamp!==BUNDLE_PINS.catalogue_runtime_stamp||meta.catalogue_crc32!==BUNDLE_PINS.catalogue_runtime_crc32||meta.catalogue_stamp!==BUNDLE_PINS.catalogue_runtime_stamp)throw Error('Bundle project dependencies do not match this player.');
+ return project;
+}
+/* END BUNDLE VERIFIER */
+async function projectHeld(action, signal){
+ if(!projectFilesReady)throw Error('Project files are still preparing.');
+ if(signal?.aborted)return null;
+ const start=performance.now();let result=x.emu_project_begin();
+ const release=()=>x.emu_project_cancel();
+ signal?.addEventListener("abort", release, {once:true});
+ try {
+  while(result===65){
+   if(performance.now()-start>1500)throw Error('Audio pause timed out; project unchanged.');
+   await new Promise(r=>setTimeout(r,16));
+   if(signal?.aborted)return null;
+   result=x.emu_project_state();
+  }
+  if(result)throw Error(projectErrors[result]||`Project operation refused (${result}).`);
+  return action();
+ } finally {
+  signal?.removeEventListener("abort", release);
+  if(!signal?.aborted)release();
+ }
+}
+async function projectJob(action){
+ if(!projectFilesReady||projectFileBusy)return;
+ recoverySnapshot?.abort();
+ projectFileBusy=true;projectDownload.disabled=projectOpen.disabled=true;
+ try{await action();}catch(e){projectMessage(e.message);}finally{projectFileBusy=false;projectDownload.disabled=projectOpen.disabled=false;projectInput.value='';}
+}
+projectDownload.addEventListener('click',()=>projectJob(async()=>{
+ const unavailable=projectUnavailable();if(unavailable)return projectMessage(unavailable);
+ const filename=openedPublic211?'BB1-Conductor-copy.bbp2':'BB1-project.bbp2';
+ let handle=null;
+ if(window.showSaveFilePicker)try{
+  handle=await window.showSaveFilePicker({suggestedName:filename,excludeAcceptAllOption:true,types:[{description:'BB1 project',accept:{'application/octet-stream':['.bbp2']}}]});
+ }catch(e){
+  if(e.name==='AbortError')return projectMessage('Save cancelled; RAM project unchanged.');
+  // Embedded previews can expose the API but disallow the native picker.
+  if(e.name!=='SecurityError'&&e.name!=='NotSupportedError')return projectMessage(`Save picker failed: ${e.message||e}. RAM project unchanged.`);
+ }
+ const {wire, stamp}=await projectHeld(()=>{
+  const n=x.emu_project_export();
+  if(!n)throw Error(projectErrors[x.emu_project_error()]||'Snapshot could not be captured.');
+  const wire=new Uint8Array(x.memory.buffer,x.emu_project_ptr(),n).slice();
+  return {wire, stamp:projectStamp()};
+ });
+ const blob=new Blob([wire],{type:'application/octet-stream'});
+ let writeFailed=false;
+ if(handle){
+  let writable;
+  try{
+   writable=await handle.createWritable();
+   await writable.write(blob);
+   await writable.close();
+   rememberProject("saved", stamp);
+   const changed=projectChanged();
+   if(!changed)clearCapturedTabRecovery();
+   const detail=changed?' Newer edits are still in RAM.':'';
+   projectMessage(`Saved ${handle.name || filename} (${wire.length} bytes).${detail}`);return;
+  }catch{
+   if(writable)try{await writable.abort();}catch{}
+   writeFailed=true;
+  }
+ }
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+ projectMessage(`${writeFailed ? 'Could not write the selected file. ' : ''}Browser download requested. Confirm that ${filename} appears in Downloads before closing. Your open project is unchanged.`);
+}));
+projectOpen.addEventListener('click',()=>{
+ if(!projectFilesReady||projectFileBusy)return;
+ const unavailable=projectUnavailable();if(unavailable)return projectMessage(unavailable);
+ projectInput.click();
+});
+projectInput.addEventListener('change',()=>projectJob(async()=>{
+ const file=projectInput.files[0];if(!file)return;const lower=file.name.toLowerCase();let wire,kind='project';
+ if(lower.endsWith('.bb1bundle')){
+  if(file.size>BUNDLE_FILE_LIMIT)throw Error('This bundle is too large to open. Your current project is unchanged.');
+  wire=await bundleProject(new Uint8Array(await file.arrayBuffer()));
+  kind='verified bundle';
+ }
+ else if(lower.endsWith('.bbp2')){
+  if(file.size<64||file.size>x.emu_project_capacity())throw Error('Choose a .bbp2 project file between 64 and 32768 bytes.');
+  wire=new Uint8Array(await file.arrayBuffer());
+  const header=new DataView(wire.buffer);
+  if(PROJECT_WIRE_MAX<3&&header.byteLength>=64&&header.getUint32(0)===0x42425032&&
+     header.getUint32(4)===0x03004000&&header.getUint32(8,true)===wire.length&&header.getUint32(16,true)===3)
+   throw Error('This project needs a BB1 player with step conditions enabled. Your current project is unchanged.');
+ }
+ else throw Error('Choose a .bbp2 project or a release-matched .bb1bundle.');
+ if(!window.confirm(`Open “${file.name}” and replace the current RAM arrangement, working parts and sounds? Current unsaved edits will be discarded. Undo will start fresh.`)){projectMessage('Open cancelled; current project retained.');return;}
+ await projectHeld(()=>{
+  new Uint8Array(x.memory.buffer,x.emu_project_ptr(),wire.length).set(wire);
+  const result=x.emu_project_import(wire.length);if(result)throw Error(projectErrors[result]||`Project import refused (${result}).`);
+ });
+ rememberProject("imported");
+ clearCapturedTabRecovery();
+ // The project owner has validated the header and the catalogue migration.
+ openedPublic211=kind==='project'&&new DataView(wire.buffer,wire.byteOffset,wire.byteLength).getUint32(20,true)===0xa594ccd5;
+ const keepOriginal=openedPublic211?' Save a separate copy for Conductor and keep the original for 2.1.1.':'';
+ projectMessage(`Opened ${kind} “${file.name}”. Arrangement and sounds restored. Playback stopped and Undo starts fresh.${keepOriginal}`);
+}));
+
+const projectState=document.getElementById('project-state');
+setInterval(()=>{
+ if(!x)return;
+ const unavailable = projectFileBusy ? '' : projectUnavailable();
+ if(!projectFilesReady && !unavailable){
+  projectFilesReady=true;
+  projectDownload.disabled=projectOpen.disabled=false;
+ }
+ const message = unavailable || projectStatus();
+ if (projectState.textContent !== message) projectState.textContent = message;
+},120);
+
+
+/* BEGIN TAB RECOVERY */
+const recoveryPanel = document.getElementById("project-recovery");
+const recoverButton = document.getElementById("project-recover");
+const discardRecovery = document.getElementById("project-recovery-discard");
+const recoveryKey = "bb1-tab-recovery-v1:" + location.pathname;
+let tabRecovery, recoveryAvailable = true, recoveryStamp = "";
+let recoveryIdleUntil = 0, recoverySnapshot = null;
+try { tabRecovery = sessionStorage.getItem(recoveryKey); }
+catch { recoveryAvailable = false; }
+recoveryPanel.hidden = tabRecovery == null;
+
+function projectNeedsFile() {
+  return !!projectCheckpoint && (projectCheckpoint.kind === "recovered" || projectChanged());
+}
+window.addEventListener("beforeunload", event => {
+  if (!projectNeedsFile()) return;
+  event.preventDefault();
+  event.returnValue = true;
+});
+
+function clearTabRecovery() {
+  sessionStorage.removeItem(recoveryKey);
+  tabRecovery = null;
+  recoveryStamp = "";
+  recoveryPanel.hidden = true;
+}
+
+function clearCapturedTabRecovery() {
+  // A copy offered at startup may belong to a different unsaved project.
+  if (!recoveryStamp) return;
+  try { clearTabRecovery(); }
+  catch { recoveryAvailable = false; }
+}
+
+for (const event of ["pointerdown", "keydown", "wheel", "click"])
+  document.addEventListener(event, () => {
+    recoveryIdleUntil = performance.now() + 2000;
+    // Release the automatic audio hold before this gesture reaches the panel.
+    recoverySnapshot?.abort();
+  }, {capture:true, passive:true});
+
+async function keepTabRecovery() {
+  if (!projectFilesReady || projectFileBusy || recoverySnapshot || !recoveryAvailable || tabRecovery != null) return;
+  if (!projectNeedsFile()) {
+    clearCapturedTabRecovery();
+    return;
+  }
+  if (document.hidden || !document.hasFocus() || performance.now() < recoveryIdleUntil || projectUnavailable() ||
+      pendingTurns.some(Boolean) || keyHolds.some(holds => holds.size) || buttonHolds.some(holds => holds.size)) return;
+  const stamp = projectStamp().join("/");
+  if (stamp === recoveryStamp) return;
+  recoverySnapshot = new AbortController();
+  let snapshot;
+  try {
+    snapshot = await projectHeld(() => {
+      if (document.hidden || performance.now() < recoveryIdleUntil) return null;
+      const n = x.emu_project_export();
+      if (!n) return null;
+      const bytes = new Uint8Array(x.memory.buffer, x.emu_project_ptr(), n);
+      return {text:btoa(String.fromCharCode(...bytes)), stamp:projectStamp().join("/")};
+    }, recoverySnapshot.signal);
+  } catch {
+    // A later idle window may be able to take the owner safely.
+    return;
+  } finally {
+    recoverySnapshot = null;
+  }
+  if (!snapshot) return;
+  try {
+    sessionStorage.setItem(recoveryKey, snapshot.text);
+    recoveryStamp = snapshot.stamp;
+  } catch { recoveryAvailable = false; }
+}
+setInterval(keepTabRecovery, 1000);
+
+recoverButton.addEventListener("click", () => projectJob(async () => {
+  if (tabRecovery == null) return;
+  const unavailable = projectUnavailable();
+  if (unavailable) return projectMessage(unavailable);
+  const limit = x.emu_project_capacity();
+  let wire;
+  try {
+    if (tabRecovery.length > Math.ceil(limit / 3) * 4) throw Error();
+    wire = Uint8Array.from(atob(tabRecovery), c => c.charCodeAt(0));
+    if (wire.length < 64 || wire.length > limit) throw Error();
+  } catch { return projectMessage("This tab recovery copy is unreadable. Current project unchanged."); }
+  if (projectNeedsFile() && !window.confirm("Recover the tab copy and replace the current RAM project?")) return;
+  await projectHeld(() => {
+    new Uint8Array(x.memory.buffer, x.emu_project_ptr(), wire.length).set(wire);
+    const result = x.emu_project_import(wire.length);
+    if (result) throw Error(projectErrors[result] || `Recovery refused (${result}).`);
+  });
+  rememberProject("recovered");
+  openedPublic211 = false;
+  // Keep this copy through another reload until a newer one replaces it.
+  tabRecovery = null;
+  recoveryStamp = projectStamp().join("/");
+  recoveryPanel.hidden = true;
+  projectMessage("Tab edits recovered. Save a project file to keep them.");
+}));
+
+discardRecovery.addEventListener("click", () => {
+  if (projectFileBusy || tabRecovery == null || !window.confirm("Discard this tab's recovery copy?")) return;
+  try { clearTabRecovery(); }
+  catch { projectMessage("The browser could not remove this tab's recovery copy."); }
+});
+/* END TAB RECOVERY */
+
+</script>
+<p class="notes"><a href="/fm1/emulator/">Earlier BB-1 1.5 player and its review form</a></p>
