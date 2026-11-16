@@ -1,154 +1,149 @@
 # Compás — BB1 2.4 Feature Applicability Guide
 
 **16 November 2026 · Claude (review)**
-**For the Compás design thread**
+**Revised after Codex review b6f120a — fixes all six findings**
 
 ---
 
 ## Summary
 
-Three BB1 2.4 features reviewed for Compás applicability. One applies directly, one applies with adaptation, one doesn't apply.
+Three BB1 2.4 features reviewed for Compás applicability. One applies with careful adaptation, one applies as shared code after fixes, one doesn't apply.
 
 ---
 
 ## 1. Conditional Steps — DOES NOT APPLY (already solved differently)
 
-**BB1's approach:** Per-event condition bits (FILL, FIRST, EVERY_2, EVERY_4, NOT_FILL) stored in a sidecar bitfield on the `bb_phrase` event list. Each drum hit carries its own condition.
+**BB1's approach:** Per-event condition bits (FILL, FIRST, EVERY_2, EVERY_4, NOT_FILL) stored in a 3-bit sidecar on the `bb_phrase` event list, behind `BB_WITH_STEP_CONDITIONS`.
 
-**Why it doesn't fit Compás:** Compás uses a `Study` / `Part` architecture where fills are already a first-class separate array:
+**Why it doesn't fit Compás:** Compás uses a `Study` / `Part` architecture with six roles (Low, Skin, Hand, Shake, Scrape, Lead — not generic bass/percussion/piano/guide). Each role has three separate 32-step arrays:
 
 ```c
 typedef struct {
     uint8_t sound;
-    uint8_t base[32];   /* normal pattern */
-    uint8_t lift[32];   /* variation       */
-    uint8_t fill[32];   /* fill pattern    */
+    uint8_t base[32];   /* normal pattern  */
+    uint8_t lift[32];   /* variation        */
+    uint8_t fill[32];   /* fill pattern     */
 } Part;
 ```
 
-Each of the six roles (bass, percussion, piano, guide, etc.) has its own base, lift and fill patterns as separate 32-step arrays. The `CP_FILL` command (`s.fill` flag) already switches between base/lift and fill playback. This is architecturally equivalent to BB1's FILL/NOT_FILL conditions but designed differently — the fill isn't per-step metadata, it's a whole alternative pattern per role.
+This is not equivalent to BB1's per-event FIRST/EVERY_2/EVERY_4 conditions — those control per-hit per-loop variation, while Compás switches between whole alternative arrays. Base/lift/fill provides section-level variation; BB1 conditions provide hit-level variation within a single pattern. The difference matters and they should not be described as "already implemented" versions of each other.
 
-**What Compás could adopt instead:**
+Adding FIRST/EVERY_2/EVERY_4 to Compás would require per-step condition bits on 32-step arrays for 6 roles. At 3 bits per step × 32 steps = 12 bytes per role × 6 roles = 72 bytes per Study. With `intro[]` arrays (32 B × 6 roles = 192 B per Study before alignment). These are not trivial additions to `score.inc` compiled data.
 
-The FIRST and EVERY_2/EVERY_4 concepts — intro variation and loop-to-loop alternation — could work in Compás as **study-level modifiers** rather than per-step conditions:
-
-```c
-/* Proposed addition to the Study struct: */
-typedef struct {
-    uint8_t steps, bpm, break_mask;
-    uint8_t intro_mask;     /* NEW: roles that play differently on first pass */
-    uint8_t alt_mask;       /* NEW: roles that alternate every other pass    */
-    Part part[CP_ROLES];
-    uint8_t intro[CP_ROLES][32];  /* NEW: first-pass pattern per role */
-} Study;
-```
-
-But this doubles the Study size and the library data (`score.inc`). **Recommendation: defer.** Compás's existing base/lift/fill already gives musical variation. Adding FIRST/ALT is a Compás V2 conversation.
+**Recommendation: defer.** Compás's existing variation system serves its musical needs. Per-hit conditions are a Compás V2 conversation after measuring the score-data and RAM impact.
 
 ---
 
-## 2. Quantised Fills — APPLIES WITH ADAPTATION
+## 2. Quantised Fills — NEEDS CAREFUL SPECIFICATION
 
-**BB1's approach:** Fill trigger quantises to the next beat or half-beat boundary before activating.
+**BB1's approach:** Fill trigger quantises to the next beat or half-beat boundary.
 
-**Current Compás behaviour:** `CP_FILL` toggles `s.fill` immediately. The pattern switches at the next step, not the next beat.
+**Current Compás behaviour (actual, from engine.c):** `CP_FILL` does NOT toggle immediately as the previous guide stated. The real implementation:
 
-**What to change:**
+1. `cp_command(CP_FILL, 1, 0)` rejects stopped/count-in/busy states
+2. It arms `s.fill = 1` and records `s.fill_phrase`
+3. `cp_render` activates the fill pattern at `pos == study.steps - 4` (four steps before the phrase wraps)
+4. The fill clears on the next phrase wrap
+5. Late requests that arrive during the final four steps target the following phrase
 
-```c
-/* In engine.c, cp_command CP_FILL handler: */
-/* BEFORE (current): */
-case CP_FILL: s.fill = (uint8_t)a; return CP_OK;
+**This is already quantised** — to the final beat of the current phrase, not to the next arbitrary beat. It has specific phrase-boundary, ARP, and part-cue semantics.
 
-/* AFTER (quantised): */
-case CP_FILL:
-    if (a) {
-        /* Arm the fill; activate at the next downbeat */
-        s.fill_armed = 1;
-    } else {
-        s.fill = 0;
-        s.fill_armed = 0;
-    }
-    return CP_OK;
-```
+**What the previous guide got wrong:**
+- Quoted a one-line `s.fill = (uint8_t)a; return CP_OK;` handler that does not exist
+- Proposed adding a `fill_armed` flag when arming already exists
+- Claimed ~20 B code cost without measurement
+- Did not account for REBAJADA, 727/Kumbia overlay, MIDI/Sideman, or cue-boundary interactions
 
-Then in the render loop, when the sequencer advances to a beat boundary:
+**Revised recommendation:** The existing fill timing may already be correct for Compás's musical needs. If a different quantisation point is desired (e.g. next beat rather than final beat), the change must:
 
-```c
-/* In the step-advance section of cp_render: */
-if (s.fill_armed && (s.pos % beats_per_bar == 0)) {
-    s.fill = 1;
-    s.fill_armed = 0;
-}
-```
+1. Preserve the stopped/count-in/busy rejection
+2. Preserve the ARP and part-cue interaction
+3. Define behaviour for requests that arrive at boundary (within 1 step)
+4. Test with REBAJADA speed, 727 overlay, MIDI clock, and Sideman observation
+5. Measure actual code and RAM cost on pi32v2 under the 2.901 ms deadline
 
-Where `beats_per_bar` depends on the study's step count (typically 4 beats for a 16-step or 32-step pattern).
-
-**Cost:** One new `uint8_t fill_armed` field in the engine state. ~20 bytes of code. No RAM increase beyond the flag.
-
-**Musical justification:** Latin music fill transitions are often on the clave — quantising to the beat aligns with how a live percussionist would enter a fill. The fill should land on a strong beat (1 or 3 in a 4/4 bar, or on the first beat of a clave cycle).
-
-**Recommendation: include in Compás 1.3.** Low cost, immediate musical improvement.
+**Priority: investigate, not implement blindly.** The existing fill timing may be the right design.
 
 ---
 
-## 3. Vinyl Brake — APPLIES DIRECTLY
+## 3. Vinyl Brake — APPLIES AFTER FIXES (shared code)
 
-**BB1's approach:** `bb_vinyl_brake.h/c` — a tempo-modulation gesture with configurable deceleration curve, snap-back on release, and stop-at-zero option.
+**What it is:** A tempo-deceleration performance gesture. Press-and-hold decelerates the master clock; release snaps back.
 
-**How it maps to Compás:** Compás stores its BPM in `s.p.bpm` and sets the step threshold via `s.threshold = s.sr * 60`. The brake would operate identically:
+**Fixes applied to `bb_vinyl_brake.h/c` after review:**
+
+1. **Removed `bb_core.h` dependency.** The module now includes only `<stdint.h>` and `<string.h>`. No platform headers. Standalone compile confirmed.
+
+2. **Switched from milliseconds to microseconds.** At 128 frames / 44.1 kHz, a block is 2902 µs — truncating to 2 ms integer would stretch an 800 ms gesture to ~1.16 s. Microsecond timing preserves fractional block duration.
+
+3. **Fixed return-ramp interpolation.** The release-start BPM is frozen in a dedicated `release_bpm` field. The return ramp interpolates `release_bpm → original_bpm` using total elapsed time — deterministic regardless of block size or callback partition.
+
+4. **Added `bb_vinyl_brake_cancel()`.** On transport STOP, song cue change, or external event, the brake cancels immediately with no ramp. The caller restores `original_bpm` to the clock.
+
+5. **Fixed `stop_at_zero` — now has distinct behaviour.** When `stop_at_zero = 1`, the brake holds at zero until release (then ramps back). When `stop_at_zero = 0`, the brake auto-returns from zero without waiting for release.
+
+6. **Struct size: measure with `sizeof`, not assume.** Previous guide claimed 12 B; Codex measured 14 B on host. The actual size is platform-dependent (pi32v2 alignment may differ from x86). The header now documents this explicitly.
+
+**Integration model for Compás (corrected):**
+
+The previous guide proposed directly writing to `s.p.bpm` and `s.threshold` from panel.c. This is wrong:
+
+- `engine.c`'s `s` is static/private — panel.c cannot access it
+- `CP_BPM` accepts only 60..180 — the brake returns values below that range
+- `s.threshold = s.sr * 60` is constant, not BPM-dependent — it was misidentified
+
+The correct integration is a **transient transport-rate overlay** owned by the audio path:
 
 ```c
-/* In board/panel.c or the control path: */
-#include "bb_vinyl_brake.h"
-
-static bb_vinyl_brake brake;
-
-/* On designated pad press: */
+/* In board/panel.c — the pad gesture: */
 void cp_brake_press(void) {
-    bb_vinyl_brake_engage(&brake, s.p.bpm);
+    unsigned bpm = cp_status(CP_TEMPO);
+    bb_vinyl_brake_engage(&brake, bpm);
 }
-
-/* On pad release: */
 void cp_brake_release(void) {
     bb_vinyl_brake_release(&brake);
 }
 
-/* Per audio block (in the main render call): */
-if (bb_vinyl_brake_active(&brake)) {
-    unsigned new_bpm = bb_vinyl_brake_tick(&brake, block_ms);
-    if (new_bpm != s.p.bpm) {
-        s.p.bpm = (uint8_t)new_bpm;
-        s.threshold = s.sr * 60;  /* recalc step threshold */
-    }
-}
+/* In the audio owner's block callback (NOT panel.c):
+ * The brake returns a transient speed that bypasses cp_command(CP_BPM)
+ * validation. The audio owner applies it directly to its phase
+ * accumulator, NOT to the saved s.p.bpm. The saved tempo is restored
+ * on cancel/completion. */
 ```
 
-**The vinyl brake code (`bb_vinyl_brake.h` / `bb_vinyl_brake.c`) is shared — it has no BB1 dependencies.** It operates on unsigned BPM values and millisecond ticks. Compás can include it directly.
+The exact audio-owner integration requires deciding:
+- How the phase accumulator responds to sub-60 BPM speeds
+- Whether held notes and effect tails continue at the slowed rate or at saved tempo
+- USB MIDI clock behaviour during the brake
+- Sideman observation during the brake
+- Interaction with STOP, song cue, and count-in
 
-**Musical justification:** The vinyl brake is a dramatic performance gesture that works in any tempo-based music. In cumbia and salsa, the "freno" (brake) is a known live performance move — the band decelerates to a dramatic stop before a section change. The gesture maps naturally.
+**Cost: measure on target after integration.** The module is ~120 lines of integer arithmetic. Flash, RAM, stack and IRQ cost must be measured against the 2.901 ms deadline at 128/44100, with maximum FX/Kumbia/dense grooves plus UI/MIDI load. The header makes no performance claim.
 
-**Cost:** ~400 bytes of code, 12 bytes of RAM (the `bb_vinyl_brake` struct). The deceleration curve is integer-only arithmetic, well within Compás's tighter 2.901 ms audio deadline.
+**Musical context:** In cumbia and salsa performance, the "freno" (brake) is a known live move — the band decelerates to a dramatic stop before a section change. This module provides the tempo curve; the audio design for record-stop sound (pitch-down, deceleration of running audio) is a separate requirement that this module does not address. The brake changes event tempo only, not rendered audio speed or pitch.
 
-**Recommendation: include in Compás 1.3.** Drop `bb_vinyl_brake.h` and `bb_vinyl_brake.c` into the Compás build, wire to a pad gesture.
+**Recommendation: prototype on a development candidate.** Wire the brake to a pad gesture and measure. Do not ship without the audio-owner integration contract settled and tested under dense load.
 
 ---
 
-## 4. Live Stutter — DOES NOT APPLY DIRECTLY
+## 4. Live Stutter — DOES NOT APPLY (defer to V2)
 
-**BB1's approach:** Freeze the current step and retrigger at a selectable rate (1/4 through 1/32).
+The stutter sketch from the BB1 2.4 design is a design outline, not a working retrigger path. It increments a step counter per step callback and cannot generate repeats faster than the step rate. A proper stutter needs:
 
-**Why it's tricky for Compás:** Compás renders six voices per step, each with its own synthesis model (not sample playback). "Retriggering a step" means re-synthesising all six roles at the captured step, which is heavier than BB1's sample re-trigger. The 2.901 ms deadline at 128-frame IRQ is tighter.
+- A sample/clock subdivision scheduler (sub-step timing)
+- Defined behaviour for phrase phase, live notes, accent/slide, release and cues
+- External clock interaction
+- Measured retrigger cost (voice re-initialisation is not free)
 
-**Recommendation: defer to Compás V2.** The vinyl brake covers the "dramatic live gesture" need for now. Stutter would need careful profiling against the tighter deadline.
+At Compás's 2.901 ms deadline with six synthesised voices, the retrigger cost must be profiled before committing. Deferring to V2.
 
 ---
 
 ## Adoption summary
 
-| Feature | Compás | Priority | Cost |
-|---------|--------|----------|------|
-| Conditional steps | No (already has base/lift/fill) | — | — |
-| Quantised fills | Yes, adapt `CP_FILL` | 1.3 | ~20 B code, 1 B RAM |
-| Vinyl brake | Yes, shared code | 1.3 | ~400 B code, 12 B RAM |
-| Live stutter | Defer to V2 | — | Needs profiling |
+| Feature | Compás | Status | Next step |
+|---------|--------|--------|-----------|
+| Conditional steps | No (different architecture) | Defer V2 | Measure score-data impact |
+| Quantised fills | Investigate | Existing timing may be correct | Compare with desired musical behaviour |
+| Vinyl brake | Yes (shared code, fixed) | Prototype | Wire, measure, settle audio-owner contract |
+| Live stutter | No | Defer V2 | Needs subdivision scheduler + profiling |
