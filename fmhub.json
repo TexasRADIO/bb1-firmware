@@ -1,6 +1,6 @@
 {
-  "what": "Two independent drum layers, sampled machines, a synthesised 808 and Dillo acid bass, with the BB1 2.3 effects chain, per-song FX recall, retrospective capture, Screen companion and Sideman USB transmission.",
-  "author": "Big Beat Studio / TexasRADIO",
+  "what": "Two drum machines, sampled classics, a synthesised 808 and Dillo acid bass—our armadillo with the low end. Capture what just happened, recall song FX, edit live and send the mix over USB.",
+  "author": "Big Beat Studio",
   "kinds": [
     "groove",
     "drums",
@@ -8,7 +8,7 @@
   ],
   "play": "https://thebigbeat.app/fm1/emulator/",
   "cheat": "https://thebigbeat.app/fm1/guide/",
-  "image": "docs/media/bb1-studio-240.png",
+  "image": "docs/media/bb1-hub-card.jpg",
   "color": "#F59E0B",
   "sounds": "licensed: Big Beat Studio sample library under project-owner redistribution authorisation; Acid-Tabs phrases by J. McConaghy, CC BY-SA 4.0"
 }
