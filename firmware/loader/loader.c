@@ -4,7 +4,8 @@
  * an update record, with interrupts off: USB is polled from the main loop.
  * It is a USB-MIDI device "Felucca Update" (1209:0002) that answers the
  * M-UPGRADE update protocol as "ota-FM-1_900" (hosts look for "ota-"), and
- * writes the app area only (ldr_core.c). The UBOOT soft key works here too.
+ * writes the app area and BB1's matching sound library (ldr_core.c). The UBOOT
+ * soft key works here too.
  * Single compilation unit. */
 #include <stdint.h>
 #define FELUCCA_LOADER 1
@@ -16,9 +17,12 @@
 #define RING_PUBLISH() __asm__ volatile("" ::: "memory")
 #include "fm1_time.h"
 #include "fm1_sys.h"
-/* the loader may write the app area and erase update records; never the head, nor Felucca's store
- * [0x97000, 0xE0000) (user data, never a record: ldr_core.c) */
-#define FL_RANGE_OK(off, n) (FL_IN(off, n, 0x4000u, 0x97000u) || FL_IN(off, n, 0xE0000u, 0xFC000u))
+/* The loader may write the app area, BB1's exact library window and erase
+ * update records. It never writes the flash head or any other user/calibration
+ * area. */
+#define FL_RANGE_OK(off, n) (FL_IN(off, n, 0x4000u, 0x97000u) || \
+                             FL_IN(off, n, 0xA0000u, 0xDC000u) || \
+                             FL_IN(off, n, 0xE0000u, 0xFC000u))
 #include "fm1_flash.h"
 #include "../src/libc.c"
 #include "../src/usb.c"

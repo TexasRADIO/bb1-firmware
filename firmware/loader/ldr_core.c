@@ -11,11 +11,12 @@
  *      (taken from isd_config.ini in the device's own flash head), so a
  *      package for another key is refused before anything is erased;
  *   2b. reads the whole flash.bin once and checks it against the CRC16 of its
- *      UFW entry (the vendor tools' check), keeping each app sector's CRC16:
+ *      UFW entry (the vendor tools' check), keeping each sector's CRC16:
  *      a damaged or truncated package is refused before anything is erased;
- *   3. writes ONLY the app area [0x4000, 0x93000), sector by sector, skipping
- *      sectors that are already equal, and verifies each one; a sector that
- *      comes in different from the checked pass is read again, never written;
+ *   3. writes ONLY the app area [0x4000, 0x93000) and BB1's matching sound
+ *      library [0xA0000, 0xDC000), sector by sector, skipping sectors that are
+ *      already equal and verifying each one; a sector that comes in different
+ *      from the checked pass is read again, never written;
  *      the flash head (SPL, isd_config) is never written;
  *   4. asks 0xF0000000 ("success"), then invalidates the update record (RAM
  *      and flash: 4K boundary - 256 between 0x93000 and 0xFC000, outside
@@ -34,12 +35,14 @@
 
 #define LDR_APP_LO 0x4000u
 #define LDR_APP_HI 0x93000u
+#define LDR_SOUND_LO 0xA0000u
+#define LDR_SOUND_HI 0xDC000u
 #define LDR_REC_LO 0x93000u                     /* update records live above the app ... */
 #define LDR_REC_HI 0xFC000u                     /* ... and below Felucca's globals (Felucca's records: 0xE4F00, */
 #define LDR_DATA_LO 0x97000u                    /* the stock firmware's: 0xE8F00), never in Felucca's store, whose */
 #define LDR_DATA_HI 0xE0000u                    /* bytes (user samples) the host writes */
-#define LDR_NSEC ((LDR_APP_HI - LDR_APP_LO) >> 12)
 #define LDR_FL_MAX 0x100000u                    /* flash.bin: at most the 1 MiB part */
+#define LDR_NSEC (LDR_FL_MAX >> 12)
 
 static uint32_t ldr_flash_id(void);
 static int ldr_fread(uint32_t off, void *p, uint32_t n);
@@ -102,50 +105,26 @@ static int ldr_check(uint32_t fl_off, uint32_t fl_size, uint32_t want, uint16_t 
         if (ota_read(fl_off + i, b, n))
             return -7;
         crc = ota_crc16(b, n, crc);
-        if (i >= LDR_APP_LO && i < LDR_APP_HI) {     /* (512-byte reads from 0: never across a sector) */
-            uint32_t k = (i - LDR_APP_LO) >> 12;
-            sc[k] = (uint16_t)ota_crc16(b, n, (i & 0xFFFu) ? sc[k] : 0u);
-        }
+        /* 512-byte reads from zero never cross a sector boundary. Keep the
+         * checked CRC for every sector so both write ranges use the same
+         * read-again-before-write rule. */
+        sc[i >> 12] = (uint16_t)ota_crc16(b, n, (i & 0xFFFu) ? sc[i >> 12] : 0u);
     }
     return crc == want ? 0 : -12;
 }
 
-static int ldr_session(void)
+static int ldr_write_range(uint32_t fl_off, uint32_t lo, uint32_t hi,
+                           const uint16_t *sc, uint8_t *sec, uint8_t *cur,
+                           uint32_t *done, uint32_t total)
 {
-    static uint8_t hdr[0x400], sec[0x1000], cur[0x1000];
-    static uint16_t sc[LDR_NSEC];
-    uint32_t i, k, fl_off, fl_size, ota_off, ota_len, key, s, want = ~0u, done = 0;   /* (no CRC16: no flash.bin entry) */
-    int rc;
-    uint32_t flash_id = ldr_flash_id();
-    if (!FL_JEDEC_OK(flash_id))
-        return -15;
-    /* 1. UFW header + entry list (ota.c; it leaves the entries decoded in hdr) */
-    if ((rc = ota_ufw(hdr, &fl_off, &fl_size, &ota_off, &ota_len)) != 0)
-        return rc;
-    if (!fl_off || fl_size < LDR_APP_HI || fl_size > LDR_FL_MAX)
-        return -3;
-    for (i = 0; i < ota_rd16(hdr + 8); i++)
-        if (ota_rd16(hdr + 0x40 + i * 0x50u) == 0)
-            want = ota_rd16(hdr + 0x40 + i * 0x50u + 4u);   /* flash.bin's data CRC16 */
-    /* 2. the package's app area must decrypt with this chip's key */
-    if ((rc = ldr_chip_key(&key)) != 0)
-        return -40 + rc;
-    if (ota_read(fl_off + LDR_APP_LO, sec, 32))
-        return -5;
-    ldr_sfc(sec, 32, 0, key);
-    if (ota_crc16(sec + 2, 30, 0) != ota_rd16(sec))
-        return -6;                                       /* package for another chip key */
-    /* 2b. the whole package first: nothing is erased for a damaged one */
-    if ((rc = ldr_check(fl_off, fl_size, want, sc, sec)) != 0)
-        return rc;
-    /* 3. app area, sector by sector */
-    for (s = LDR_APP_LO; s < LDR_APP_HI; s += 0x1000u) {
+    uint32_t s, k;
+    for (s = lo; s < hi; s += 0x1000u) {
         uint32_t again;
-        for (again = 0;; again++) {                      /* as checked in 2b, else read it again */
+        for (again = 0;; again++) {
             for (k = 0; k < 0x1000u; k += 512u)
                 if (ota_read(fl_off + s + k, sec + k, 512))
                     return -7;
-            if (ota_crc16(sec, 0x1000u, 0) == sc[(s - LDR_APP_LO) >> 12])
+            if (ota_crc16(sec, 0x1000u, 0) == sc[s >> 12])
                 break;
             if (again == 2u)
                 return -13;
@@ -166,11 +145,47 @@ static int ldr_session(void)
                     break;
             }
             if (tries == 2u)
-                return -11;                              /* verify failed twice */
+                return -11;
         }
-        done += 0x1000u;
-        ldr_progress(done, LDR_APP_HI - LDR_APP_LO);
+        *done += 0x1000u;
+        ldr_progress(*done, total);
     }
+    return 0;
+}
+
+static int ldr_session(void)
+{
+    static uint8_t hdr[0x400], sec[0x1000], cur[0x1000];
+    static uint16_t sc[LDR_NSEC];
+    uint32_t i, fl_off, fl_size, ota_off, ota_len, key, s, want = ~0u, done = 0;   /* (no CRC16: no flash.bin entry) */
+    const uint32_t write_total = (LDR_APP_HI - LDR_APP_LO) + (LDR_SOUND_HI - LDR_SOUND_LO);
+    int rc;
+    uint32_t flash_id = ldr_flash_id();
+    if (!FL_JEDEC_OK(flash_id))
+        return -15;
+    /* 1. UFW header + entry list (ota.c; it leaves the entries decoded in hdr) */
+    if ((rc = ota_ufw(hdr, &fl_off, &fl_size, &ota_off, &ota_len)) != 0)
+        return rc;
+    if (!fl_off || fl_size < LDR_SOUND_HI || fl_size > LDR_FL_MAX)
+        return -3;
+    for (i = 0; i < ota_rd16(hdr + 8); i++)
+        if (ota_rd16(hdr + 0x40 + i * 0x50u) == 0)
+            want = ota_rd16(hdr + 0x40 + i * 0x50u + 4u);   /* flash.bin's data CRC16 */
+    /* 2. the package's app area must decrypt with this chip's key */
+    if ((rc = ldr_chip_key(&key)) != 0)
+        return -40 + rc;
+    if (ota_read(fl_off + LDR_APP_LO, sec, 32))
+        return -5;
+    ldr_sfc(sec, 32, 0, key);
+    if (ota_crc16(sec + 2, 30, 0) != ota_rd16(sec))
+        return -6;                                       /* package for another chip key */
+    /* 2b. the whole package first: nothing is erased for a damaged one */
+    if ((rc = ldr_check(fl_off, fl_size, want, sc, sec)) != 0)
+        return rc;
+    /* 3. application and the exact matching BB1 sound-library window. */
+    if ((rc = ldr_write_range(fl_off, LDR_APP_LO, LDR_APP_HI, sc, sec, cur, &done, write_total)) != 0 ||
+        (rc = ldr_write_range(fl_off, LDR_SOUND_LO, LDR_SOUND_HI, sc, sec, cur, &done, write_total)) != 0)
+        return rc;
     /* 4. finish: the host confirms, the record goes, the SPL boots the app */
     for (i = 0; i < 4u; i++)
         if (!ota_read(0xF0000000u, sec, 8))

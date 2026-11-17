@@ -2,13 +2,13 @@
   "schema": "bb1-release-build-pins/v1",
   "version": "2.3",
   "product": "FM-1_92200203",
-  "release_flavour": "shared-editor",
-  "source_tree_sha256": "9461f36a3fcb5add3148e9f9ca0148a1455d58a00f231a20c3d0348c50172ec2",
+  "release_flavour": "shared-editor-native-hub",
+  "source_tree_sha256": "fd1dce01cc8966293b657c76c37b0173fd8b32e30ec094085e120020b3641c3c",
   "recipe": "composition-21",
   "expected_app_bytes": 576876,
   "expected_app_sha256": "7f956afca2e77b918721896ea3ceed51a386a965ef5eed4a360d8d71fdeaa9de",
-  "expected_package_bytes": 610157,
-  "expected_package_sha256": "7b52044b8cf381f529d95eb4f98aa313a50052a10d9868723b94b4fdc854f9b6",
+  "expected_package_bytes": 1056701,
+  "expected_package_sha256": "a272334fd67c16a825f30bb68684ed4dce95dcf571b9607d0530736b1561d23e",
   "sound_library": {
     "name": "bb1-sounds-2.3.bin",
     "bytes": 245760,
@@ -21,5 +21,18 @@
     "BB_WITH_DILLO_KICK": "1",
     "FELUCCA_ID": "FM-1_92200203"
   },
-  "native_rebuild_repeated_for_this_archive": false
+  "native_rebuild_repeated_for_this_archive": false,
+  "hardware_verified": true,
+  "hardware_identity": "FM-1_92200203",
+  "hardware_library_header_verified": true,
+  "write_ranges": [
+    [
+      "0x4000",
+      "0x93000"
+    ],
+    [
+      "0xA0000",
+      "0xDC000"
+    ]
+  ]
 }

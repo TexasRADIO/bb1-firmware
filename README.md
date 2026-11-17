@@ -1,9 +1,22 @@
-# BB1 2.3 shared-editor firmware
+# Big Beat Studio BB1 2.3 native Firmware Hub release
 
-[Download the editor release](https://github.com/TexasRADIO/bb1-firmware/releases/tag/v2.3-editor.1) · [Play in your browser](https://thebigbeat.app/fm1/emulator/) · [Player’s guide](https://thebigbeat.app/fm1/guide/)
+[Download v2.3-editor.2](https://github.com/TexasRADIO/bb1-firmware/releases/tag/v2.3-editor.2) · [Play in your browser](https://thebigbeat.app/fm1/emulator/) · [Player’s guide](https://thebigbeat.app/fm1/guide/)
 
 
-The editor release retains BB1 firmware version 2.3. Its release tag is `v2.3-editor.1`.
+The release retains BB1 firmware version 2.3 and the shared-editor protocol.
+Its release tag is `v2.3-editor.2`.
+
+The `.fwsc` is now a self-contained Firmware Hub package. One native Hub
+install writes the unchanged 2.3 application and its exact matching 240 KiB
+sound library. The loader writes only the application range
+`0x4000..0x93000` and the library range `0xA0000..0xDC000`; it does not write
+the flash head, bootloader or other storage regions.
+
+The package was verified on a physical M-VAVE FM-1. The unit booted as
+`FM-1_92200203`, reported a known flash device and clean runtime status, and
+the installed `BBSK` library header matched the released library. The test
+unit was then restored to its prior firmware using its verified return
+package.
 
 Corresponding source for the BB1 2.3 shared-editor package identified in
 `RELEASE-BUILD-PINS.json`. This is the retained native-build source snapshot;
@@ -26,7 +39,10 @@ uses the retained per-unit compiler commands, size pass and link order, writes
 The existing target and package hashes were verified from retained build
 outputs; an independent source rebuild was not repeated while preparing this
 archive. `tools/fm1pkg_make.py` packages an application with its matching RAM
-loader and product identity. The released package includes its matching loader.
+loader and product identity. The released package includes its matching
+full-install loader. The package and loader can be independently checked with
+`tools/verify_hub_install.py` and
+`big-beat/integration/tests/test_hub_loader.c`.
 
 The shared editor exposes the current firmware's bounded working-state
 surface. Editor state files are distinct from full device projects. Native
