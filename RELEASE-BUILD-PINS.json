@@ -1,0 +1,31 @@
+{
+  "schema": "bb1-release-build-pins/v1",
+  "recipe": "composition-21",
+  "candidate_defines": {
+    "BB_WITH_DILLO_KIT_VIEW": "0",
+    "BB_AUDIO_PROFILE": "0",
+    "BB_WITH_RETRO_TAKE": "1",
+    "BB_WITH_DILLO_KICK": "1",
+    "FELUCCA_ID": "FM-1_92200231"
+  },
+  "sound_library": {
+    "name": "bb1-sounds-2.3.bin",
+    "bytes": 245760,
+    "sha256": "8c2c3edb14bcbf4d91ff8b80ccf172f659c7ea837875d88819b78f8fe8ccfe2a"
+  },
+  "version": "2.3.1",
+  "product": "FM-1_92200231",
+  "release_flavour": "install-health-maintenance",
+  "expected_app_sha256": "8b64b2645ac478e4b23eddee1de02b70c05129af4bbdda660893e2881ab26dc1",
+  "expected_app_bytes": 577180,
+  "expected_package_sha256": "9d37de80f0e92a40d02d9f2ccb1a806c7c7b3db4194b444d4286bd82edf48c41",
+  "expected_package_bytes": 610157,
+  "loader_sha256": "246873886d4ba185945806269fdf02d50ab7d7e8bf041e6f03993231bbd7c38b",
+  "resource_reserves_bytes": {
+    "code": 4384,
+    "ram": 4100,
+    "pool": 104124
+  },
+  "source_commit": "862e69e54a1bfd7d4d18b0a429ae6792d7ccc91b",
+  "native_rebuild_verified": true
+}

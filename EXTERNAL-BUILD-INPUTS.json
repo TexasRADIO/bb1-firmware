@@ -1,0 +1,39 @@
+{
+  "schema": "bb1-external-build-inputs/v1",
+  "docker_image": "sha256:2d0e361d19a6da61a8587d6c2f2c1517d0389fd72d64930cd16980f8662afac3",
+  "docker_platform": "linux/amd64",
+  "network_required": false,
+  "toolchain": {
+    "family": "JieLi PI32v2",
+    "external": true,
+    "executables": {
+      "pi32v2/bin/clang": "c45189ee624de0430deb0db02e6dce171fb5538e7fe323e3964dc8ac6236240f",
+      "pi32v2/bin/ld": "fd61aff15616bb6f6b58fd2e9ede7af741c7bf05facb3e0cb3d3c9817c268fd9",
+      "common/bin/objcopy": "295151226e28891115c97262e6460a06fe67fc0753858e0df3234eb000ea6e66",
+      "common/bin/objdump": "f7e449e2c8001d5ed4493a45d1f5f304c8910418e4074acdc8715079ef64e08a"
+    }
+  },
+  "sdk": {
+    "external": true,
+    "licence": "Apache-2.0",
+    "files_relative_to_sdk": {
+      "cpu/wl82/tools/uboot.boot": "4e3b4c220dc96641cb5a723f41e68ce41d5261ae9434bb33fbd7f2c59976ded4",
+      "cpu/wl82/tools/cfg_tool.bin": "276579954f076886a6a7694f65dc71c034a63a2c204b76749065c0ac7b010d1b",
+      "cpu/wl82/tools/cfg/eq_cfg_hw.bin": "41167491bffed4651750719c973d2758adeb9021a5670d02d6a53c85ed80ea7d"
+    }
+  },
+  "sound_library": {
+    "name": "bb1-sounds-2.3.bin",
+    "bytes": 245760,
+    "sha256": "8c2c3edb14bcbf4d91ff8b80ccf172f659c7ea837875d88819b78f8fe8ccfe2a",
+    "external": true,
+    "licence": "Separate distribution terms; see LICENSING.md."
+  },
+  "packaging": {
+    "product": "FM-1_92200231",
+    "chip_key": "0x980f",
+    "app_sha256": "8b64b2645ac478e4b23eddee1de02b70c05129af4bbdda660893e2881ab26dc1",
+    "ota_sha256": "246873886d4ba185945806269fdf02d50ab7d7e8bf041e6f03993231bbd7c38b",
+    "package_sha256": "9d37de80f0e92a40d02d9f2ccb1a806c7c7b3db4194b444d4286bd82edf48c41"
+  }
+}

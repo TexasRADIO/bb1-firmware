@@ -1,0 +1,8 @@
+[
+  "-target",
+  "pi32v2",
+  "-c",
+  "/work/source/firmware/crt0.S",
+  "-o",
+  "/work/group_target_build-r1/crt0.o"
+]

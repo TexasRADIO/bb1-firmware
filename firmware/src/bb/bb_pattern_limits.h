@@ -1,0 +1,4 @@
+#ifndef BB_PATTERN_LIMITS_H
+#define BB_PATTERN_LIMITS_H
+#define BB_PATTERN_SLOTS 2u
+#endif
