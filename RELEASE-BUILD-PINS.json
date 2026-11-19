@@ -22,7 +22,7 @@
     "FELUCCA_ID": "FM-1_92200203"
   },
   "native_rebuild_repeated_for_this_archive": true,
-  "hardware_verified": true,
+  "hardware_verified": false,
   "hardware_identity": "FM-1_92200203",
   "hardware_library_header_verified": true,
   "write_ranges": [
@@ -39,5 +39,7 @@
   "expected_loader_bytes": 8364,
   "expected_loader_sha256": "72eea6f6d3ff8f085f3f1fffa3827edc01c7d4a2698f4dc555bb23a41f76955b",
   "switching_qualified": false,
-  "stock_v15_transition_verified": false
+  "stock_v15_transition_verified": false,
+  "hardware_install_observed": true,
+  "hardware_basic_panel_sound_verified": false
 }
