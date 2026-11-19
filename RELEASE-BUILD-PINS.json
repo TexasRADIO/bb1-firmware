@@ -3,7 +3,7 @@
   "version": "2.3",
   "product": "FM-1_92200203",
   "release_flavour": "shared-editor-native-hub",
-  "source_tree_sha256": "fd1dce01cc8966293b657c76c37b0173fd8b32e30ec094085e120020b3641c3c",
+  "source_tree_sha256": "f7af7ba5d915ef31f283e8d187e45d1240e140bfae6c5ed429f5a825ff0c0a96",
   "recipe": "composition-21",
   "expected_app_bytes": 576876,
   "expected_app_sha256": "7f956afca2e77b918721896ea3ceed51a386a965ef5eed4a360d8d71fdeaa9de",
@@ -21,7 +21,7 @@
     "BB_WITH_DILLO_KICK": "1",
     "FELUCCA_ID": "FM-1_92200203"
   },
-  "native_rebuild_repeated_for_this_archive": false,
+  "native_rebuild_repeated_for_this_archive": true,
   "hardware_verified": true,
   "hardware_identity": "FM-1_92200203",
   "hardware_library_header_verified": true,
@@ -34,5 +34,10 @@
       "0xA0000",
       "0xDC000"
     ]
-  ]
+  ],
+  "packaging_tag": "v2.3-hub.1",
+  "expected_loader_bytes": 8364,
+  "expected_loader_sha256": "72eea6f6d3ff8f085f3f1fffa3827edc01c7d4a2698f4dc555bb23a41f76955b",
+  "switching_qualified": false,
+  "stock_v15_transition_verified": false
 }

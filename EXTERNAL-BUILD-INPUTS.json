@@ -1,0 +1,24 @@
+{
+  "schema": "bb1-hub-external-inputs/v1",
+  "build_image": "sha256:2d0e361d19a6da61a8587d6c2f2c1517d0389fd72d64930cd16980f8662afac3",
+  "platform": "linux/amd64",
+  "toolchain_release": "jieli-linux-toolchains-20260730.1",
+  "network_required_for_build": false,
+  "toolchain_sha256": {
+    "pi32v2/bin/clang": "c45189ee624de0430deb0db02e6dce171fb5538e7fe323e3964dc8ac6236240f",
+    "pi32v2/bin/ld": "fd61aff15616bb6f6b58fd2e9ede7af741c7bf05facb3e0cb3d3c9817c268fd9",
+    "common/bin/objcopy": "295151226e28891115c97262e6460a06fe67fc0753858e0df3234eb000ea6e66",
+    "common/bin/objdump": "f7e449e2c8001d5ed4493a45d1f5f304c8910418e4074acdc8715079ef64e08a"
+  },
+  "base_package": {
+    "url": "https://github.com/TexasRADIO/bb1-firmware/releases/download/v2.3-editor.1/bb1-2.3-editor.fwsc",
+    "bytes": 610157,
+    "sha256": "7b52044b8cf381f529d95eb4f98aa313a50052a10d9868723b94b4fdc854f9b6"
+  },
+  "sound_library": {
+    "url": "https://github.com/TexasRADIO/bb1-firmware/releases/download/v2.3-editor.1/bb1-sounds-2.3.bin",
+    "bytes": 245760,
+    "sha256": "8c2c3edb14bcbf4d91ff8b80ccf172f659c7ea837875d88819b78f8fe8ccfe2a",
+    "licensing": "See LICENSING.md and BIG-BEAT-LICENSING.md; not relicensed by the source archive."
+  }
+}

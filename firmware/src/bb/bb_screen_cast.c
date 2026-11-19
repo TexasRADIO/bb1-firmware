@@ -9,12 +9,10 @@
 
 #define RAW_CAP BB_CAST_MAX_RAW
 
-/* Change detection is companion bookkeeping, not audio working state.  Keep
- * it in the roomy application pool instead of spending scarce general RAM. */
-static struct {
-    uint8_t raw[RAW_CAP];
-    uint8_t len;
-} bb_cast_history __attribute__((section(".pool")));
+/* Bounded change-detection history. These arrays retain the static storage
+ * layout used by this release. */
+static uint8_t prev_raw[RAW_CAP];
+static uint8_t prev_len;
 
 static inline void p8(uint8_t *b, int *p, uint8_t v) { if (*p < RAW_CAP) b[(*p)++] = v; }
 static inline void p16(uint8_t *b, int *p, uint16_t v) { p8(b, p, (uint8_t)v); p8(b, p, (uint8_t)(v >> 8)); }
@@ -128,8 +126,8 @@ int bb_cast_encode(const void *in_ptr, uint8_t *buf, int maxlen)
     int raw_len = pack_raw(in, raw);
 
     /* Change detection: skip if identical to previous send */
-    if (raw_len == bb_cast_history.len &&
-        memcmp(raw, bb_cast_history.raw, (unsigned)raw_len) == 0)
+    if (raw_len == prev_len &&
+        memcmp(raw, prev_raw, (unsigned)raw_len) == 0)
         return 0;
 
     /* SysEx header: F0 00 22 24 35 02 */
@@ -147,13 +145,13 @@ int bb_cast_encode(const void *in_ptr, uint8_t *buf, int maxlen)
     buf[hdr + enc_len] = 0xF7;
 
     /* Update change detection state */
-    memcpy(bb_cast_history.raw, raw, (unsigned)raw_len);
-    bb_cast_history.len = (uint8_t)raw_len;
+    memcpy(prev_raw, raw, (unsigned)raw_len);
+    prev_len = (uint8_t)raw_len;
 
     return hdr + enc_len + 1;
 }
 
 void bb_cast_reset(void)
 {
-    bb_cast_history.len = 0;
+    prev_len = 0;
 }

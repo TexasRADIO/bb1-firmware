@@ -24,7 +24,7 @@ static struct {
     bb_player_selection prev[3];             /* each moved part's request before the cue (restored if it ends)    */
     uint32_t ticket;                         /* the cue in flight, 0 = none                                       */
     bb_catalogue_id pending_part;            /* section label bound to that ticket */
-    uint8_t welcome, was_running, performed; /* start card; transport edge; a band heard at least once */
+    uint8_t welcome; /* start card; transport edge; a band heard at least once */
     uint8_t take, coll;                      /* take is fixed to all three; collection 0 SONGS 1 ERAS 2 PRESETS     */
     uint8_t moved;                           /* parts carrying the ticket                                         */
     uint8_t key, want;                       /* the cue's section; a newer section waiting for the handoff (+1)    */
@@ -43,7 +43,6 @@ static void bb_cd_reset_playback(void) {
     bb_cd.ticket=bb_cd.pticket=0;
     bb_cd.moved=bb_cd.key=bb_cd.want=bb_cd.cancel=0;
     bb_cd.retried=bb_cd.chose=0;
-    bb_cd.performed=0;
     bb_cd.qset=bb_cd.pset=bb_cd.wset=0;
     bb_cd.chord.active=0;
 }
@@ -169,7 +168,8 @@ static const bb_factory_choice *bb_cd_group_ref(void) {
 /* An empty return has the same PLAY promise as power-on. Keep the
  * current instrument or song in control whenever it owns playback. */
 static void bb_cd_restore_empty_landing(int running) {
-    if(running||bb_cd.performed)return;
+    if(running||bb_nav_p1(BB_P1_SONG_ARMED,0,0)||
+       bb_cd_group_ref()||bb_cd_ref(1)||bb_cd_ref(2))return;
     bb_nav.bank=BB_NAV_HOME_SONGS;
     bb_cd.welcome=1;
 }
@@ -352,16 +352,13 @@ static int bb_cd_play(void) {
 /* Every scan: follow the cue to APPLIED, or put the labels back and say why it ended; resubmit a newer key. */
 static void bb_cd_poll(void) {
     bb_section_status st;
-    uint8_t running=(uint8_t)!!bb_face.requested.running;
-    if(running&&bb_cd.pticket)bb_cd.performed=1;
     if(bb_nav.page!=BB_NAV_STUDIO||bb_nav.bank!=BB_NAV_HOME_SONGS)bb_cd.welcome=0;
     /* BB1 2.3: return to the welcome card when stopped on SONGS.
      * The welcome card is the resting state — the RC mark, the song name,
      * PRESS PLAY. It comes back whenever transport stops on the HOME page. */
     if(bb_nav.page==BB_NAV_STUDIO&&bb_nav.bank==BB_NAV_HOME_SONGS&&
-       bb_cd.was_running&&!running&&!bb_cd.ticket&&bb_cd.list.ready)
+       !bb_face.requested.running&&!bb_cd.ticket&&bb_cd.list.ready)
         bb_cd.welcome=1;
-    bb_cd.was_running=running;
     if(!bb_cd.list.ready&&bb_browser_init(&bb_cd.list,&bb_factory_catalogue)){
         (void)bb_browser_group(&bb_cd.list,BB_BROWSER_SONGS);bb_cd.take=7;
     }

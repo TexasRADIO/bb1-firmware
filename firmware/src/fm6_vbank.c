@@ -196,7 +196,7 @@ static uint32_t fvb_end(const uint8_t *name, uint32_t crc)
             if (st_read(base + FVB_VOICES + k * UPF_PK, d, UPF_PK))
                 return 4;
             upf_pk_get(d, pk);
-            c = bb_crc32_add(c, pk, FM6_PACKED);
+            c = st_crc32_add(c, pk, FM6_PACKED);
         }
     if (~c != crc)
         return 2;
