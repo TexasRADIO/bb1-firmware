@@ -18,6 +18,10 @@ installation, and back up music before switching firmware families.
 - `fmhub.json` and `bb1-hub-card.jpg`: product card and image.
 - Licence files: firmware, component and sound-library terms.
 
+If BB1 starts but USB does not reconnect after installation, restart the unit
+and reconnect it directly to another USB port. Do not begin another transfer
+while an installation is still running.
+
 [Player’s guide](https://thebigbeat.app/fm1/guide/) ·
 [Browser editor](https://thebigbeat.app/editor/) ·
 [Corresponding source](https://github.com/TexasRADIO/bb1-firmware/tree/v2.3-hub.1)
